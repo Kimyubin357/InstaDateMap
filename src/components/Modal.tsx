@@ -3,11 +3,11 @@ import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "
 import Icon from "./Icon";
 import { createPortal } from "react-dom";
 import { sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
-export default function Modal({ title, children, onClose, variant = "resizable", footer }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer, className = "", initialStop = 1 }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; className?: string; initialStop?: SheetStop }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
-  const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(1); const mobile = useRef(false);
+  const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
   const suppressClickUntil = useRef(0);
   const drag = useRef<{ id: number; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
   if (typeof document === "undefined") return null;
-  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""} ${className}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
     {variant === "resizable" && <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onClick={() => { if (Date.now() >= suppressClickUntil.current) snap(stop.current === 2 ? 0 : (stop.current + 1) as SheetStop); }}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>}
