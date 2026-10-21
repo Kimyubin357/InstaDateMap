@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import Icon from "./Icon";
 import { sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
-export default function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
@@ -17,11 +17,11 @@ export default function Modal({ title, children, onClose }: { title: string; chi
       const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
       const top = Math.max(0, Math.min(window.visualViewport?.offsetTop || 0, layoutHeight - visibleHeight));
       setViewport((previous) => mobile.current ? previous?.top === top && previous.height === visibleHeight ? previous : { top, height: visibleHeight } : undefined);
-      setHeight(mobile.current ? stops.current[stop.current] : undefined);
+      setHeight(mobile.current && variant === "resizable" ? stops.current[stop.current] : undefined);
     };
     resize(); window.addEventListener("resize", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
     return () => { window.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
-  }, []);
+  }, [variant]);
   function revealInput() {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !ref.current?.contains(active) || !active.matches("input, textarea, select")) return;
@@ -59,21 +59,22 @@ export default function Modal({ title, children, onClose }: { title: string; chi
   }
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLButtonElement>('[aria-label="닫기"]')?.focus({ preventScroll: true });
+    (ref.current?.querySelector<HTMLButtonElement>('[aria-label="닫기"]') || ref.current)?.focus({ preventScroll: true });
     const keyboard = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); close.current(); }
       if (e.key !== "Tab") return;
       const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, [tabindex="0"]') ?? []).filter((el) => el.getClientRects().length);
       if (!items.length) return;
+      if (document.activeElement === ref.current || !ref.current?.contains(document.activeElement)) { e.preventDefault(); items[e.shiftKey ? items.length - 1 : 0].focus(); return; }
       if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items[items.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === items[items.length - 1]) { e.preventDefault(); items[0].focus(); }
     };
     document.addEventListener("keydown", keyboard);
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
-  return <div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} className={`sheet${dragging ? " is-dragging" : ""}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
-    <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
+  return <div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
+    {variant === "resizable" && <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onClick={() => { if (Date.now() >= suppressClickUntil.current) snap(stop.current === 2 ? 0 : (stop.current + 1) as SheetStop); }}
-      onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>
-    <div className="sheet-heading"><h2>{title}</h2><button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button></div><div className="sheet-body">{children}</div></section></div>;
+      onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>}
+    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div className="sheet-body">{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>;
 }

@@ -46,3 +46,16 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
    Scroll containers also opt out of browser pinch zoom without blocking scrolling. */
 html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 @media(max-width:759px){.saved-search input,.list-heading select,.memo,.caption-box{font-size:16px}}
+
+/* Compact filters and floating map tools leave the map visible to the bottom edge. */
+.sheet-compact{padding-top:24px;max-height:80%;animation:none;transition:none}
+.sheet-compact .sheet-body{padding-bottom:20px}
+.sheet-footer{flex:none;padding:0 20px calc(var(--safe-b) + 20px);background:#fff}
+.sheet-footer .actions{margin:0}
+.sheet-footer .btn.primary{font-size:16px}
+.sheet-compact:focus{outline:none}
+.map-controls{bottom:calc(var(--safe-b) + 20px);gap:12px}
+.save-fab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:54px;padding:14px 18px;border-radius:28px;background:var(--accent);color:#fff;font-size:16px;font-weight:750;text-decoration:none;box-shadow:0 5px 18px #d8315540}
+.places-list{bottom:0;padding-bottom:calc(var(--safe-b) + 100px)}
+.view-map .toast{top:calc(var(--header-height) + 12px);bottom:auto}
+@media(min-width:760px){.map-controls{bottom:28px}}

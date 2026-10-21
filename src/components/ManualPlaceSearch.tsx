@@ -17,7 +17,8 @@ export default function ManualPlaceSearch({ sourceId, onSaved }: { sourceId?: st
     try {
       const r = sourceId ? await requestJson<{ place_url: string }>(`/api/sources/${sourceId}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selections: [], direct: picked, query: searched }) }) :
         await requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: searched, place_id: picked.kakao_place_id }) });
-      onSaved({ status: "saved", message: `${picked.name}을(를) 저장했어요.`, ...r });
+      // Link confirmation returns "ok"; expose the same saved/duplicate outcome as direct saves.
+      onSaved({ ...r, status: "status" in r && r.status === "duplicate" ? "duplicate" : "saved", message: `${picked.name}을(를) 저장했어요.` });
     } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); } finally { setBusy(false); }
   }
   return <><form onSubmit={search} className="search-row"><input className="field" aria-label="새 장소 검색어" placeholder="장소 이름과 동네를 함께 입력해요" value={query} onChange={(e) => { setQuery(e.target.value); setPicked(null); }} maxLength={100} /><button className="btn" disabled={busy || !query.trim()}>{busy ? "찾는 중…" : "검색"}</button></form>

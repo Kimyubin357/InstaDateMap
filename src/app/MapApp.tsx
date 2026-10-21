@@ -21,6 +21,8 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false); const [toast, setToast] = useState("");
+  const [savedArrival, setSavedArrival] = useState<string | null>(null);
+  const duplicateArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
   const root = useRef<HTMLDivElement>(null); const header = useRef<HTMLElement>(null); const list = useRef<HTMLDivElement>(null);
   const mapPosition = useRef<MapPosition>(); const listScroll = useRef(0); const snapshot = useRef({ view, query, statuses, category });
@@ -39,7 +41,7 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
     } catch { /* A stale local view must not prevent opening the map. */ }
     setRestored(true);
     const sync = () => { const params = new URLSearchParams(window.location.search); const id = params.get("place"); setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null); };
-    sync(); window.addEventListener("popstate", sync);
+    sync(); const arrival = new URLSearchParams(window.location.search); setSavedArrival(arrival.get("saved")); duplicateArrival.current = arrival.get("duplicate") === "1"; window.addEventListener("popstate", sync);
     return () => { window.removeEventListener("popstate", sync); sessionStorage.setItem("datemap-view", JSON.stringify({ ...snapshot.current, position: mapPosition.current, scroll: listScroll.current })); };
   }, []);
   useEffect(() => {
@@ -72,6 +74,22 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
   const categories = useMemo(() => [...new Set(places.map((p) => p.category).filter((s): s is string => !!s))].sort(), [places]);
   const visible = useMemo(() => sortPlaces(filterPlaces(places, query, statuses, category), sort === "near" ? origin : null), [places, query, statuses, category, sort, origin]);
   const selected = places.find((p) => p.id === selectedId);
+  useEffect(() => {
+    if (!loaded || !savedArrival) return;
+    const place = places.find((p) => p.id === savedArrival);
+    setView("map"); setQuery(""); setStatuses([...STATUS_ORDER]); setCategory("");
+    setFocusedId(place?.id || null);
+    setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng } : { sequence: ++requestSequence.current, kind: "saved" });
+    setToast(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
+    setSavedArrival(null);
+    const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
+    history.replaceState(history.state, "", url.pathname + url.search);
+  }, [loaded, places, savedArrival]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
   function showPlaceOnMap(place: PlaceView) {
     if (!visible.some((p) => p.id === place.id)) reset();
     setView("map"); setFocusedId(place.id);
@@ -100,12 +118,11 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
     {loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "검색어나 필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>검색·필터 초기화</button>}</div>}
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
     {error && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={refresh}>다시 불러오기</button></div>}
-    {view === "map" && <div className="map-controls"><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="pin" width="19" /><span>저장한 곳</span></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => locate(false)}><Icon name="location" /></button></div>}
-    <footer className="save-dock"><Link href="/add" className="btn primary large"><Icon name="plus" width="24" />장소 저장</Link></footer>
+    <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="pin" width="19" /><span>저장한 곳</span></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => locate(false)}><Icon name="location" /></button></>}<Link href="/add" className="save-fab"><Icon name="plus" width="24" /><span>장소 저장</span></Link></div>
     {toast && <div className="toast" role="status"><span>{toast}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setToast("")}><Icon name="close" width="16" /></button></div>}
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => setPlaces((ps) => ps.map((p) => p.id === selected.id ? { ...p, ...patch } : p))} onDelete={() => { setPlaces((ps) => ps.filter((p) => p.id !== selected.id)); close(); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
-    {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" onClose={close}><h3>우리의 상태</h3><div className="filter-options">{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={statuses.includes(s)} onClick={() => setStatuses((current) => current.includes(s) ? current.filter((v) => v !== s) : [...current, s])}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div><div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div></Modal>}
+    {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant="compact" onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}><h3>우리의 상태</h3><div className="filter-options">{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={statuses.includes(s)} onClick={() => setStatuses((current) => current.includes(s) ? current.filter((v) => v !== s) : [...current, s])}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}
     {overlay === "pending" && <Modal title="조금만 더 확인해요" onClose={close}><p className="lead">지점을 고르거나 장소 정보를 보태면 저장할 수 있어요.</p><div className="pending-list">{pending.map((p) => <Link key={p.id} href={`/confirm/${p.id}`} className="pending-row"><div><strong>{PENDING_LABEL[p.status] || "장소 확인하기"}</strong><small>{p.shared_by}님이 발견한 링크</small><span>{p.url.replace("https://www.instagram.com/", "")}</span></div><Icon name="chevron" /></Link>)}</div></Modal>}
   </div>;
 }
