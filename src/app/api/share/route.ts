@@ -2,7 +2,7 @@ import { boardFromRequest, unauthorized } from "@/lib/auth";
 import { ingestShare } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 type ImgType = "image/jpeg" | "image/png" | "image/webp";
 

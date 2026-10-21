@@ -86,30 +86,84 @@ export interface CaptionResult {
 
 type Fetcher = typeof fetch;
 
-/** 캡션 수집: og 메타태그 → (토큰이 있으면) oEmbed → 실패 시 null(단축어가 붙여넣기 요청) */
-export async function fetchCaption(url: string, fetcher: Fetcher = fetch): Promise<CaptionResult> {
-  let locationTag: string | null = null;
+/** 인스타가 로그인 없이 og 태그를 내주는 링크 미리보기 봇들의 User-Agent */
+const PREVIEW_AGENTS = [
+  "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+  "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+];
+const BROWSER_AGENT =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
+const LOGIN_WALL = /로그인|Log in|Sign up|Create an account|See Instagram photos and videos/i;
+
+/** 임베드 페이지(/embed/captioned/)의 캡션 블록이나 JSON에서 캡션을 꺼냅니다. */
+export function captionFromEmbedHtml(html: string): string | null {
+  // 1) JSON 안의 캡션
+  const j = html.match(/"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (j) {
+    try {
+      const t = JSON.parse(`"${j[1]}"`) as string;
+      if (t.trim().length >= 2) return t.trim();
+    } catch {
+      /* 아래로 */
+    }
+  }
+  // 2) <div class="Caption"> … </div> 블록
+  const m = html.match(/<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i) ||
+    html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+  if (!m) return null;
+  const inner = m[1].replace(/<a[^>]*class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "");
+  const text = stripHtml(inner);
+  return text.length >= 2 ? text : null;
+}
+
+function shortcodePath(url: string): string | null {
+  const m = url.match(/instagram\.com\/(p|reel|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? `${m[1]}/${m[2]}` : null;
+}
+
+async function getHtml(fetcher: Fetcher, url: string, ua: string): Promise<string | null> {
   try {
     const res = await fetcher(url, {
-      headers: {
-        "User-Agent": "DatemapPersonal/0.1 (couple's private place list)",
-        "Accept-Language": "ko-KR,ko;q=0.9",
-      },
+      headers: { "User-Agent": ua, "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.5", Accept: "text/html" },
       redirect: "follow",
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(6000),
     });
-    if (res.ok) {
-      const html = await res.text();
-      locationTag = locationTagFromHtml(html);
-      const desc = metaContent(html, "og:description") || metaContent(html, "description");
-      // 로그인 페이지로 튕기면 og:description이 일반 소개 문구라 걸러냅니다.
-      if (desc && !/로그인|Log in|Sign up|Create an account/i.test(desc)) {
-        const caption = captionFromOgDescription(desc);
-        if (caption.length >= 2) return { caption, method: "og", locationTag };
-      }
-    }
+    return res.ok ? await res.text() : null;
   } catch {
-    // 네트워크 실패는 다음 경로로 넘깁니다.
+    return null;
+  }
+}
+
+/**
+ * 캡션 수집 순서:
+ * 1) 링크 미리보기 봇 UA로 게시물 페이지 → og:description
+ * 2) 임베드 페이지(/embed/captioned/) → 캡션 블록
+ * 3) (토큰이 있으면) oEmbed
+ * 모두 실패하면 null → 스크린샷이나 캡션 붙여넣기로 넘어갑니다.
+ */
+export async function fetchCaption(url: string, fetcher: Fetcher = fetch): Promise<CaptionResult> {
+  let locationTag: string | null = null;
+
+  for (const ua of PREVIEW_AGENTS) {
+    const html = await getHtml(fetcher, url, ua);
+    if (!html) continue;
+    locationTag = locationTag ?? locationTagFromHtml(html);
+    const desc = metaContent(html, "og:description") || metaContent(html, "description");
+    if (desc && !LOGIN_WALL.test(desc)) {
+      const caption = captionFromOgDescription(desc);
+      if (caption.length >= 2) return { caption, method: "og", locationTag };
+    }
+  }
+
+  const path = shortcodePath(url);
+  if (path) {
+    const html = await getHtml(fetcher, `https://www.instagram.com/${path}/embed/captioned/`, BROWSER_AGENT);
+    if (html) {
+      locationTag = locationTag ?? locationTagFromHtml(html);
+      const caption = captionFromEmbedHtml(html);
+      if (caption) return { caption, method: "og", locationTag };
+    }
   }
 
   const token = env.oembedToken();
@@ -118,7 +172,7 @@ export async function fetchCaption(url: string, fetcher: Fetcher = fetch): Promi
       const api = `https://graph.facebook.com/${env.oembedVersion()}/instagram_oembed?url=${encodeURIComponent(
         url,
       )}&access_token=${encodeURIComponent(token)}`;
-      const res = await fetcher(api, { signal: AbortSignal.timeout(4000) });
+      const res = await fetcher(api, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const body = (await res.json()) as { html?: string };
         const text = body.html ? stripHtml(body.html) : "";

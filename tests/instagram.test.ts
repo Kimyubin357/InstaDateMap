@@ -48,3 +48,20 @@ describe("캡션 수집 파싱", () => {
     expect(locationTagFromHtml("<html></html>")).toBeNull();
   });
 });
+
+describe("임베드 페이지 캡션", () => {
+  it("Caption 블록에서 사용자 이름을 빼고 캡션만", async () => {
+    const { captionFromEmbedHtml } = await import("../src/lib/instagram");
+    const html = `<div class="Caption"><a class="CaptionUsername" href="#">cafe_lover</a> 성수 <b>어니언</b> 다녀옴<br>📍서울 성동구<div class="CaptionComments"></div></div>`;
+    expect(captionFromEmbedHtml(html)).toBe("성수 어니언 다녀옴\n📍서울 성동구");
+  });
+  it("JSON 캡션 우선", async () => {
+    const { captionFromEmbedHtml } = await import("../src/lib/instagram");
+    const html = `{"edge_media_to_caption":{"edges":[{"node":{"text":"\\ud83d\\udccd\uc5b4\ub2c8\uc5b8 \\n\uc131\uc218"}}]}}`;
+    expect(captionFromEmbedHtml(html)).toBe("📍어니언 \n성수");
+  });
+  it("없으면 null", async () => {
+    const { captionFromEmbedHtml } = await import("../src/lib/instagram");
+    expect(captionFromEmbedHtml("<html>login</html>")).toBeNull();
+  });
+});
