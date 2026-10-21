@@ -87,16 +87,20 @@ describe("둘만의 PIN", () => {
     expect(safeNext("https://evil.test")).toBe("/"); expect(safeNext("//evil.test")).toBe("/"); expect(safeNext("/\\evil.test")).toBe("/");
     expect(safeNext("/add?url=test&t=secret&who=name")).toBe("/add?url=test");
   });
-  it("설정 API에서 잘못된 날짜와 기존 저장자 이름 변경을 거절", async () => {
+  it("설정 API에서 잘못된 날짜를 거절", async () => {
     tables.boards[0].pin_hash = null; tables.access_sessions[0].purpose = "setup";
     const cookie = `datemap_setup=${token}`;
     const body = { date: "2024-02-30", confirmPin: "240230", names: ["민지", "준호"] };
     expect((await setup(req("setup", body, cookie))).status).toBe(400);
-    tables.sources = [{ board_id: "b1", shared_by: "유빈" }];
-    expect((await setup(req("setup", { ...body, date: "2000-01-02", confirmPin: "000102" }, cookie))).status).toBe(400);
-    tables.sources = [];
-    tables.place_saves = [{ board_id: "b1", added_by: "유빈" }];
-    expect((await setup(req("setup", { ...body, date: "2000-01-02", confirmPin: "000102" }, cookie))).status).toBe(400);
     expect(tables.boards[0].pin_hash).toBeNull();
+  });
+  it("익명·제3의 이름이 섞여 있어도 최초 설정을 완료하고 예전 기록은 보존", async () => {
+    tables.boards[0].pin_hash = null; tables.access_sessions[0].purpose = "setup";
+    tables.sources = [{ board_id: "b1", shared_by: "익명" }, { board_id: "b1", shared_by: "예전 이름" }];
+    tables.place_saves = [{ board_id: "b1", added_by: "익명" }, { board_id: "b1", added_by: "제3의 이름" }];
+    const before = structuredClone({ sources: tables.sources, saves: tables.place_saves });
+    const res = await setup(req("setup", { date: "2000-01-02", confirmPin: "000102", names: ["민지", "준호"] }, `datemap_setup=${token}`));
+    expect(res.status).toBe(200); expect(tables.boards[0].member_names).toEqual(["민지", "준호"]);
+    expect(tables.sources).toEqual(before.sources); expect(tables.place_saves).toEqual(before.saves);
   });
 });

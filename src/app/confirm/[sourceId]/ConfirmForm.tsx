@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { KakaoPlace } from "@/lib/types";
 import { requestJson } from "@/lib/client-request";
 import ManualPlaceSearch from "@/components/ManualPlaceSearch";
 import PageHeader from "@/components/PageHeader";
 import ClientReady from "@/components/ClientReady";
+import LinkRecovery from "@/components/LinkRecovery";
+import type { ShareResult } from "@/lib/share-stream";
 
 export interface ExtractionView {
   id: string;
@@ -37,6 +40,7 @@ export default function ConfirmForm({
   source: { id: string; url: string; status: string; caption: string | null };
   extractions: ExtractionView[];
 }) {
+  const router = useRouter();
   const [choices, setChoices] = useState<Record<string, Choice>>(() =>
     Object.fromEntries(
       extractions.map((e) => [
@@ -51,6 +55,9 @@ export default function ConfirmForm({
   const [error, setError] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [reprocessing, setReprocessing] = useState(false);
+  const [shots, setShots] = useState<string[]>([]);
+  const [manual, setManual] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const headers = { "Content-Type": "application/json" };
   const [mapHref, setMapHref] = useState("/");
@@ -84,21 +91,22 @@ export default function ConfirmForm({
     finally { setSaving(false); }
   }
 
-  async function reprocess() {
-    if (!caption.trim()) return;
+  async function reprocess(images = shots) {
+    if (saving || reprocessing) return;
     setReprocessing(true);
     setError(null);
     try {
-      const body = await requestJson<{ status: string; place_url?: string }>("/api/share", {
+      const body = await requestJson<ShareResult>("/api/share", {
         method: "POST",
         headers,
-        body: JSON.stringify({ url: source.url, caption }),
+        body: JSON.stringify({ url: source.url, caption, images, retry: true }),
       });
-      if (body.status === "saved") {
+      if (body.status === "saved" || body.status === "duplicate") {
         setMapHref(body.place_url || "/");
         setDone(1);
       } else {
-        window.location.reload();
+        setNotice(body.message);
+        router.refresh();
       }
     } catch (e) { setError(e instanceof Error ? e.message : "다시 찾지 못했어요."); }
     finally { setReprocessing(false); }
@@ -122,14 +130,14 @@ export default function ConfirmForm({
     <main className="confirm"><ClientReady>
       <PageHeader title="장소 확인" />
       <h2>
-        {extractions.length === 0
+        {noPlaces
           ? "장소를 알려 주세요"
           : extractions.length > 1
             ? "남길 곳을 골라 주세요"
             : "어느 곳인지 골라 주세요"}
       </h2>
       <p className="lead">
-        {extractions.length === 0 ? "캡션을 붙여넣거나 직접 검색하면 돼요." : "체크를 풀면 지도에 찍히지 않아요."}{" "}
+        {noPlaces ? "캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요." : "체크를 풀면 지도에 찍히지 않아요."}{" "}
         <a className="source-link" href={source.url} target="_blank" rel="noreferrer">
           원본 보기
         </a>
@@ -190,39 +198,20 @@ export default function ConfirmForm({
         );
       })}
 
-      {(extractions.length === 0 || noPlaces) && (
-        <section className="pick">
-          <div className="pick-name">캡션을 붙여넣어 다시 찾기</div>
-          <p className="pick-evidence">인스타 게시물의 캡션을 길게 눌러 복사한 뒤 붙여넣어 주세요.</p>
-          <textarea
-            className="caption-box"
-            value={caption}
-            onChange={(ev) => setCaption(ev.target.value)}
-            placeholder={source.caption ?? "📍 성수동 OO카페 …"}
-          />
-          <button className="btn" style={{ marginTop: 8, width: "100%" }} disabled={reprocessing || !caption.trim()} onClick={reprocess}>
-            {reprocessing ? "찾는 중…" : "이 캡션으로 다시 찾기"}
-          </button>
-          {noPlaces && (
-            <div style={{ marginTop: 14 }}>
-              <div className="pick-evidence" style={{ marginBottom: 6 }}>
-                또는 장소를 직접 검색하기
-              </div>
-              <DirectAdd sourceId={source.id} onDone={(href) => { setMapHref(href); setDone(1); }} />
-            </div>
-          )}
-        </section>
-      )}
-
-      {error && <p className="error">{error}</p>}
-
       {extractions.length > 0 && (
-        <div className="savebar">
-          <button className="btn primary" disabled={saving} onClick={save}>
+        <div className="confirm-save">
+          <button className="btn primary" disabled={saving || reprocessing} onClick={save}>
             {saving ? "저장 중…" : count > 0 ? `${count}곳 지도에 저장` : "아무것도 저장하지 않기"}
           </button>
         </div>
       )}
+      <LinkRecovery caption={caption} onCaption={setCaption} busy={saving || reprocessing} shotCount={shots.length} onRetry={() => reprocess()} onCaptionSubmit={() => reprocess()} onScreenshots={async (images) => { setShots(images); await reprocess(images); }} onSearch={() => setManual(true)} />
+      {reprocessing && <p className="hint" role="status">보태주신 정보로 장소를 다시 찾고 있어요…</p>}
+      {notice && <p className="notice" role="status">{notice}</p>}
+      {manual && <section className="manual-recovery"><h3>장소 이름으로 직접 찾기</h3><DirectAdd sourceId={source.id} onDone={(href) => { setMapHref(href); setDone(1); }} /></section>}
+
+      {error && <p className="error">{error}</p>}
+
       <a className="return-link" href="/">우리 지도로 돌아가기</a>
     </ClientReady></main>
   );

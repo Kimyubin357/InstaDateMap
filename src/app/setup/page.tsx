@@ -3,6 +3,7 @@ import { pageRequest, setupSession } from "@/lib/access";
 import { safeNext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import SetupForm from "./SetupForm";
+import { suggestedMemberNames } from "@/lib/member-names";
 export const dynamic = "force-dynamic";
 export default async function SetupPage({ searchParams }: { searchParams: { next?: string } }) {
   let session;
@@ -14,6 +15,6 @@ export default async function SetupPage({ searchParams }: { searchParams: { next
     db().from("place_saves").select("added_by").eq("board_id", session.board_id),
   ]);
   if (sources.error || saves.error) throw new Error("기존 저장자 이름을 확인하지 못했어요. 잠시 후 다시 열어 주세요.");
-  const names = [...new Set<string>([...(sources.data ?? []).map((s) => s.shared_by), ...(saves.data ?? []).map((s) => s.added_by)])].slice(0, 2);
+  const names = suggestedMemberNames([...(sources.data ?? []).map((s) => s.shared_by), ...(saves.data ?? []).map((s) => s.added_by)]);
   return <SetupForm names={names} next={safeNext(searchParams.next)} />;
 }

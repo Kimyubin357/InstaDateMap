@@ -40,3 +40,6 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 .sheet-heading{flex:none;padding:0 20px}
 .sheet-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 20px calc(var(--safe-b) + 24px)}
 @media(min-width:760px){.map-controls{right:28px;bottom:28px}.sheet{padding-top:20px}.sheet-handle{display:none}}
+.manual-recovery{margin-top:24px}.manual-recovery h3{font-size:17px}.confirm .notice{margin-top:18px}
+.confirm-save{margin:18px 0 24px}.confirm-save .btn{width:100%;font-size:17px}
+@media(max-width:759px){.memo,.caption-box{font-size:16px}}

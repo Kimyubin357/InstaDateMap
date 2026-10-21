@@ -96,8 +96,10 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     }
     if (existing.status === "pending_confirm" || existing.status === "needs_review" || existing.status === "needs_caption") {
       return {
-        status: "confirm",
-        message: "확인이 남아 있는 링크예요.",
+        status: existing.status === "pending_confirm" ? "confirm" : existing.status,
+        message: existing.status === "pending_confirm" ? "확인이 남아 있는 링크예요. 지점을 골라 저장하거나 다른 방법으로 다시 찾을 수 있어요."
+          : existing.status === "needs_caption" ? "아직 게시물 내용을 읽지 못한 링크예요. 캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요."
+          : "장소 확인이 필요한 링크예요. 다시 시도하거나 캡션·스크린샷·직접 검색으로 이어갈 수 있어요.",
         confirm_url: confirmUrl(existing.id),
         source_id: existing.id,
       };

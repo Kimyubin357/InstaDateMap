@@ -17,9 +17,9 @@ export default function SetupForm({ names, next }: { names: string[]; next: stri
   return <main className="form-page"><ClientReady><div className="wordmark small">데이트맵<span>♥</span></div><h1>우리 지도에 이름을 붙여요</h1><p className="lead">사귄 날의 여섯 자리로 둘만의 지도를 열어요.</p>
     <form onSubmit={submit} className="stack"><label className="form-label">우리가 사귀기 시작한 날<input className="field" type="date" value={date} onChange={(e) => { setDate(e.target.value); setConfirmPin(""); }} required /></label>
     {pin && <div className="notice">우리의 첫 PIN은 <strong className="generated-pin">{pin}</strong>이에요.<small>설정에서 다른 여섯 자리로 바꿀 수 있어요.</small></div>}
-    <div className="name-fields"><label className="form-label">한 사람의 이름<input className="field" aria-label="한 사람의 이름" value={first} onChange={(e) => setFirst(e.target.value)} maxLength={20} required readOnly={!!names[0]} /></label>
-    <label className="form-label">다른 사람의 이름<input className="field" aria-label="다른 사람의 이름" value={second} onChange={(e) => setSecond(e.target.value)} maxLength={20} required readOnly={!!names[1]} /></label></div>
-    {names.length > 0 && <p className="hint">이미 저장한 이름은 그대로 이어가요.</p>}
+    <div className="name-fields"><label className="form-label">한 사람의 이름<input className="field" aria-label="한 사람의 이름" value={first} onChange={(e) => setFirst(e.target.value)} maxLength={20} required /></label>
+    <label className="form-label">다른 사람의 이름<input className="field" aria-label="다른 사람의 이름" value={second} onChange={(e) => setSecond(e.target.value)} maxLength={20} required /></label></div>
+    <p className="hint">두 사람의 이름으로 고칠 수 있어요. 예전 장소의 저장자 기록은 그대로 남아요.</p>
     <PinInput label="우리 PIN 한 번 더 확인" value={confirmPin} onChange={setConfirmPin} />
     <label className="remember"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />이 기기에서 기억하기</label>
     {error && <p role="alert" className="error">{error}</p>}<button className="btn primary large" disabled={busy || !pin || pin !== confirmPin || !first.trim() || !second.trim()}>{busy ? "우리 지도 만드는 중…" : "우리 지도 시작하기"}</button></form></ClientReady></main>;

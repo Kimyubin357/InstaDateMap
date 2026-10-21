@@ -35,6 +35,15 @@ beforeEach(() => {
 describe("저장 실패와 재시도", () => {
   const input = { ...base, text: "https://www.instagram.com/p/AAA/", caption: "어니언" };
 
+  it.each(["needs_caption", "needs_review", "pending_confirm"])("예전 %s 링크를 처음 다시 넣어도 상태에 맞는 보완 흐름으로 반환", async (status) => {
+    tables.sources = [{ id: "s1", board_id: "b1", url: input.text, shared_by: "민지", status }];
+    const llm = vi.fn(llmFor(["어니언"]));
+    const result = await ingestShare({ ...base, text: input.text }, llm);
+    expect(result.status).toBe(status === "pending_confirm" ? "confirm" : status);
+    expect(result.source_id).toBe("s1"); expect(result.confirm_url).toContain("/confirm/s1");
+    expect(llm).not.toHaveBeenCalled(); expect(fetchCaption).not.toHaveBeenCalled();
+  });
+
   it("삭제한 핀은 같은 링크를 다시 공유해서 복구", async () => {
     await ingestShare(input, llmFor(["어니언"]));
     tables.places = [];

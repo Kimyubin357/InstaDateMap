@@ -11,13 +11,6 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const names = Array.isArray(body?.names) ? body.names.map((n: unknown) => typeof n === "string" ? n.trim() : "") : [];
     if (names.length !== 2 || names.some((n: string) => !n || n.length > 20) || names[0] === names[1]) throw new AccessError("서로 다른 두 이름을 20자 이내로 입력해 주세요.");
-    const [sources, saves] = await Promise.all([
-      db().from("sources").select("shared_by").eq("board_id", session.board_id),
-      db().from("place_saves").select("added_by").eq("board_id", session.board_id),
-    ]);
-    if (sources.error || saves.error) throw new Error("기존 저장자 이름을 확인하지 못했어요.");
-    const historicalNames = [...(sources.data ?? []).map((s) => s.shared_by), ...(saves.data ?? []).map((s) => s.added_by)];
-    if (historicalNames.some((name) => !names.includes(name))) throw new AccessError("기존 장소를 저장한 사람의 이름을 그대로 사용해 주세요.");
     let pin: string;
     try { pin = pinFromDate(typeof body?.date === "string" ? body.date : ""); }
     catch { throw new AccessError("사귀기 시작한 날짜를 올바르게 선택해 주세요."); }
