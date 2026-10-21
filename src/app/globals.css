@@ -25,3 +25,18 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 .fallback-options>button+.form-label{margin-top:20px}
 .confirm>.client-ready>h2{font-size:27px;margin-bottom:8px}
 .pick .manual-confirm .actions{flex-direction:column}
+
+/* Direct place details, map return controls, and touch-resizable sheets. */
+.seg button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.map-controls{position:absolute;z-index:10;right:16px;bottom:calc(var(--safe-b) + 104px);display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.map-controls .locate-btn{position:static}
+.saved-places-btn{display:flex;align-items:center;gap:6px;min-height:44px;padding:9px 13px;border:1px solid var(--line);border-radius:24px;background:#fff;box-shadow:0 2px 8px #45291f12;font-size:13px;font-weight:650}
+.show-place-map{width:100%;margin-bottom:12px;background:var(--mist);border-color:var(--mist);font-size:14px}
+.sheet{display:flex;flex-direction:column;max-height:92dvh;overflow:hidden;padding:0;transition:height .22s cubic-bezier(.2,.8,.2,1)}
+.sheet.is-dragging{transition:none;user-select:none}
+.sheet-handle{display:flex;align-items:center;justify-content:center;width:100%;height:36px;flex:none;padding:0;border:0;background:none;touch-action:none;cursor:grab}
+.sheet-handle:active{cursor:grabbing}
+.sheet-handle .grabber{display:block;width:36px;height:4px;margin:0;border-radius:4px;background:#d5cecb}
+.sheet-heading{flex:none;padding:0 20px}
+.sheet-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 20px calc(var(--safe-b) + 24px)}
+@media(min-width:760px){.map-controls{right:28px;bottom:28px}.sheet{padding-top:20px}.sheet-handle{display:none}}

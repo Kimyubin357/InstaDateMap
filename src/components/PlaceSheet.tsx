@@ -6,16 +6,18 @@ import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, type PlaceView, placeMeta } from "@/lib/place-view";
 import { requestJson } from "@/lib/client-request";
 import { loadScript } from "@/lib/scripts";
-export default function PlaceSheet({ place, onClose, onPatch, onDelete }: { place: PlaceView; onClose: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string }) => void; onDelete: () => void }) {
+export default function PlaceSheet({ place, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string }) => void; onDelete: () => void }) {
   const [memo, setMemo] = useState(place.memo || ""); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   const [more, setMore] = useState(false); const [deleting, setDeleting] = useState(false);
-  function close() { if (memo === (place.memo || "") || confirm("아직 저장하지 않은 메모가 있어요. 닫을까요?")) onClose(); }
+  function mayLeave() { return memo === (place.memo || "") || confirm("아직 저장하지 않은 메모가 있어요. 닫을까요?"); }
+  function close() { if (mayLeave()) onClose(); }
   async function patch(value: { status?: PlaceStatus; memo?: string }) {
     setBusy(true); setError(""); setNotice("");
     try { await requestJson(`/api/places/${place.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) }); onPatch(value); setNotice(value.memo !== undefined ? "메모를 저장했어요." : "상태를 바꿨어요."); }
     catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); } finally { setBusy(false); }
   }
   return <Modal title={place.name} onClose={busy ? () => {} : close}><p className="addr">{place.address}</p><div className="place-badges"><span>{placeMeta(place)}</span><span>{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "우리의 장소"}</span></div>
+    <button className="btn show-place-map" disabled={busy} onClick={() => { if (mayLeave()) onShowMap(); }}><Icon name="pin" width="18" />지도에서 보기</button>
     <div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(place.address || place.name); setNotice("주소를 복사했어요."); } catch { setError("주소를 복사하지 못했어요. 주소를 길게 눌러 복사해 주세요."); } }}><Icon name="copy" />주소 복사</button>
       <button className="icon-btn bordered" aria-label="장소 더 보기" aria-expanded={more} onClick={() => setMore(!more)}><Icon name="more" /></button></div>
