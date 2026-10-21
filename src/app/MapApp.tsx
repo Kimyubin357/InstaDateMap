@@ -74,6 +74,11 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
   const map = useRef<any>(null);
   const overlays = useRef<any[]>([]);
   const fitted = useRef(false);
+  const meOverlay = useRef<any>(null);
+  const mePos = useRef<{ lat: number; lng: number } | null>(null);
+  const followOnFix = useRef(false);
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
 
   const api = useCallback(
     (path: string, init?: RequestInit) =>
@@ -167,6 +172,86 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
     if (mapReady) drawMarkers();
   }, [drawMarkers, mapReady]);
 
+  // 내 위치: 지도가 준비되면 위치를 계속 받아 파란 점으로 보여 줍니다.
+  const showMe = useCallback((lat: number, lng: number) => {
+    const k = window.kakao;
+    if (!map.current || !k) return;
+    const pos = new k.maps.LatLng(lat, lng);
+    if (!meOverlay.current) {
+      const el = document.createElement("div");
+      el.className = "me-dot";
+      el.setAttribute("aria-label", "내 위치");
+      meOverlay.current = new k.maps.CustomOverlay({ position: pos, content: el, zIndex: 5 });
+      meOverlay.current.setMap(map.current);
+    } else {
+      meOverlay.current.setPosition(pos);
+    }
+  }, []);
+
+  const geoError = useCallback((e: GeolocationPositionError) => {
+    setLocating(false);
+    followOnFix.current = false;
+    setLocError(
+      e.code === e.PERMISSION_DENIED
+        ? "위치 권한이 꺼져 있어요. 설정 → 개인정보 보호 및 보안 → 위치 서비스 → Safari 웹 사이트를 '앱을 사용하는 동안'으로 바꿔 주세요."
+        : "현재 위치를 찾지 못했어요. 잠시 뒤 다시 눌러 주세요.",
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady || !("geolocation" in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (p) => {
+        const { latitude: lat, longitude: lng } = p.coords;
+        mePos.current = { lat, lng };
+        setLocError(null);
+        showMe(lat, lng);
+        if (followOnFix.current) {
+          followOnFix.current = false;
+          setLocating(false);
+          map.current?.setLevel(4);
+          map.current?.panTo(new window.kakao.maps.LatLng(lat, lng));
+        } else if (!fitted.current && places.length === 0 && loaded) {
+          // 저장한 장소가 없으면 내 위치에서 시작
+          map.current?.setCenter(new window.kakao.maps.LatLng(lat, lng));
+          fitted.current = true;
+        }
+      },
+      geoError,
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [mapReady, showMe, geoError, loaded, places.length]);
+
+  const goToMe = () => {
+    setLocError(null);
+    if (!("geolocation" in navigator)) {
+      setLocError("이 브라우저는 위치를 지원하지 않아요.");
+      return;
+    }
+    if (mePos.current) {
+      map.current?.setLevel(4);
+      map.current?.panTo(new window.kakao.maps.LatLng(mePos.current.lat, mePos.current.lng));
+      return;
+    }
+    setLocating(true);
+    followOnFix.current = true;
+    // 권한을 아직 안 물었다면 여기서 물어봅니다.
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const { latitude: lat, longitude: lng } = p.coords;
+        mePos.current = { lat, lng };
+        showMe(lat, lng);
+        followOnFix.current = false;
+        setLocating(false);
+        map.current?.setLevel(4);
+        map.current?.panTo(new window.kakao.maps.LatLng(lat, lng));
+      },
+      geoError,
+      { enableHighAccuracy: true, timeout: 20000 },
+    );
+  };
+
   const selected = places.find((p) => p.id === selectedId) ?? null;
 
   const toggleStatus = (s: PlaceStatus) =>
@@ -193,7 +278,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
           <p>
             아직 저장한 곳이 없어요.
             <br />
-            인스타에서 공유 → 데이트맵 단축어를 눌러 첫 장소를 넣어 보세요.
+            오른쪽 아래 + 링크를 눌러 인스타 링크를 붙여넣어 보세요.
           </p>
         </div>
       )}
@@ -224,6 +309,24 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
           </div>
         )}
       </header>
+
+      {!selected && mapReady && (
+        <button className="locate-btn" onClick={goToMe} aria-label="내 위치로 이동" disabled={locating}>
+          {locating ? "…" : "◎"}
+        </button>
+      )}
+
+      {locError && !selected && (
+        <div className="loc-toast" role="status" onClick={() => setLocError(null)}>
+          {locError}
+        </div>
+      )}
+
+      {!selected && (
+        <a className="fab" href={`/add?t=${encodeURIComponent(token)}&who=${encodeURIComponent(who)}`}>
+          + 링크
+        </a>
+      )}
 
       {pending.length > 0 && !selected && (
         <button className="pending-bar" onClick={() => setShowPending(true)}>
