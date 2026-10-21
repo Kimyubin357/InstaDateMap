@@ -19,6 +19,8 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const viewport = useKeyboardViewport();
   const [backHref, setBackHref] = useState("/");
+  const [homeHref, setHomeHref] = useState("/");
+  useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };
   const resume = () => { setSuspended(false); store.resume(); };
   const lock = async () => { suspend(); await store.forget(); try { sessionStorage.removeItem("datemap-view"); } catch {} announceAccess("locked"); window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
@@ -58,7 +60,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     window.addEventListener("datemap:changed", change); window.addEventListener("storage", storage);
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
-  return <Context.Provider value={{ store, homeHref: backHref, suspended, suspend, resume, resetAccess, lock }}>
+  return <Context.Provider value={{ store, homeHref, suspended, suspend, resume, resetAccess, lock }}>
     {state.access && <><div className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
       <div className={`persistent-search${pathname === "/search" ? "" : " is-away"}`} aria-hidden={pathname !== "/search"}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div></>}
     {children}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useBoardState, useBoardSync } from "./BoardProvider";
 import Icon from "./Icon";
 import Modal from "./Modal";
@@ -81,8 +82,9 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   }
   const query = state.query.trim();
   return <main className={`search-app${viewport.keyboard ? " keyboard-open" : ""}`} style={viewport.keyboard ? { height: viewport.height, top: viewport.top } : undefined}>
-    <header className="unified-search-header"><button className="icon-btn" aria-label="이전 화면으로" onClick={() => router.replace(returnHref.current, { scroll: false })}><Icon name="back" /></button>
-      <form role="search" onSubmit={(e) => { e.preventDefault(); run(); }}><Icon name="search" /><input ref={input} aria-label="통합 장소 검색" placeholder="장소 이름, 지역으로 검색" value={state.query} onChange={(e) => changeQuery(e.target.value)} maxLength={100} enterKeyHint="search" autoComplete="off" />{state.query && <button type="button" className="icon-btn" aria-label="검색어 지우기" onClick={clear}><Icon name="close" width="20" /></button>}<button type="submit" className="sr-only">검색 실행</button></form>
+    <header className="unified-search-header">
+      <form role="search" onSubmit={(e) => { e.preventDefault(); run(); }}><button type="button" className="icon-btn search-back" aria-label="이전 화면으로" onClick={() => router.replace(returnHref.current, { scroll: false })}><Icon name="back" width="20" /></button><input ref={input} aria-label="통합 장소 검색" placeholder="장소 이름, 지역으로 검색" value={state.query} onChange={(e) => changeQuery(e.target.value)} maxLength={100} enterKeyHint="search" autoComplete="off" />{state.query && <button type="button" className="icon-btn" aria-label="검색어 지우기" onClick={clear}><Icon name="close" width="20" /></button>}<button type="submit" className="sr-only">검색 실행</button></form>
+      <Link href="/settings" className="icon-btn floating-settings" aria-label="우리 설정"><Icon name="settings" width="21" /></Link>
     </header>
     <div className="unified-search-body" ref={scroll} onScroll={(e) => { scrollTop.current = e.currentTarget.scrollTop; }}>
       {!query ? <section className="recent-searches"><div className="search-group-heading"><h1>최근 검색</h1>{recent.length > 0 && <button className="text-btn" onClick={() => setRecent(history.clear())}>전체 삭제</button>}</div>
