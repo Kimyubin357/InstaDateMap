@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterPlaces, sortPlaces, distanceM, type PlaceView } from "@/lib/place-view";
-const place = (id: string, over: Partial<PlaceView> = {}): PlaceView => ({ id, name: "도나스데이", address: "경기 수원시", category: "카페", status: "wish", memo: "창가 자리", lat: 37.24, lng: 126.97, kakao_url: "", sharers: [], sources: [], created_at: "2026-01-01", last_saved_at: "2026-01-01", ...over });
+const place = (id: string, over: Partial<PlaceView> = {}): PlaceView => ({ id, name: "도나스데이", address: "경기 수원시", category: "카페", status: "wish", memo: "창가 자리", lat: 37.24, lng: 126.97, kakao_place_id: id, kakao_url: "", sharers: [], sources: [], created_at: "2026-01-01", last_saved_at: "2026-01-01", ...over });
 describe("지도와 리스트의 공통 보기", () => {
   it("상호·주소·메모와 상태·분류 필터를 동시에 적용", () => {
     const all = [place("one"), place("two", { status: "visited", category: "음식점" })];

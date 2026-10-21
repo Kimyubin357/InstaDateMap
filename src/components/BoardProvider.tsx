@@ -6,8 +6,10 @@ import { connectBoardSync } from "@/lib/sync-connection";
 import { accessSender, announceAccess, type AccessMessage } from "@/lib/board-events";
 import { cacheScope, type SyncAccess } from "@/lib/sync-types";
 import MapApp from "@/app/MapApp";
+import SearchApp from "./SearchApp";
+import useKeyboardViewport from "./useKeyboardViewport";
 
-interface BoardContext { store: BoardStore; suspended: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<void>; lock: () => Promise<void> }
+interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<void>; lock: () => Promise<void> }
 const Context = createContext<BoardContext | null>(null);
 export function useBoardSync() { const context = useContext(Context); if (!context) throw new Error("BoardProvider missing"); return context; }
 export function useBoardState() { const { store } = useBoardSync(); return useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE); }
@@ -15,6 +17,8 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const [store] = useState(() => new BoardStore()); const [suspended, setSuspended] = useState(false);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE);
   const pathname = usePathname();
+  const viewport = useKeyboardViewport();
+  const [backHref, setBackHref] = useState("/");
   const suspend = () => { setSuspended(true); store.suspend(); };
   const resume = () => { setSuspended(false); store.resume(); };
   const lock = async () => { suspend(); await store.forget(); try { sessionStorage.removeItem("datemap-view"); } catch {} announceAccess("locked"); window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
@@ -54,8 +58,9 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     window.addEventListener("datemap:changed", change); window.addEventListener("storage", storage);
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
-  return <Context.Provider value={{ store, suspended, suspend, resume, resetAccess, lock }}>
-    {state.access && <div className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} /></div>}
+  return <Context.Provider value={{ store, homeHref: backHref, suspended, suspend, resume, resetAccess, lock }}>
+    {state.access && <><div className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
+      <div className={`persistent-search${pathname === "/search" ? "" : " is-away"}`} aria-hidden={pathname !== "/search"}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div></>}
     {children}
   </Context.Provider>;
 }

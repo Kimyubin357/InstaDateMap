@@ -38,7 +38,7 @@ export function safeNext(value?: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   try {
     const url = new URL(value, "https://datemap.local");
-    if (!["/", "/add", "/settings"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname)) return "/";
+    if (!["/", "/add", "/settings", "/search"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname)) return "/";
     for (const key of ["t", "who", "next"]) url.searchParams.delete(key);
     return url.pathname + url.search;
   } catch { return "/"; }

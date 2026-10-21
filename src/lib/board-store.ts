@@ -1,6 +1,7 @@
 import { DeviceBoardCache, type SnapshotCache } from "./board-cache";
 import { cacheScope, isSnapshot, snapshotEtag, type BoardSnapshot, type SyncAccess } from "./sync-types";
 import type { PlaceView } from "./place-view";
+import { clearRecentSearches } from "./recent-searches";
 export interface BoardState { access: SyncAccess | null; snapshot: BoardSnapshot | null; syncing: boolean; error: string; connected: boolean }
 export const EMPTY_BOARD_STATE: BoardState = { access: null, snapshot: null, syncing: false, error: "", connected: false };
 export class BoardStore {
@@ -92,5 +93,5 @@ export class BoardStore {
   suspend() { ++this.generation; this.paused = true; this.cancel(); this.set({ connected: false, syncing: false }); }
   resume() { this.paused = false; void this.refresh(); }
   private cancel() { clearTimeout(this.debounce); this.abort?.abort(); this.flight = null; this.dirty = false; }
-  async forget() { ++this.generation; this.paused = true; this.cancel(); this.set(EMPTY_BOARD_STATE); await this.cache.clear().catch(() => {}); }
+  async forget() { ++this.generation; this.paused = true; this.cancel(); clearRecentSearches(); this.set(EMPTY_BOARD_STATE); await this.cache.clear().catch(() => {}); }
 }

@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     const [placeResult, linkResult, pendingResult, saveResult] = await Promise.all([
       db()
         .from("places")
-        .select("id, name, address, lat, lng, category, kakao_url, status, memo, created_at")
+        .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, created_at")
         .eq("board_id", board.id)
         .order("created_at", { ascending: false }),
       db()
@@ -64,6 +64,7 @@ export async function GET(req: Request) {
         const e = byPlace.get(p.id);
         return {
           ...p,
+          kakao_place_id: p.kakao_place_id ?? null,
           sharers: e ? [...e.sharers] : [],
           sources: e ? [...e.sources.values()] : [],
           last_saved_at: latest.get(p.id) || p.created_at,

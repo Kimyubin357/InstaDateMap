@@ -3,7 +3,7 @@ import { BoardStore } from "@/lib/board-store";
 import type { SnapshotCache } from "@/lib/board-cache";
 import { isSnapshot, snapshotEtag, type BoardSnapshot, type SyncAccess } from "@/lib/sync-types";
 const access: SyncAccess = { boardId: "b1", authVersion: 1, who: "우리", expiresAt: "2030-01-01T00:00:00Z", kakaoKey: "public-map-key" };
-const snapshot = (revision = "1", memo = "서버 메모"): BoardSnapshot => ({ boardId: "b1", authVersion: 1, revision, board: "우리 지도", pending: [], places: [{ id: "p1", name: "카페", lat: 37, lng: 127, address: null, category: "카페", kakao_url: null, status: "wish", memo, sharers: ["우리"], sources: [], created_at: "2026-01-01", last_saved_at: "2026-01-01" }] });
+const snapshot = (revision = "1", memo = "서버 메모"): BoardSnapshot => ({ boardId: "b1", authVersion: 1, revision, board: "우리 지도", pending: [], places: [{ id: "p1", name: "카페", lat: 37, lng: 127, address: null, category: "카페", kakao_place_id: "k1", kakao_url: null, status: "wish", memo, sharers: ["우리"], sources: [], created_at: "2026-01-01", last_saved_at: "2026-01-01" }] });
 function cache(data: BoardSnapshot | null = null): SnapshotCache {
   return { read: vi.fn(async () => data), write: vi.fn(async () => {}), clear: vi.fn(async () => {}) };
 }
@@ -30,7 +30,7 @@ describe("기기 조회 캐시와 서버 일치", () => {
     const store = new BoardStore(disk, fetcher as typeof fetch); await store.authorize(access); await store.refresh();
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("If-None-Match")).toBe(snapshotEtag(snapshot()));
     expect(disk.write).not.toHaveBeenCalled(); expect(store.getSnapshot().snapshot).toEqual(snapshot());
-    expect(snapshotEtag(snapshot())).toBe('"dm1:b1:1:1"');
+    expect(snapshotEtag(snapshot())).toBe('"dm2:b1:1:1"');
   });
   it("연속 이벤트를 250ms에 한 번 조회로 묶음", async () => {
     vi.useFakeTimers(); const fetcher = vi.fn(async () => response()), store = new BoardStore(cache(), fetcher as typeof fetch);
@@ -70,6 +70,8 @@ describe("기기 조회 캐시와 서버 일치", () => {
     pending.resolve(response()); await store.refresh(); expect(store.getSnapshot().snapshot).toBeNull(); expect(store.getSnapshot().error).not.toBe("");
   });
   it("손상된 캐시 구조와 만료된 세션을 거절", async () => {
+    const old = snapshot(); delete (old.places[0] as Partial<typeof old.places[0]>).kakao_place_id;
+    expect(isSnapshot(old)).toBe(false);
     expect(isSnapshot({ ...snapshot(), places: [{ id: "p1", name: "깨진 값" }] })).toBe(false);
     const disk = cache(snapshot()), store = new BoardStore(disk); const expired = vi.fn(); store.onUnauthorized = expired;
     await store.authorize({ ...access, expiresAt: "2000-01-01" }); expect(expired).toHaveBeenCalledOnce(); expect(disk.read).not.toHaveBeenCalled();

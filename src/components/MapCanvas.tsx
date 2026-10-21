@@ -17,14 +17,30 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   const pick = useRef(onPick); pick.current = onPick;
   const fitted = useRef(!!initialPosition); const [ready, setReady] = useState(false); const [error, setError] = useState("");
   const appliedRequest = useRef<number>();
+  const layoutSize = useRef({ width: 0, height: 0 });
+  function rememberPosition() {
+    if (el.current && (el.current.clientWidth !== layoutSize.current.width || el.current.clientHeight !== layoutSize.current.height)) return;
+    const center = map.current.getCenter();
+    position.current = { lat: center.getLat(), lng: center.getLng(), level: map.current.getLevel() };
+    onMove.current(position.current);
+  }
+  function relayout() {
+    // Kakao's getCenter() already reflects the new element width before relayout.
+    // Keep the last idle center so resizing doesn't pan the map by half the width delta.
+    const p = position.current;
+    const center = p ? new window.kakao.maps.LatLng(p.lat, p.lng) : map.current.getCenter();
+    layoutSize.current = { width: el.current?.clientWidth || 0, height: el.current?.clientHeight || 0 };
+    map.current.relayout(); map.current.setCenter(center); rememberPosition();
+  }
   function showSaved() {
     if (!places.length) return;
     const k = window.kakao.maps;
     if (places.length === 1) { map.current.setLevel(4); map.current.setCenter(new k.LatLng(places[0].lat, places[0].lng)); }
     else {
       const bounds = new k.LatLngBounds(); places.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
-      map.current.setBounds(bounds, 55, 120, 125, window.matchMedia("(min-width:760px)").matches ? 555 : 120);
+      map.current.setBounds(bounds, 120, 90, 125, 90);
     }
+    rememberPosition();
   }
   useEffect(() => {
     let cancelled = false;
@@ -33,10 +49,10 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       .then(() => window.kakao.maps.load(() => {
         if (cancelled || !el.current || map.current) return;
         const k = window.kakao.maps; const p = position.current;
+        layoutSize.current = { width: el.current.clientWidth, height: el.current.clientHeight };
         map.current = new k.Map(el.current, { center: new k.LatLng(p?.lat ?? 37.28, p?.lng ?? 127.01), level: p?.level ?? 7 });
-        k.event.addListener(map.current, "idle", () => {
-          const center = map.current.getCenter(); onMove.current({ lat: center.getLat(), lng: center.getLng(), level: map.current.getLevel() });
-        });
+        position.current = { lat: p?.lat ?? 37.28, lng: p?.lng ?? 127.01, level: p?.level ?? 7 };
+        k.event.addListener(map.current, "idle", rememberPosition);
         setReady(true);
       })).catch(() => setError("지도를 불러오지 못했어요. 연결을 확인하거나 리스트로 봐 주세요."));
     return () => { cancelled = true; };
@@ -70,14 +86,12 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     }
   }, [places, ready, active]);
   useEffect(() => {
-    if (ready && active) { const center = map.current.getCenter(); map.current.relayout(); map.current.setCenter(center); }
+    if (ready && active) relayout();
   }, [ready, active]);
   useEffect(() => {
     if (!ready || !el.current) return;
     const observer = new ResizeObserver(() => {
-      const center = map.current.getCenter();
-      map.current.relayout();
-      map.current.setCenter(center);
+      relayout();
     });
     observer.observe(el.current);
     return () => observer.disconnect();
@@ -97,6 +111,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     else {
       map.current.setLevel(4);
       map.current.setCenter(new window.kakao.maps.LatLng(viewRequest.lat, viewRequest.lng));
+      rememberPosition();
     }
   }, [ready, active, viewRequest, places]);
   return <><div ref={el} className="map-canvas" aria-label="저장한 장소 지도" />{error && <div className="map-notice" role="status">{error}</div>}</>;

@@ -1,4 +1,4 @@
-import { cacheScope, isSnapshot, type BoardSnapshot, type SyncAccess } from "./sync-types";
+import { cacheScope, isSnapshot, SNAPSHOT_SCHEMA, type BoardSnapshot, type SyncAccess } from "./sync-types";
 export interface SnapshotCache { read(access: SyncAccess): Promise<BoardSnapshot | null>; write(snapshot: BoardSnapshot): Promise<void>; clear(): Promise<void> }
 /** Each operation closes its connection; unavailable/quota-limited storage is optional. */
 export class DeviceBoardCache implements SnapshotCache {
@@ -30,13 +30,13 @@ export class DeviceBoardCache implements SnapshotCache {
   }
   async read(access: SyncAccess) {
     const record = await this.run<{ schema: number; snapshot: unknown }>((store) => store.get(cacheScope(access)));
-    if (record?.schema !== 1 || !isSnapshot(record.snapshot) || cacheScope(record.snapshot) !== cacheScope(access)) return null;
+    if (record?.schema !== SNAPSHOT_SCHEMA || !isSnapshot(record.snapshot) || cacheScope(record.snapshot) !== cacheScope(access)) return null;
     return record.snapshot;
   }
   async write(snapshot: BoardSnapshot) {
     // Only the public map snapshot is persisted, never access credentials or API keys.
     const { boardId, authVersion, revision, board, places, pending } = snapshot;
-    await this.run((store) => store.put({ schema: 1, snapshot: { boardId, authVersion, revision, board, places, pending } }, cacheScope(snapshot)));
+    await this.run((store) => store.put({ schema: SNAPSHOT_SCHEMA, snapshot: { boardId, authVersion, revision, board, places, pending } }, cacheScope(snapshot)));
   }
   async clear() { await this.run((store) => store.clear()); }
 }

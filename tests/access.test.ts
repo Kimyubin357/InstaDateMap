@@ -86,6 +86,7 @@ describe("둘만의 PIN", () => {
   it("외부 리다이렉트를 차단하고 URL에서 예전 인증 값을 제거", () => {
     expect(safeNext("https://evil.test")).toBe("/"); expect(safeNext("//evil.test")).toBe("/"); expect(safeNext("/\\evil.test")).toBe("/");
     expect(safeNext("/add?url=test&t=secret&who=name")).toBe("/add?url=test");
+    expect(safeNext("/search?q=%EC%88%98%EC%9B%90&t=secret&who=name")).toBe("/search?q=%EC%88%98%EC%9B%90");
   });
   it("설정 API에서 잘못된 날짜를 거절", async () => {
     tables.boards[0].pin_hash = null; tables.access_sessions[0].purpose = "setup";
