@@ -1,17 +1,19 @@
 "use client";
 import ClientReady from "@/components/ClientReady";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import PinInput from "@/components/PinInput";
 import { requestJson } from "@/lib/client-request";
 export default function EnterForm({ configured, next }: { configured: boolean; next: string }) {
+  const router = useRouter();
   const [pin, setPin] = useState("");
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
-    try { const data = await requestJson<{ next: string }>("/api/access/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, remember, next }) }); window.location.replace(data.next); }
+    try { const data = await requestJson<{ next: string }>("/api/access/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, remember, next }) }); router.replace(data.next); router.refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : "다시 시도해 주세요."); setPin(""); }
     finally { setBusy(false); }
   }

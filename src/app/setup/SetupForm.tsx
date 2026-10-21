@@ -1,15 +1,17 @@
 "use client";
 import ClientReady from "@/components/ClientReady";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import PinInput from "@/components/PinInput";
 import { requestJson } from "@/lib/client-request";
 export default function SetupForm({ names, next }: { names: string[]; next: string }) {
+  const router = useRouter();
   const [date, setDate] = useState(""); const [first, setFirst] = useState(names[0] || ""); const [second, setSecond] = useState(names[1] || "");
   const [confirmPin, setConfirmPin] = useState(""); const [remember, setRemember] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const pin = date.length === 10 ? date.slice(2).replaceAll("-", "") : "";
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
-    try { const res = await requestJson<{ next: string }>("/api/access/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, confirmPin, names: [first, second], remember, next }) }); window.location.replace(res.next); }
+    try { const res = await requestJson<{ next: string }>("/api/access/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, confirmPin, names: [first, second], remember, next }) }); router.replace(res.next); router.refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : "설정하지 못했어요."); } finally { setBusy(false); }
   }
   return <main className="form-page"><ClientReady><div className="wordmark small">데이트맵<span>♥</span></div><h1>우리 지도에 이름을 붙여요</h1><p className="lead">사귄 날의 여섯 자리로 둘만의 지도를 열어요.</p>

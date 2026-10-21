@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "데이트맵",
   description: "우리가 같이 가보고 싶은 곳",
+  manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "데이트맵", statusBarStyle: "default" },
 };
 
