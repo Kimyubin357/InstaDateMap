@@ -3,7 +3,7 @@ import { tokenHash } from "./pin";
 
 export const SESSION_COOKIE = "datemap_session";
 export const SETUP_COOKIE = "datemap_setup";
-export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[] }
+export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[]; authVersion: number; expiresAt: string }
 export function cookieValue(req: Request, name: string) {
   return req.headers.get("cookie")?.split(";").map((s) => s.trim()).find((s) => s.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
 }
@@ -28,7 +28,7 @@ export async function boardFromRequest(req: Request): Promise<Board | null> {
   if (boardError) throw new Error("보드에 연결하지 못했어요. 데이터베이스 연결을 확인해 주세요.");
   if (!board || board.auth_version !== session.auth_version) return null;
   return { id: board.id, name: board.name, who: board.member_names.includes(session.member_name) ? session.member_name : "",
-    sessionHash: session.token_hash, remember: session.remember, memberNames: board.member_names };
+    sessionHash: session.token_hash, remember: session.remember, memberNames: board.member_names, authVersion: board.auth_version, expiresAt: session.expires_at };
 }
 export function requireIdentity(board: Board) {
   if (!board.who) throw new AccessError("이 기기에서 사용할 이름을 먼저 골라 주세요.", 409);

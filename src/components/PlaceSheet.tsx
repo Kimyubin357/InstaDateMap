@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import Icon from "./Icon";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
@@ -8,6 +8,8 @@ import { requestJson } from "@/lib/client-request";
 import { loadScript } from "@/lib/scripts";
 export default function PlaceSheet({ place, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string }) => void; onDelete: () => void }) {
   const [memo, setMemo] = useState(place.memo || ""); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
+  const lastMemo = useRef(place.memo || "");
+  useEffect(() => { const incoming = place.memo || "", previous = lastMemo.current; setMemo((draft) => draft === previous ? incoming : draft); lastMemo.current = incoming; }, [place.memo]);
   const [more, setMore] = useState(false); const [deleting, setDeleting] = useState(false);
   function mayLeave() { return memo === (place.memo || "") || confirm("아직 저장하지 않은 메모가 있어요. 닫을까요?"); }
   function close() { if (mayLeave()) onClose(); }

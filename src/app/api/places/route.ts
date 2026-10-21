@@ -2,6 +2,8 @@ import { boardFromRequest, unauthorized, requireIdentity, AccessError, accessErr
 import { db } from "@/lib/db";
 import { keywordSearch } from "@/lib/kakao";
 import { savePlace } from "@/lib/pipeline";
+import { boardRevision } from "@/lib/sync-server";
+import { snapshotEtag } from "@/lib/sync-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +13,10 @@ export async function GET(req: Request) {
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
-
+    for (let attempt = 0; attempt < 3; attempt++) {
+    const revision = await boardRevision(board.id);
+    const etag = snapshotEtag({ boardId: board.id, authVersion: board.authVersion, revision });
+    if (req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "no-store" } });
     const [placeResult, linkResult, pendingResult, saveResult] = await Promise.all([
       db()
         .from("places")
@@ -51,7 +56,9 @@ export async function GET(req: Request) {
       if (!latest.has(s.place_id) || s.added_at > latest.get(s.place_id)!) latest.set(s.place_id, s.added_at);
     }
 
+    if (await boardRevision(board.id) !== revision) continue;
     return Response.json({
+      boardId: board.id, authVersion: board.authVersion, revision,
       board: board.name,
       places: (places ?? []).map((p) => {
         const e = byPlace.get(p.id);
@@ -63,7 +70,9 @@ export async function GET(req: Request) {
         };
       }),
       pending: pending ?? [],
-    }, { headers: { "Cache-Control": "no-store" } });
+    }, { headers: { "Cache-Control": "no-store", ETag: etag } });
+    }
+    return Response.json({ status: "error", message: "변경 내용을 맞추는 중이에요. 잠시 후 다시 확인할게요." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "1" } });
   } catch (e) {
     return accessError(e);
   }

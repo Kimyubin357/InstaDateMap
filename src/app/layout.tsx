@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import BoardProvider from "@/components/BoardProvider";
 
 export const metadata: Metadata = {
   title: "데이트맵",
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body>{children}</body>
+      <body><BoardProvider>{children}</BoardProvider></body>
     </html>
   );
 }

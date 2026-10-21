@@ -59,3 +59,6 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 .places-list{bottom:0;padding-bottom:calc(var(--safe-b) + 100px)}
 .view-map .toast{top:calc(var(--header-height) + 12px);bottom:auto}
 @media(min-width:760px){.map-controls{bottom:28px}}
+.persistent-map{position:fixed;inset:0;z-index:0}.persistent-map.is-away{visibility:hidden;pointer-events:none}.map-opening{padding:30px;color:var(--ink-soft)}
+.sync-notice{position:absolute;z-index:12;top:calc(var(--header-height) + 10px);left:16px;right:16px;display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff9eb;border:1px solid #f1e5ce;border-radius:12px;font-size:12px;box-shadow:0 2px 8px #45291f12}.sync-notice>span{flex:1}.sync-notice .text-btn{flex:none;font-size:12px}
+@media(min-width:760px){.sync-notice{left:460px;right:180px;top:24px}}

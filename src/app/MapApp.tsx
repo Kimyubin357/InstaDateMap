@@ -1,20 +1,21 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import MapCanvas, { type MapPosition, type MapViewRequest } from "@/components/MapCanvas";
 import PlaceSheet from "@/components/PlaceSheet";
-import { requestJson, RequestError } from "@/lib/client-request";
+import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type PlaceView } from "@/lib/place-view";
-interface Pending { id: string; url: string; status: string; shared_by: string }
 type Overlay = "filters" | "pending" | "place" | null;
 const PENDING_LABEL: Record<string, string> = { pending_confirm: "지점 고르기", needs_review: "장소 확인하기", needs_caption: "정보 보태기" };
-export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: string }) {
-  const [board, setBoard] = useState("우리 데이트맵");
-  const [places, setPlaces] = useState<PlaceView[]>([]); const [pending, setPending] = useState<Pending[]>([]);
-  const [loaded, setLoaded] = useState(false); const [error, setError] = useState("");
+const NO_PLACES: PlaceView[] = [];
+export default function MapApp({ who, kakaoKey, active }: { who: string; kakaoKey: string; active: boolean }) {
+  const { store } = useBoardSync(); const { snapshot: data, error, syncing } = useBoardState();
+  const places = data?.places || NO_PLACES, pending = data?.pending || []; const board = data?.board || "우리 데이트맵", loaded = !!data;
+  const navigation = useSearchParams().toString(); const [arrivalReady, setArrivalReady] = useState(false);
   const [view, setView] = useState<"map" | "list">("map"); const [query, setQuery] = useState("");
   const [statuses, setStatuses] = useState<PlaceStatus[]>([...STATUS_ORDER]); const [category, setCategory] = useState("");
   const [overlay, setOverlay] = useState<Overlay>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -40,25 +41,32 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
       }
     } catch { /* A stale local view must not prevent opening the map. */ }
     setRestored(true);
-    const sync = () => { const params = new URLSearchParams(window.location.search); const id = params.get("place"); setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null); };
-    sync(); const arrival = new URLSearchParams(window.location.search); setSavedArrival(arrival.get("saved")); duplicateArrival.current = arrival.get("duplicate") === "1"; window.addEventListener("popstate", sync);
-    return () => { window.removeEventListener("popstate", sync); sessionStorage.setItem("datemap-view", JSON.stringify({ ...snapshot.current, position: mapPosition.current, scroll: listScroll.current })); };
+    const saveView = () => { try { sessionStorage.setItem("datemap-view", JSON.stringify({ ...snapshot.current, position: mapPosition.current, scroll: listScroll.current })); } catch {} };
+    window.addEventListener("pagehide", saveView);
+    return () => { window.removeEventListener("pagehide", saveView); saveView(); };
   }, []);
+  useEffect(() => {
+    const syncOverlay = () => {
+      const params = new URLSearchParams(window.location.search), id = params.get("place");
+      setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null);
+    };
+    window.addEventListener("popstate", syncOverlay);
+    return () => window.removeEventListener("popstate", syncOverlay);
+  }, []);
+  useEffect(() => {
+    if (!active) { setOverlay(null); return; }
+    const params = new URLSearchParams(navigation), id = params.get("place");
+    setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null);
+    const saved = params.get("saved"); setSavedArrival(saved); duplicateArrival.current = params.get("duplicate") === "1";
+    let cancelled = false;
+    if (saved) { setArrivalReady(false); void store.refresh().then(() => { if (!cancelled) setArrivalReady(true); }); }
+    return () => { cancelled = true; };
+  }, [active, navigation, store]);
   useEffect(() => {
     if (!header.current) return;
     const observer = new ResizeObserver(() => root.current?.style.setProperty("--header-height", `${header.current!.offsetHeight}px`));
     observer.observe(header.current); return () => observer.disconnect();
   }, []);
-  const refresh = useCallback(async () => {
-    try {
-      const data = await requestJson<{ board: string; places: PlaceView[]; pending: Pending[] }>("/api/places", { cache: "no-store" });
-      setBoard(data.board); setPlaces(data.places); setPending(data.pending); setLoaded(true); setError("");
-    } catch (e) {
-      if (e instanceof RequestError && e.status === 401) { window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); return; }
-      setError(e instanceof Error ? e.message : "장소를 불러오지 못했어요.");
-    }
-  }, []);
-  useEffect(() => { refresh(); const focus = () => refresh(); window.addEventListener("focus", focus); return () => window.removeEventListener("focus", focus); }, [refresh]);
   useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listScroll.current; }, [view, loaded]);
   function open(kind: Exclude<Overlay, null>, id?: string) {
     const url = new URL(window.location.href); url.searchParams.delete("place"); url.searchParams.delete("panel");
@@ -75,7 +83,7 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
   const visible = useMemo(() => sortPlaces(filterPlaces(places, query, statuses, category), sort === "near" ? origin : null), [places, query, statuses, category, sort, origin]);
   const selected = places.find((p) => p.id === selectedId);
   useEffect(() => {
-    if (!loaded || !savedArrival) return;
+    if (!active || !loaded || !savedArrival || !arrivalReady || syncing || error) return;
     const place = places.find((p) => p.id === savedArrival);
     setView("map"); setQuery(""); setStatuses([...STATUS_ORDER]); setCategory("");
     setFocusedId(place?.id || null);
@@ -84,7 +92,7 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
     history.replaceState(history.state, "", url.pathname + url.search);
-  }, [loaded, places, savedArrival]);
+  }, [active, loaded, places, savedArrival, arrivalReady, syncing, error]);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 5000);
@@ -105,7 +113,7 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
   function reset() { setQuery(""); setStatuses([...STATUS_ORDER]); setCategory(""); }
   const all = statuses.length === STATUS_ORDER.length;
   return <div ref={root} className={`app-root view-${view}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas places={visible} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => open("place", id)} location={mapLocation} viewRequest={mapRequest} />}</div>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas places={visible} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => open("place", id)} location={mapLocation} viewRequest={mapRequest} />}</div>
     <header ref={header} className="app-header"><div className="app-title"><h1>{board}</h1><Link href="/settings" className="icon-btn" aria-label="우리 설정"><Icon name="settings" /></Link></div>
       <div className="saved-search"><Icon name="search" /><input aria-label="저장한 장소 찾기" placeholder="저장한 장소 찾기" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <button className="icon-btn" aria-label="검색 지우기" onClick={() => setQuery("")}><Icon name="close" width="18" /></button>}</div>
       <div className="view-tools"><div className="seg two view-switch" aria-label="보는 방식"><button aria-pressed={view === "map"} onClick={() => setView("map")}>지도</button><button aria-pressed={view === "list"} onClick={() => setView("list")}>리스트</button></div><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>
@@ -117,10 +125,11 @@ export default function MapApp({ who, kakaoKey }: { who: string; kakaoKey: strin
     </div>}
     {loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "검색어나 필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>검색·필터 초기화</button>}</div>}
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
-    {error && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={refresh}>다시 불러오기</button></div>}
+    {error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
+    {error && loaded && <div className="sync-notice" role="status"><span>{error} 마지막 조회 내용을 유지하고 있어요.</span><button className="text-btn" onClick={() => void store.refresh()}>다시 연결</button></div>}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="pin" width="19" /><span>저장한 곳</span></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => locate(false)}><Icon name="location" /></button></>}<Link href="/add" className="save-fab"><Icon name="plus" width="24" /><span>장소 저장</span></Link></div>
     {toast && <div className="toast" role="status"><span>{toast}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setToast("")}><Icon name="close" width="16" /></button></div>}
-    {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => setPlaces((ps) => ps.map((p) => p.id === selected.id ? { ...p, ...patch } : p))} onDelete={() => { setPlaces((ps) => ps.filter((p) => p.id !== selected.id)); close(); }} />}
+    {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); close(); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
     {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant="compact" onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}><h3>우리의 상태</h3><div className="filter-options">{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={statuses.includes(s)} onClick={() => setStatuses((current) => current.includes(s) ? current.filter((v) => v !== s) : [...current, s])}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}
     {overlay === "pending" && <Modal title="조금만 더 확인해요" onClose={close}><p className="lead">지점을 고르거나 장소 정보를 보태면 저장할 수 있어요.</p><div className="pending-list">{pending.map((p) => <Link key={p.id} href={`/confirm/${p.id}`} className="pending-row"><div><strong>{PENDING_LABEL[p.status] || "장소 확인하기"}</strong><small>{p.shared_by}님이 발견한 링크</small><span>{p.url.replace("https://www.instagram.com/", "")}</span></div><Icon name="chevron" /></Link>)}</div></Modal>}

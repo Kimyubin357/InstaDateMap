@@ -10,6 +10,7 @@ import { RequestError } from "@/lib/client-request";
 import LinkRecovery from "@/components/LinkRecovery";
 import { useRouter } from "next/navigation";
 import { shareDestination } from "@/lib/share-navigation";
+import { boardChanged } from "@/lib/board-events";
 const stages = ["caption", "extract", "search", "save"];
 const stageLabels = ["게시물 내용 가져오기", "장소 정보 읽기", "지도에서 위치 확인하기", "우리 지도에 저장하기"];
 export default function AddForm({ initialUrl }: { initialUrl: string }) {
@@ -18,6 +19,7 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
   const [result, setResult] = useState<ShareResult | null>(null); const [running, setBusy] = useState(false); const [leaving, setLeaving] = useState(false); const busy = running || leaving; const [stage, setStage] = useState("caption");
   const [shots, setShots] = useState<string[]>([]); const started = useRef(false);
   function complete(data: ShareResult) {
+    boardChanged();
     const destination = shareDestination(data);
     if (destination) { setLeaving(true); router.replace(destination); router.refresh(); }
     else setResult(data);

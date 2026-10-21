@@ -50,6 +50,7 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
   const snapshot = structuredClone(tables);
   const check = (r: { error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); };
   try {
+    if (name === "dm_board_revision") { const result = await new Q("board_sync").eq("board_id", p.p_board).maybeSingle(); check(result); return { data: String(result.data?.revision ?? 0), error: null }; }
     if (name === "dm_save_place") {
       if (p.p_source && !tables.sources?.some((s) => s.id === p.p_source && s.board_id === p.p_board)) throw Error("이 보드의 링크가 아닙니다.");
       if (p.p_extraction && !tables.extractions?.some((e) => e.id === p.p_extraction && e.source_id === p.p_source)) throw Error("이 링크의 장소 후보가 아닙니다.");
