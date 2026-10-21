@@ -37,13 +37,15 @@ export function decodeEntities(s: string): string {
 }
 
 export function metaContent(html: string, property: string): string | null {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${property}["'][^>]*content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${property}["']`,
-    "i",
-  );
-  const m = html.match(re);
-  const v = m?.[1] ?? m?.[2];
-  return v ? decodeEntities(v) : null;
+  for (const tag of html.match(/<meta\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi) ?? []) {
+    const attrs = new Map<string, string>();
+    for (const m of tag.matchAll(/([\w:-]+)\s*=\s*(["'])([\s\S]*?)\2/g)) attrs.set(m[1].toLowerCase(), m[3]);
+    if ((attrs.get("property") || attrs.get("name"))?.toLowerCase() === property.toLowerCase()) {
+      const content = attrs.get("content");
+      if (content) return decodeEntities(content);
+    }
+  }
+  return null;
 }
 
 /**

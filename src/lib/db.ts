@@ -8,6 +8,8 @@ export function db(): SupabaseClient {
   if (!client) {
     client = createClient(env.supabaseUrl(), env.supabaseServiceKey(), {
       auth: { persistSession: false },
+      // Next의 fetch 캐시에 인증 결과나 변경 전 지도 목록이 남지 않도록 합니다.
+      global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
     });
   }
   return client;

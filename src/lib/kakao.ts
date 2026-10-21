@@ -23,7 +23,7 @@ async function kakaoGet<T>(path: string, params: Record<string, string>, fetcher
     headers: { Authorization: `KakaoAK ${env.kakaoRestKey()}` },
     signal: AbortSignal.timeout(4000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error(`카카오 장소 검색 실패 (${res.status}). REST API 키와 카카오맵 사용 설정을 확인해 주세요.`);
   return (await res.json()) as T;
 }
 
@@ -54,11 +54,25 @@ export async function keywordSearch(query: string, fetcher: Fetcher = fetch, nea
 async function geocode(address: string, fetcher: Fetcher) {
   const r = await kakaoGet<{ documents: { x: string; y: string }[] }>(
     "/v2/local/search/address.json",
-    { query: address },
+    { query: roadAddress(address) || address },
     fetcher,
   );
   const d = r?.documents?.[0];
   return d ? { lat: Number(d.y), lng: Number(d.x) } : null;
+}
+
+/** 상호·층수는 제외하고 도로명과 건물 번호까지 비교합니다. */
+function roadAddress(address: string): string | null {
+  return address.match(/^(.+?(?:대로|로|길)\s+\d+(?:-\d+)?)(?=\s|$|,)/)?.[1] ?? null;
+}
+
+function addressKey(address: string): string | null {
+  const road = roadAddress(address);
+  return road?.replace(/경기도/g, "경기").replace(/서울특별시/g, "서울").replace(/인천광역시/g, "인천").replace(/\s/g, "") ?? null;
+}
+
+function matchesName(place: KakaoPlace, cand: PlaceCandidate) {
+  return nameKey(place.name).includes(nameKey(cand.name));
 }
 
 function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -122,6 +136,9 @@ export async function resolveCandidate(cand: PlaceCandidate, fetcher: Fetcher = 
 /** 사람이 확인하지 않아도 되는 경우: 후보가 하나뿐이거나, 1등이 이름까지 정확히 같고 2등과 차이가 클 때 */
 export function isConfident(cand: PlaceCandidate, places: KakaoPlace[]): boolean {
   if (places.length === 0) return false;
+  const address = cand.address ? addressKey(cand.address) : null;
+  if (cand.confidence >= 0.6 && address && matchesName(places[0], cand) && addressKey(places[0].address) === address &&
+      !places.slice(1).some((p) => addressKey(p.address) === address)) return true;
   if (places.length === 1) return cand.confidence >= 0.5;
   const [a, b] = places.map((p) => scorePlace(p, cand));
   return cand.confidence >= 0.6 && nameKey(places[0].name) === nameKey(cand.name, cand.branch) && a - b >= 3;

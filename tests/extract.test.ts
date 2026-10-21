@@ -111,7 +111,7 @@ describe("라우터", () => {
     expect(r.errors[0].module).toBe("location_tag");
   });
 
-  it("실제 모듈 조합: 캡션 + 위치 태그, 스크린샷은 필요할 때만", async () => {
+  it("실제 모듈 조합: 사용자가 올린 스크린샷은 캡션 후보가 있어도 분석", async () => {
     const calls: string[] = [];
     const llm = async (system: string) => {
       calls.push(system.includes("사진") ? "image" : "caption");
@@ -124,8 +124,16 @@ describe("라우터", () => {
       { llm },
       [locationTagModule, captionModule, imageModule],
     );
-    expect(calls).toEqual(["caption"]);
-    expect(r.candidates).toHaveLength(1);
+    expect(calls).toEqual(["caption", "image"]);
+    expect(r.candidates).toHaveLength(2);
     expect(r.candidates[0]).toMatchObject({ name: "어니언", branch: "성수점" });
+  });
+  it("도시 위치 태그는 제외하고 실제 공원·가게는 유지", async () => {
+    const deps = { llm: async () => "" };
+    for (const locationTag of ["경기도 수원", "서울특별시", "경기 수원시 권선구"]) {
+      expect(await locationTagModule.run(ctx({ locationTag }), deps)).toEqual([]);
+    }
+    expect(await locationTagModule.run(ctx({ locationTag: "서울숲" }), deps)).toHaveLength(1);
+    expect(await locationTagModule.run(ctx({ locationTag: "도나스데이 본점" }), deps)).toHaveLength(1);
   });
 });

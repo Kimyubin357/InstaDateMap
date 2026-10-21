@@ -3,7 +3,7 @@ import { env } from "./env";
 
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: env.anthropicKey() });
+  if (!client) client = new Anthropic({ apiKey: env.anthropicKey(), timeout: 15000, maxRetries: 0 });
   return client;
 }
 
@@ -41,6 +41,7 @@ export const callGemini: LlmCall = async (system, content) => {
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       headers: { "content-type": "application/json", "x-goog-api-key": env.geminiKey() },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },

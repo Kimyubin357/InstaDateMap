@@ -28,6 +28,10 @@ describe("인스타 링크 정리", () => {
 });
 
 describe("캡션 수집 파싱", () => {
+  it("캡션 안의 작은따옴표 때문에 장소 정보가 잘리지 않음", () => {
+    expect(metaContent(`<meta property="og:description" content="Today's pick: 도나스데이 수원본점">`, "og:description")).toBe("Today's pick: 도나스데이 수원본점");
+    expect(metaContent(`<meta content='오늘의 "카페" 도나스데이' name='description'>`, "description")).toBe('오늘의 "카페" 도나스데이');
+  });
   const html = `<html><head>
     <meta property="og:title" content="cafe_lover on Instagram" />
     <meta property="og:description" content="좋아요 1,234개, 댓글 56개 - cafe_lover님, 2025년 3월 1일: &quot;📍성수 카페 어니언 성수점&#10;주소: 서울 성동구 아차산로9길 8&quot;." />

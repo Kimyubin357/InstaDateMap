@@ -2,6 +2,8 @@
 type Row = Record<string, any>;
 export const tables: Record<string, Row[]> = {};
 let seq = 0;
+const failures: { table: string; op: string; message: string }[] = [];
+export function failNext(table: string, op: string, message = "테스트 DB 오류") { failures.push({ table, op, message }); }
 const uniq: Record<string, string[]> = {
   sources: ["board_id", "url"],
   places: ["board_id", "kakao_place_id"],
@@ -13,6 +15,12 @@ class Q {
   private op: "select" | "update" | "delete" = "select";
   private patch: Row = {};
   private result: Row[] | null = null;
+  private failure: { message: string } | null = null;
+  private failed(op: string) {
+    const index = failures.findIndex((f) => f.table === this.t && f.op === op);
+    if (index >= 0) this.failure = { message: failures.splice(index, 1)[0].message };
+    return !!this.failure;
+  }
   constructor(private t: string) {
     tables[t] ??= [];
   }
@@ -33,14 +41,17 @@ class Q {
   }
   update(p: Row) {
     this.op = "update";
+    this.failed("update");
     this.patch = p;
     return this;
   }
   delete() {
     this.op = "delete";
+    this.failed("delete");
     return this;
   }
   insert(rows: Row[]) {
+    if (this.failed("insert")) return this;
     this.result = rows.map((r) => {
       const row = { id: `id${++seq}`, ...r };
       tables[this.t].push(row);
@@ -49,6 +60,7 @@ class Q {
     return this;
   }
   upsert(input: Row | Row[], opts: { ignoreDuplicates?: boolean } = {}) {
+    if (this.failed("upsert")) return this;
     const keys = uniq[this.t];
     this.result = (Array.isArray(input) ? input : [input]).map((r) => {
       const found = tables[this.t].find((x) => keys.every((k) => x[k] === r[k]));
@@ -63,6 +75,7 @@ class Q {
     return this;
   }
   private run(): Row[] {
+    if (this.failure || (this.result === null && this.op === "select" && this.failed("select"))) return [];
     if (this.result) return this.result;
     const rows = tables[this.t].filter((r) => this.filters.every((f) => f(r)));
     if (this.op === "update") rows.forEach((r) => Object.assign(r, this.patch));
@@ -70,18 +83,20 @@ class Q {
     return rows;
   }
   async maybeSingle() {
-    return { data: this.run()[0] ?? null, error: null };
+    return { data: this.run()[0] ?? null, error: this.failure };
   }
   async single() {
     const d = this.run()[0];
-    return { data: d ?? null, error: d ? null : { message: "none" } };
+    return { data: d ?? null, error: this.failure ?? (d ? null : { message: "none" }) };
   }
-  then(res: (v: { data: Row[]; error: null }) => unknown) {
-    return Promise.resolve({ data: this.run(), error: null }).then(res);
+  then(res: (v: { data: Row[]; error: { message: string } | null }) => unknown) {
+    return Promise.resolve({ data: this.run(), error: this.failure }).then(res);
   }
 }
 
 export const fakeDb = { from: (t: string) => new Q(t) };
 export function reset() {
+  seq = 0;
+  failures.length = 0;
   for (const k of Object.keys(tables)) delete tables[k];
 }

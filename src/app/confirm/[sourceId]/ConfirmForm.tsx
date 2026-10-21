@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { KakaoPlace } from "@/lib/types";
+import { requestJson } from "@/lib/client-request";
 
 export interface ExtractionView {
   id: string;
@@ -71,38 +72,34 @@ export default function ConfirmForm({
       const place = all.find((p) => p.kakao_place_id === c.pickedId) ?? null;
       return { extraction_id: e.id, include: c.include && !!place, place };
     });
-    const res = await fetch(`/api/sources/${source.id}/confirm`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ who, selections }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      setError("저장하지 못했어요. 잠시 후 다시 눌러 주세요.");
-      return;
-    }
-    const body = await res.json();
-    setDone(body.saved);
+    try {
+      const body = await requestJson<{ saved: number }>(`/api/sources/${source.id}/confirm`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ who, selections }),
+      });
+      setDone(body.saved);
+    } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
+    finally { setSaving(false); }
   }
 
   async function reprocess() {
     if (!caption.trim()) return;
     setReprocessing(true);
     setError(null);
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ url: source.url, who, caption }),
-    });
-    const body = await res.json().catch(() => ({}));
-    setReprocessing(false);
-    if (body.status === "saved") {
-      setDone(1);
-    } else if (res.ok) {
-      window.location.reload();
-    } else {
-      setError(body.message ?? "다시 찾지 못했어요.");
-    }
+    try {
+      const body = await requestJson<{ status: string }>("/api/share", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ url: source.url, who, caption }),
+      });
+      if (body.status === "saved") {
+        setDone(1);
+      } else {
+        window.location.reload();
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "다시 찾지 못했어요."); }
+    finally { setReprocessing(false); }
   }
 
   if (done !== null) {
@@ -204,7 +201,7 @@ export default function ConfirmForm({
           <button className="btn" style={{ marginTop: 8, width: "100%" }} disabled={reprocessing || !caption.trim()} onClick={reprocess}>
             {reprocessing ? "찾는 중…" : "이 캡션으로 다시 찾기"}
           </button>
-          {extractions.length === 0 && (
+          {noPlaces && (
             <div style={{ marginTop: 14 }}>
               <div className="pick-evidence" style={{ marginBottom: 6 }}>
                 또는 장소를 직접 검색하기
@@ -228,18 +225,21 @@ export default function ConfirmForm({
   );
 }
 
-function ManualSearch({ token, initial, onPick }: { token: string; initial: string; onPick: (p: KakaoPlace) => void }) {
+function ManualSearch({ token, initial, onPick }: { token: string; initial: string; onPick: (p: KakaoPlace) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(initial);
   const [results, setResults] = useState<KakaoPlace[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function run() {
     setBusy(true);
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { headers: { "x-board-token": token } });
-    const body = await res.json().catch(() => ({ places: [] }));
-    setResults(body.places ?? []);
-    setBusy(false);
+    setError(null);
+    try {
+      const body = await requestJson<{ places: KakaoPlace[] }>(`/api/search?q=${encodeURIComponent(q)}`, { headers: { "x-board-token": token } });
+      setResults(body.places ?? []);
+    } catch (e) { setError(e instanceof Error ? e.message : "검색하지 못했어요."); }
+    finally { setBusy(false); }
   }
 
   if (!open) {
@@ -264,14 +264,19 @@ function ManualSearch({ token, initial, onPick }: { token: string; initial: stri
         </button>
       </div>
       {results && results.length === 0 && <p className="pick-evidence">검색 결과가 없어요.</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {results?.map((p) => (
         <button
           key={p.kakao_place_id}
           className="option"
           style={{ width: "100%", marginTop: 6, background: "var(--paper)", textAlign: "left" }}
-          onClick={() => {
-            onPick(p);
-            setOpen(false);
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try { await onPick(p); setOpen(false); }
+            catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
+            finally { setBusy(false); }
           }}
         >
           <span>
@@ -291,12 +296,12 @@ function DirectAdd({ token, sourceId, who, onDone }: { token: string; sourceId: 
       token={token}
       initial=""
       onPick={async (p) => {
-        const res = await fetch(`/api/sources/${sourceId}/confirm`, {
+        await requestJson(`/api/sources/${sourceId}/confirm`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-board-token": token },
           body: JSON.stringify({ who, selections: [], direct: p }),
         });
-        if (res.ok) onDone();
+        onDone();
       }}
     />
   );

@@ -45,9 +45,10 @@ export default function AddForm({ token, who, initialUrl }: { token: string; who
       const res = await fetch("/api/share", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-board-token": token },
-        body: JSON.stringify({ url: v, who: who || "익명", images }),
+        body: JSON.stringify({ url: v, who: who || "익명", images, retry: true }),
       });
       const data = (await res.json()) as Result;
+      if (!res.ok || data.status === "error") { setResult(data); return; }
       // 캡션을 못 가져왔으면 이 화면에서 스크린샷을 받습니다.
       if (data.status === "needs_caption" || (data.status === "needs_review" && images.length === 0)) {
         setResult(data);
@@ -87,9 +88,13 @@ export default function AddForm({ token, who, initialUrl }: { token: string; who
 
   async function onPickShots(files: FileList | null) {
     if (!files?.length) return;
-    const picked = await Promise.all([...files].slice(0, 4).map(toJpegBase64));
-    setShots(picked);
-    if (text.trim()) submit(text, picked);
+    try {
+      const picked = await Promise.all([...files].slice(0, 4).map(toJpegBase64));
+      setShots(picked);
+      if (text.trim()) submit(text, picked);
+    } catch {
+      setResult({ status: "error", message: "이미지를 읽지 못했어요. JPG 또는 PNG 스크린샷으로 다시 올려 주세요." });
+    }
   }
 
   const ok = result && ["saved", "duplicate"].includes(result.status);
@@ -111,6 +116,7 @@ export default function AddForm({ token, who, initialUrl }: { token: string; who
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit(text)}
           inputMode="url"
+          aria-label="인스타그램 링크"
         />
         <button className="btn" style={{ flex: "none" }} onClick={() => submit(text)} disabled={busy || !text.trim()}>
           저장
@@ -123,9 +129,7 @@ export default function AddForm({ token, who, initialUrl }: { token: string; who
           <p style={{ margin: "6px 0 0" }}>
             {result.status === "needs_caption"
               ? "인스타가 게시물 글을 막아 둔 경우예요. 게시물(캡션·간판·자막이 보이게) 스크린샷을 올리면 AI가 읽고 장소를 찾아요."
-              : result.status === "needs_review"
-                ? "글에서는 장소를 못 찾았어요. 사진 속 간판·자막에 상호가 있다면 스크린샷을 올려 보세요."
-                : result.message}
+              : result.message}
           </p>
         </div>
       )}
@@ -150,11 +154,11 @@ export default function AddForm({ token, who, initialUrl }: { token: string; who
         🖼️ 스크린샷으로 찾기{shots.length ? ` (${shots.length}장 선택됨)` : ""}
       </button>
 
-      {needShot && result?.confirm_url && (
+      {result?.confirm_url && (
         <p className="lead" style={{ marginTop: 10, fontSize: 14 }}>
           또는{" "}
           <a className="source-link" href={result.confirm_url.replace(/^https?:\/\/[^/]+/, "")}>
-            장소 이름 직접 검색하기
+            캡션 붙여넣기 또는 장소 직접 검색
           </a>
         </p>
       )}

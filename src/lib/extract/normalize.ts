@@ -23,6 +23,7 @@ export function candidatesFromLlm(text: string, module: ModuleName): PlaceCandid
   if (!parsed || !Array.isArray(parsed.places)) return [];
   const out: PlaceCandidate[] = [];
   for (const p of parsed.places) {
+    if (!p || typeof p !== "object") continue;
     const name = str(p.name);
     if (!name || name.length > 60) continue;
     const c = typeof p.confidence === "number" ? p.confidence : Number(p.confidence);

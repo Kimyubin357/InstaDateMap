@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeDb, reset, tables } from "./fakeDb";
+import { fakeDb, failNext, reset, tables } from "./fakeDb";
 
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("@/lib/instagram", async (orig) => {
@@ -19,17 +19,89 @@ vi.mock("@/lib/kakao", async (orig) => {
 
 import { confirmSelections, ingestShare } from "@/lib/pipeline";
 import { fetchCaption } from "@/lib/instagram";
+import { resolveCandidate } from "@/lib/kakao";
 
 process.env.APP_BASE_URL = "https://app.test";
 const llmFor = (names: string[]) => async () =>
   JSON.stringify({ places: names.map((n) => ({ name: n, confidence: 0.9 })) });
+const base = { boardId: "b1", token: "tok", who: "민지" };
 
 beforeEach(() => {
   reset();
+  vi.clearAllMocks();
   tables.boards = [{ id: "b1", name: "우리", token: "tok" }];
 });
 
-const base = { boardId: "b1", token: "tok", who: "민지" };
+describe("저장 실패와 재시도", () => {
+  const input = { ...base, text: "https://www.instagram.com/p/AAA/", caption: "어니언" };
+
+  it("삭제한 핀은 같은 링크를 다시 공유해서 복구", async () => {
+    await ingestShare(input, llmFor(["어니언"]));
+    tables.places = [];
+    tables.source_places = [];
+    const r = await ingestShare({ ...base, text: input.text }, llmFor(["어니언"]));
+    expect(r.status).toBe("saved");
+    expect(tables.places).toHaveLength(1);
+    expect(tables.source_places).toHaveLength(1);
+  });
+
+  it("확인 대기 중인 링크도 명시적으로 재분석 가능", async () => {
+    await ingestShare({ ...input, caption: "없는집" }, llmFor(["없는집"]));
+    const r = await ingestShare({ ...base, text: input.text, retry: true }, llmFor(["어니언"]));
+    expect(r.status).toBe("saved");
+  });
+
+  it("지역 위치 태그 때문에 장소 하나가 여러 장소로 바뀌지 않음", async () => {
+    vi.mocked(fetchCaption).mockResolvedValueOnce({ caption: "어니언", method: "og", locationTag: "경기도 수원" });
+    const r = await ingestShare({ ...base, text: input.text }, llmFor(["어니언"]));
+    expect(r.status).toBe("saved");
+    expect(tables.extractions).toHaveLength(1);
+  });
+
+  it("캡션 후보가 있어도 업로드한 스크린샷으로 다시 찾음", async () => {
+    const llm = vi.fn(async (_system, content) => JSON.stringify({ places: [{ name: content.some((c: { type: string }) => c.type === "image") ? "어니언" : "없는집", confidence: 0.9 }] }));
+    const r = await ingestShare({ ...input, images: [{ mediaType: "image/png", data: "test" }] }, llm);
+    expect(llm).toHaveBeenCalledTimes(2);
+    expect(r.status).toBe("confirm");
+    expect(tables.extractions.some((e) => e.module === "image" && e.candidates.length)).toBe(true);
+  });
+
+  for (const [table, op] of [["source_places", "upsert"], ["extractions", "insert"], ["extractions", "delete"], ["sources", "update"], ["places", "upsert"]]) {
+    it(`${table} ${op} 실패를 저장 성공으로 보고하지 않음`, async () => {
+      failNext(table, op);
+      const r = await ingestShare(input, llmFor(["어니언"]));
+      expect(r.status).toBe("error");
+      expect(r.confirm_url).toContain("/confirm/");
+      expect(tables.sources[0].status).toBe("needs_review");
+    });
+  }
+
+  it("캡션 없는 링크의 DB 저장 실패를 숨기지 않음", async () => {
+    failNext("sources", "upsert");
+    await expect(ingestShare({ ...base, text: input.text }, llmFor([]))).rejects.toThrow("링크 저장 실패");
+  });
+
+  it("AI 장애를 장소 정보 없음과 구분하고 재시도 가능하게 보존", async () => {
+    const r = await ingestShare(input, async () => { throw new Error("quota"); });
+    expect(r.status).toBe("error");
+    expect(r.message).toContain("AI");
+    expect(tables.sources[0].status).toBe("needs_review");
+  });
+
+  it("카카오 장애를 빈 검색 결과로 바꾸지 않음", async () => {
+    vi.mocked(resolveCandidate).mockRejectedValueOnce(new Error("카카오 장소 검색 실패 (401)"));
+    const r = await ingestShare(input, llmFor(["어니언"]));
+    expect(r.status).toBe("error");
+    expect(r.message).toContain("401");
+  });
+
+  it("다른 링크의 추출 후보를 연결하지 못함", async () => {
+    const r = await ingestShare(input, llmFor(["자연도소금빵"]));
+    tables.extractions.push({ id: "foreign", source_id: "other" });
+    await expect(confirmSelections("b1", r.source_id!, "민지", [{ extraction_id: "foreign", include: true, place: tables.extractions[0].candidates[0] }])).rejects.toThrow("이 링크의 장소 후보");
+    expect(tables.places ?? []).toHaveLength(0);
+  });
+});
 
 describe("공유 → 저장 흐름", () => {
   it("캡션을 못 받으면 붙여넣기 요청", async () => {

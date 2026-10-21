@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { isConfident, resolveCandidate, scorePlace } from "@/lib/kakao";
+import { isConfident, keywordSearch, resolveCandidate, scorePlace } from "@/lib/kakao";
 import type { PlaceCandidate } from "@/lib/extract/types";
 
 beforeAll(() => {
@@ -38,6 +38,30 @@ const cand: PlaceCandidate = {
 };
 
 describe("카카오 후보 고르기", () => {
+  const suwon = { kakao_place_id: "978669489", name: "도나스데이 본점", address: "경기 수원시 권선구 서수원로 174-2", lat: 37.24, lng: 126.97, category: "카페", kakao_url: "" };
+  const yongin = { ...suwon, kakao_place_id: "other", address: "경기 용인시 기흥구 구성로 160" };
+  const donas = { ...cand, name: "도나스데이", branch: "수원본점", areaHint: "수원", address: "경기도 수원시 권선구 서수원로 174-2 도나스데이 본점" };
+
+  it("사용자 실패 링크: 지점 표기가 달라도 상호와 정확한 주소가 맞으면 확정", () => {
+    expect(isConfident(donas, [suwon, yongin])).toBe(true);
+    expect(isConfident({ ...donas, address: null }, [suwon, yongin])).toBe(false);
+    expect(isConfident(donas, [yongin, suwon])).toBe(false);
+    expect(isConfident(donas, [suwon, { ...suwon, kakao_place_id: "same-building" }])).toBe(false);
+  });
+
+  it("상호가 붙은 주소는 건물 번호까지 정리해서 좌표 검색", async () => {
+    const queries: string[] = [];
+    await resolveCandidate(donas, (async (input: RequestInfo | URL) => {
+      const u = new URL(String(input));
+      if (u.pathname.includes("address")) queries.push(u.searchParams.get("query")!);
+      return new Response(JSON.stringify({ documents: [] }));
+    }) as typeof fetch);
+    expect(queries).toEqual(["경기도 수원시 권선구 서수원로 174-2"]);
+  });
+
+  it("카카오 인증 실패를 검색 결과 없음으로 숨기지 않음", async () => {
+    await expect(keywordSearch("카페", (async () => new Response("{}", { status: 401 })) as typeof fetch)).rejects.toThrow("401");
+  });
   it("지점까지 맞는 곳이 1등, 이름이 전혀 다른 결과는 버림", async () => {
     const places = await resolveCandidate(
       cand,

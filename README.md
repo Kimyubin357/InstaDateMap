@@ -52,7 +52,7 @@
 cp .env.example .env.local   # 값 채우기
 npm install
 npm run dev                  # http://localhost:3000/?t=토큰&who=민지
-npm test                     # 단위·흐름 테스트 24개
+npm test                     # 단위·API·저장 흐름 회귀 테스트
 ```
 
 ### 5. iOS 단축어 (두 폰 모두)
@@ -93,7 +93,7 @@ export const commentModule: ExtractorModule = {
 };
 ```
 
-`src/lib/extract/router.ts`의 `MODULES`에 한 줄 넣으면 라우터가 알아서 부릅니다. 무거운 모듈은 신뢰도 0.6 이상인 후보가 이미 있으면 건너뜁니다(`GOOD_ENOUGH`). DB의 `extractions.module` 체크 제약에도 이름을 추가하세요.
+`src/lib/extract/router.ts`의 `MODULES`에 한 줄 넣으면 라우터가 알아서 부릅니다. 무거운 모듈은 신뢰도 0.6 이상인 후보가 이미 있으면 건너뜁니다(`GOOD_ENOUGH`). 단, 사용자가 올린 스크린샷은 항상 분석합니다. DB의 `extractions.module` 체크 제약에도 이름을 추가하세요.
 
 ## 알아 둘 점
 

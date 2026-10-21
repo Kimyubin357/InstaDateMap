@@ -10,7 +10,8 @@ export async function boardFromRequest(req: Request): Promise<Board | null> {
   const url = new URL(req.url);
   const token = req.headers.get("x-board-token") || url.searchParams.get("t");
   if (!token) return null;
-  const { data } = await db().from("boards").select("id, name").eq("token", token).maybeSingle();
+  const { data, error } = await db().from("boards").select("id, name").eq("token", token).maybeSingle();
+  if (error) throw new Error("보드에 연결하지 못했어요. 데이터베이스 연결과 설정을 확인해 주세요.");
   return data ?? null;
 }
 

@@ -41,7 +41,8 @@ export async function extractPlaces(
 
   // 2) 결과가 부족할 때만 무거운 모듈을 하나씩 실행
   for (const m of usable.filter((x) => x.cost === "heavy")) {
-    if (collected.some((c) => c.confidence >= GOOD_ENOUGH)) break;
+    // 사용자가 올린 스크린샷은 명시적인 재시도이므로 반드시 읽습니다.
+    if (collected.some((c) => c.confidence >= GOOD_ENOUGH) && !(m.name === "image" && ctx.images.length > 0)) continue;
     await runOne(m);
   }
 

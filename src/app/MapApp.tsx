@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
+import { requestJson } from "@/lib/client-request";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -45,17 +46,21 @@ const PENDING_LABEL: Record<Pending["status"], string> = {
   needs_caption: "캡션 필요",
 };
 
+const scripts = new Map<string, Promise<void>>();
 function loadScript(src: string, id: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.getElementById(id)) return resolve();
+  const existing = scripts.get(id);
+  if (existing) return existing;
+  const promise = new Promise<void>((resolve, reject) => {
     const s = document.createElement("script");
     s.id = id;
     s.src = src;
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error(`${src} 로드 실패`));
+    s.onerror = () => { scripts.delete(id); s.remove(); reject(new Error("지도 스크립트 로드 실패")); };
     document.head.appendChild(s);
   });
+  scripts.set(id, promise);
+  return promise;
 }
 
 export default function MapApp({ token, who, kakaoKey }: { token: string; who: string; kakaoKey: string }) {
@@ -64,6 +69,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
   const [pending, setPending] = useState<Pending[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<Set<PlaceStatus>>(new Set(STATUS_ORDER));
   const [category, setCategory] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,21 +88,26 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
 
   const api = useCallback(
     (path: string, init?: RequestInit) =>
-      fetch(path, { ...init, headers: { "Content-Type": "application/json", "x-board-token": token, ...init?.headers } }),
+      fetch(path, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", "x-board-token": token, ...init?.headers } }),
     [token],
   );
 
   const refresh = useCallback(async () => {
-    const res = await api("/api/places");
-    if (!res.ok) {
-      setError(res.status === 401 ? "보드 주소가 맞지 않아요. 처음 받은 주소로 다시 열어 주세요." : "장소를 불러오지 못했어요.");
-      return;
+    try {
+      const res = await api("/api/places");
+      if (!res.ok) {
+        setError(res.status === 401 ? "보드 주소가 맞지 않아요. 처음 받은 주소로 다시 열어 주세요." : "장소를 불러오지 못했어요.");
+        return;
+      }
+      const body = await res.json();
+      setBoard(body.board);
+      setPlaces(body.places);
+      setPending(body.pending);
+      setLoaded(true);
+      setError(null);
+    } catch {
+      setError("서버에 연결하지 못했어요. 연결을 확인하고 다시 열어 주세요.");
     }
-    const body = await res.json();
-    setBoard(body.board);
-    setPlaces(body.places);
-    setPending(body.pending);
-    setLoaded(true);
   }, [api]);
 
   useEffect(() => {
@@ -109,7 +120,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
   // 카카오맵 SDK
   useEffect(() => {
     if (!kakaoKey) {
-      setError("카카오 JavaScript 키(NEXT_PUBLIC_KAKAO_JS_KEY)가 설정되지 않았어요.");
+      setMapError("카카오 JavaScript 키(NEXT_PUBLIC_KAKAO_JS_KEY)가 설정되지 않았어요.");
       return;
     }
     loadScript(`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false`, "kakao-sdk")
@@ -123,7 +134,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
           setMapReady(true);
         }),
       )
-      .catch(() => setError("지도를 불러오지 못했어요. 카카오 앱 설정의 사이트 도메인을 확인해 주세요."));
+      .catch(() => setMapError("지도를 불러오지 못했어요. 카카오 앱 설정의 사이트 도메인을 확인해 주세요."));
   }, [kakaoKey]);
 
   const categories = useMemo(
@@ -154,6 +165,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
       const ov = new k.maps.CustomOverlay({
         position: new k.maps.LatLng(p.lat, p.lng),
         content: el,
+        xAnchor: 0, // .pin의 translate(-50%)가 가운데 정렬을 담당합니다.
         yAnchor: 0,
         zIndex: p.id === selectedId ? 10 : 1,
       });
@@ -163,7 +175,7 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
     if (!fitted.current && visible.length > 0) {
       const b = new k.maps.LatLngBounds();
       visible.forEach((p) => b.extend(new k.maps.LatLng(p.lat, p.lng)));
-      map.current.setBounds(b, 80, 40, 120, 40);
+      map.current.setBounds(b, 80, 120, 120, 120);
       fitted.current = true;
     }
   }, [visible, selectedId]);
@@ -268,12 +280,12 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
   return (
     <div className="map-root">
       <div ref={mapEl} className="map-canvas" aria-label="저장한 장소 지도" />
-      {error && (
+      {(error || mapError) && (
         <div className="map-empty">
-          <p>{error}</p>
+          <p>{error || mapError}</p>
         </div>
       )}
-      {!error && loaded && places.length === 0 && (
+      {!error && !mapError && loaded && places.length === 0 && (
         <div className="map-empty" style={{ pointerEvents: "none" }}>
           <p>
             아직 저장한 곳이 없어요.
@@ -343,12 +355,12 @@ export default function MapApp({ token, who, kakaoKey }: { token: string; who: s
           place={selected}
           onClose={() => setSelectedId(null)}
           onChange={async (patch) => {
+            await requestJson(`/api/places/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-board-token": token }, body: JSON.stringify(patch) });
             setPlaces((ps) => ps.map((p) => (p.id === selected.id ? { ...p, ...patch } : p)));
-            await api(`/api/places/${selected.id}`, { method: "PATCH", body: JSON.stringify(patch) });
           }}
           onDelete={async () => {
             if (!confirm(`${selected.name}을(를) 지도에서 지울까요?`)) return;
-            await api(`/api/places/${selected.id}`, { method: "DELETE" });
+            await requestJson(`/api/places/${selected.id}`, { method: "DELETE", headers: { "x-board-token": token } });
             setSelectedId(null);
             setPlaces((ps) => ps.filter((p) => p.id !== selected.id));
           }}
@@ -390,10 +402,20 @@ function PlaceSheet({
 }: {
   place: Place;
   onClose: () => void;
-  onChange: (patch: Partial<Pick<Place, "status" | "memo">>) => void;
-  onDelete: () => void;
+  onChange: (patch: Partial<Pick<Place, "status" | "memo">>) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const [memo, setMemo] = useState(place.memo ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function change(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try { await action(); }
+    catch (e) { setError(e instanceof Error ? e.message : "변경 내용을 저장하지 못했어요."); }
+    finally { setBusy(false); }
+  }
   const both = place.sharers.length >= 2;
 
   // 인스타 공식 임베드: 원본 사진·캐러셀·릴스를 그 자리에서 보여 줍니다.
@@ -421,7 +443,7 @@ function PlaceSheet({
 
         <div className="seg" role="group" aria-label="상태">
           {STATUS_ORDER.map((s) => (
-            <button key={s} className={s} aria-pressed={place.status === s} onClick={() => onChange({ status: s })}>
+            <button key={s} className={s} disabled={busy} aria-pressed={place.status === s} onClick={() => change(() => onChange({ status: s }))}>
               {STATUS_LABEL[s]}
             </button>
           ))}
@@ -448,10 +470,12 @@ function PlaceSheet({
         <textarea
           className="memo"
           value={memo}
+          maxLength={500}
           placeholder="예: 주말엔 웨이팅 김, 창가 자리 추천"
           onChange={(e) => setMemo(e.target.value)}
-          onBlur={() => memo !== (place.memo ?? "") && onChange({ memo })}
+          onBlur={() => memo !== (place.memo ?? "") && change(() => onChange({ memo }))}
         />
+        {error && <p className="error" role="alert">{error}</p>}
 
         <div className="actions">
           {place.kakao_url && (
@@ -459,7 +483,7 @@ function PlaceSheet({
               카카오맵에서 열기
             </a>
           )}
-          <button className="btn danger" onClick={onDelete}>
+          <button className="btn danger" disabled={busy} onClick={() => change(onDelete)}>
             핀 지우기
           </button>
         </div>
