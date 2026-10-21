@@ -7,7 +7,7 @@ import Modal from "@/components/Modal";
 import MapCanvas, { type MapPosition, type MapViewRequest } from "@/components/MapCanvas";
 import PlaceSheet from "@/components/PlaceSheet";
 import BottomNav from "@/components/BottomNav";
-import FloatingSearchBar from "@/components/FloatingSearchBar";
+import ShellLink from "@/components/ShellLink";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type PlaceView } from "@/lib/place-view";
@@ -128,7 +128,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const all = statuses.length === STATUS_ORDER.length;
   return <div className={`app-root view-${view}`}>
     <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => open("place", id)} location={mapLocation} viewRequest={mapRequest} />}</div>
-    <h1 className="sr-only">{board}</h1><FloatingSearchBar />
+    <h1 className="sr-only">{board}</h1>
     <div className="floating-filters"><div className="chips" aria-label="빠른 상태 필터"><button className="chip" aria-pressed={all} onClick={() => setStatuses([...STATUS_ORDER])}>전체</button>{(["wish", "visited"] as PlaceStatus[]).map((s) => <button className="chip" key={s} aria-pressed={statuses.length === 1 && statuses[0] === s} onClick={() => setStatuses([s])}>{STATUS_LABEL[s]}</button>)}{category && <button className="chip" aria-pressed="true" onClick={() => setCategory("")}>{category}<Icon name="close" width="14" /></button>}</div><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {view === "list" && <div ref={list} className="places-list" onScroll={(e) => { listScroll.current = e.currentTarget.scrollTop; }}><div className="list-heading"><h2>저장한 장소</h2><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>
@@ -138,7 +138,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
     {error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
     {error && loaded && <div className="sync-notice" role="status"><span>{error} 마지막 조회 내용을 유지하고 있어요.</span><button className="text-btn" onClick={() => void store.refresh()}>다시 연결</button></div>}
-    <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => locate(false)}><Icon name="location" /></button></>}<Link href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></Link></div>
+    <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => locate(false)}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} />
     {toast && <div className="toast" role="status"><span>{toast}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setToast("")}><Icon name="close" width="16" /></button></div>}
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); close(); }} />}

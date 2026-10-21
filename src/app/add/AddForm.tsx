@@ -11,6 +11,7 @@ import LinkRecovery from "@/components/LinkRecovery";
 import { useRouter } from "next/navigation";
 import { shareDestination } from "@/lib/share-navigation";
 import { boardChanged } from "@/lib/board-events";
+import { navigateShell } from "@/lib/shell-navigation";
 const stages = ["caption", "extract", "search", "save"];
 const stageLabels = ["게시물 내용 가져오기", "장소 정보 읽기", "지도에서 위치 확인하기", "우리 지도에 저장하기"];
 export default function AddForm({ initialUrl }: { initialUrl: string }) {
@@ -18,10 +19,13 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
   const [tab, setTab] = useState("link"); const [text, setText] = useState(initialUrl); const [caption, setCaption] = useState("");
   const [result, setResult] = useState<ShareResult | null>(null); const [running, setBusy] = useState(false); const [leaving, setLeaving] = useState(false); const busy = running || leaving; const [stage, setStage] = useState("caption");
   const [shots, setShots] = useState<string[]>([]); const started = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   function complete(data: ShareResult) {
     boardChanged();
+    if (!alive.current) return;
     const destination = shareDestination(data);
-    if (destination) { setLeaving(true); router.replace(destination); router.refresh(); }
+    if (destination) { setLeaving(true); if (!navigateShell(destination, true)) router.replace(destination); }
     else setResult(data);
   }
   async function submit(value = text, images = shots) {
@@ -39,7 +43,7 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
   useEffect(() => { if (initialUrl && !started.current) { started.current = true; submit(initialUrl); } }, []);
   async function clipboard() { try { const value = await navigator.clipboard.readText(); if (value.trim()) { setText(value); await submit(value); } } catch { setResult({ status: "error", message: "클립보드를 읽지 못했어요. 입력칸을 길게 눌러 붙여넣어 주세요." }); } }
   return <main className="form-page"><ClientReady><PageHeader title="장소 저장" />
-    <div className="seg two save-tabs" role="group" aria-label="저장 방식"><button disabled={busy} aria-pressed={tab === "link"} onClick={() => setTab("link")}><Icon name="link" width="17" /> 인스타 링크</button><button disabled={busy} aria-pressed={tab === "search"} onClick={() => result?.source_id ? setTab("search") : router.push("/search")}><Icon name="search" width="17" /> 장소 검색</button></div>
+    {tab === "search" && <button className="text-btn" disabled={busy} onClick={() => setTab("link")}>링크로 다시 찾기</button>}
     <section className="add-intro"><h2>{tab === "link" ? "발견한 곳, 여기 담아둘까요?" : "이미 아는 좋은 곳도 담아요"}</h2><p>{tab === "link" ? "인스타에서 복사한 링크를 넣으면 장소를 찾아드려요." : "가보고 싶은 장소를 검색하고 지점을 골라 주세요."}</p></section>
     {leaving ? <p className="notice" role="status">{stage === "save" ? "우리 지도를 여는 중…" : "다음 화면을 여는 중…"}</p> : tab === "search" ? <ManualPlaceSearch sourceId={result?.source_id} onSaved={complete} /> : <>
       <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="search-row"><input className="field" aria-label="인스타그램 링크" inputMode="url" value={text} onChange={(e) => { setText(e.target.value); setResult(null); setShots([]); setCaption(""); }} placeholder="https://www.instagram.com/…" disabled={busy} /><button className="btn primary" disabled={busy || !text.trim()} style={{ fontSize: 15 }}>{busy ? "찾는 중" : "저장"}</button></form>
@@ -50,5 +54,5 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
         {result.confirm_url && <Link className="return-link" href={result.confirm_url.replace(/^https?:\/\/[^/]+/, "")}>확인 화면 이어서 열기</Link>}
       </LinkRecovery></>}
     </>}
-    <Link className="return-link" href="/">우리 지도로 돌아가기</Link></ClientReady></main>;
+    </ClientReady></main>;
 }

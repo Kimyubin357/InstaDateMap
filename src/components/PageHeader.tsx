@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
+import ShellLink from "./ShellLink";
 import Icon from "./Icon";
 import { useBoardSync } from "./BoardProvider";
 export default function PageHeader({ title }: { title: string }) {
   const { homeHref } = useBoardSync();
-  return <header className="page-header"><Link href={homeHref} className="icon-btn" aria-label="우리 지도로 돌아가기"><Icon name="back" /></Link><h1>{title}</h1><span className="header-spacer" /></header>;
+  return <header className="page-header"><ShellLink href={homeHref} className="icon-btn" aria-label="이전 화면으로"><Icon name="back" /></ShellLink><h1>{title}</h1><span className="header-spacer" /></header>;
 }

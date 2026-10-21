@@ -1,4 +1,5 @@
 import { requirePageBoard } from "@/lib/access";
-import SettingsForm from "./SettingsForm";
+import { MapEntry } from "@/components/BoardProvider";
+import { syncAccess } from "@/lib/sync-server";
 export const dynamic = "force-dynamic";
-export default async function SettingsPage() { const board = await requirePageBoard("/settings"); return <SettingsForm who={board.who} names={board.memberNames} />; }
+export default async function SettingsPage() { const board = await requirePageBoard("/settings"); return <MapEntry access={syncAccess(board)} />; }

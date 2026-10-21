@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import Icon from "./Icon";
+import { createPortal } from "react-dom";
 import { sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
 export default function Modal({ title, children, onClose, variant = "resizable", footer }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
@@ -72,9 +73,10 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     document.addEventListener("keydown", keyboard);
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
-  return <div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
+  if (typeof document === "undefined") return null;
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
     {variant === "resizable" && <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onClick={() => { if (Date.now() >= suppressClickUntil.current) snap(stop.current === 2 ? 0 : (stop.current + 1) as SheetStop); }}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>}
-    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div className="sheet-body">{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>;
+    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div className="sheet-body">{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
 }

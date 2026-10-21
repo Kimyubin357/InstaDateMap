@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BoardStore } from "@/lib/board-store";
 import type { SnapshotCache } from "@/lib/board-cache";
 import { isSnapshot, snapshotEtag, type BoardSnapshot, type SyncAccess } from "@/lib/sync-types";
-const access: SyncAccess = { boardId: "b1", authVersion: 1, who: "우리", expiresAt: "2030-01-01T00:00:00Z", kakaoKey: "public-map-key" };
+const access: SyncAccess = { boardId: "b1", authVersion: 1, who: "우리", memberNames: ["우리", "서로"], expiresAt: "2030-01-01T00:00:00Z", kakaoKey: "public-map-key" };
 const snapshot = (revision = "1", memo = "서버 메모"): BoardSnapshot => ({ boardId: "b1", authVersion: 1, revision, board: "우리 지도", pending: [], places: [{ id: "p1", name: "카페", lat: 37, lng: 127, address: null, category: "카페", kakao_place_id: "k1", kakao_url: null, status: "wish", memo, sharers: ["우리"], sources: [], created_at: "2026-01-01", last_saved_at: "2026-01-01" }] });
 function cache(data: BoardSnapshot | null = null): SnapshotCache {
   return { read: vi.fn(async () => data), write: vi.fn(async () => {}), clear: vi.fn(async () => {}) };

@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BoardStore, EMPTY_BOARD_STATE } from "@/lib/board-store";
 import { connectBoardSync } from "@/lib/sync-connection";
 import { accessSender, announceAccess, type AccessMessage } from "@/lib/board-events";
@@ -8,6 +8,14 @@ import { cacheScope, type SyncAccess } from "@/lib/sync-types";
 import MapApp from "@/app/MapApp";
 import SearchApp from "./SearchApp";
 import useKeyboardViewport from "./useKeyboardViewport";
+import AddForm from "@/app/add/AddForm";
+import SettingsForm from "@/app/settings/SettingsForm";
+import Icon from "./Icon";
+
+function AddPanel() {
+  const url = useSearchParams().get("url") || "";
+  return <AddForm key={url} initialUrl={url} />;
+}
 
 interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<void>; lock: () => Promise<void> }
 const Context = createContext<BoardContext | null>(null);
@@ -18,8 +26,11 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE);
   const pathname = usePathname();
   const viewport = useKeyboardViewport();
+  const onMap = pathname === "/" || pathname === "/search";
   const [backHref, setBackHref] = useState("/");
   const [homeHref, setHomeHref] = useState("/");
+  const [accessNotice, setAccessNotice] = useState("");
+  useEffect(() => { if (!accessNotice) return; const timer = setTimeout(() => setAccessNotice(""), 5000); return () => clearTimeout(timer); }, [accessNotice]);
   useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };
   const resume = () => { setSuspended(false); store.resume(); };
@@ -61,8 +72,12 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
   return <Context.Provider value={{ store, homeHref, suspended, suspend, resume, resetAccess, lock }}>
-    {state.access && <><div className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
-      <div className={`persistent-search${pathname === "/search" ? "" : " is-away"}`} aria-hidden={pathname !== "/search"}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div></>}
+    {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${onMap ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
+      <div className={`persistent-search${onMap ? "" : " is-away"}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
+      {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
+      {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} onPinChanged={setAccessNotice} /></div>}
+      {accessNotice && pathname === "/settings" && <div className="toast" role="status"><span>{accessNotice}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setAccessNotice("")}><Icon name="close" width="16" /></button></div>}
+    </>}
     {children}
   </Context.Provider>;
 }

@@ -10,6 +10,7 @@ import ClientReady from "@/components/ClientReady";
 import LinkRecovery from "@/components/LinkRecovery";
 import type { ShareResult } from "@/lib/share-stream";
 import { savedMapHref, shareDestination } from "@/lib/share-navigation";
+import { navigateShell } from "@/lib/shell-navigation";
 
 export interface ExtractionView {
   id: string;
@@ -61,7 +62,7 @@ export default function ConfirmForm({
   const [notice, setNotice] = useState("");
 
   const headers = { "Content-Type": "application/json" };
-  function returnToMap(href: string) { setLeaving(true); router.replace(href); router.refresh(); }
+  function returnToMap(href: string) { setLeaving(true); if (!navigateShell(href, true)) router.replace(href); }
 
   const count = useMemo(
     () => Object.values(choices).filter((c) => c.include && c.pickedId).length,

@@ -6,10 +6,8 @@ import PinInput from "@/components/PinInput";
 import Icon from "@/components/Icon";
 import { requestJson } from "@/lib/client-request";
 import { useBoardSync } from "@/components/BoardProvider";
-import { useRouter } from "next/navigation";
-export default function SettingsForm({ who, names }: { who: string; names: string[] }) {
+export default function SettingsForm({ who, names, onPinChanged }: { who: string; names: string[]; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
-  const router = useRouter();
   const [name, setName] = useState(who); const [currentPin, setCurrent] = useState(""); const [newPin, setNew] = useState(""); const [confirmPin, setConfirm] = useState("");
   const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   async function action(path: string, body: unknown) {
@@ -18,7 +16,7 @@ export default function SettingsForm({ who, names }: { who: string; names: strin
     try {
       const data = await requestJson<{ next?: string; message?: string }>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (path.endsWith("/lock")) await sync.lock();
-      else if (path.endsWith("/pin")) { await sync.resetAccess(); router.refresh(); }
+      else if (path.endsWith("/pin")) { await sync.resetAccess(); onPinChanged(data.message || "PIN을 바꿨어요."); }
       else if (path.endsWith("/identity")) { const access = sync.store.getSnapshot().access; if (access) await sync.store.authorize({ ...access, who: (body as { name: string }).name }); }
       return data;
     }

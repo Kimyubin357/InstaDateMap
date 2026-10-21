@@ -1,5 +1,5 @@
 import type { PlaceView } from "./place-view";
-export interface SyncAccess { boardId: string; authVersion: number; who: string; kakaoKey: string; expiresAt: string }
+export interface SyncAccess { boardId: string; authVersion: number; who: string; memberNames: string[]; kakaoKey: string; expiresAt: string }
 export interface PendingSource { id: string; url: string; status: string; shared_by: string }
 export interface BoardSnapshot { boardId: string; authVersion: number; revision: string; board: string; places: PlaceView[]; pending: PendingSource[] }
 export const cacheScope = (access: Pick<SyncAccess, "boardId" | "authVersion">) => `${access.boardId}:${access.authVersion}`;
