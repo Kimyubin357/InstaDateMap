@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import type { KakaoPlace } from "@/lib/types";
 import { requestJson } from "@/lib/client-request";
+import ManualPlaceSearch from "@/components/ManualPlaceSearch";
+import PageHeader from "@/components/PageHeader";
+import ClientReady from "@/components/ClientReady";
 
 export interface ExtractionView {
   id: string;
@@ -11,6 +14,7 @@ export interface ExtractionView {
   areaHint: string | null;
   evidence: string | null;
   candidates: KakaoPlace[];
+  excluded?: boolean;
 }
 
 interface Choice {
@@ -27,13 +31,9 @@ const MODULE_LABEL: Record<string, string> = {
 };
 
 export default function ConfirmForm({
-  token,
-  who,
   source,
   extractions,
 }: {
-  token: string;
-  who: string;
   source: { id: string; url: string; status: string; caption: string | null };
   extractions: ExtractionView[];
 }) {
@@ -42,7 +42,7 @@ export default function ConfirmForm({
       extractions.map((e) => [
         e.id,
         // 기본값: 전부 체크, 첫 번째 후보 선택. 후보가 없으면 체크 해제
-        { include: e.candidates.length > 0, pickedId: e.candidates[0]?.kakao_place_id ?? null, extra: [] },
+        { include: !e.excluded && e.candidates.length > 0, pickedId: e.candidates[0]?.kakao_place_id ?? null, extra: [] },
       ]),
     ),
   );
@@ -52,8 +52,8 @@ export default function ConfirmForm({
   const [caption, setCaption] = useState("");
   const [reprocessing, setReprocessing] = useState(false);
 
-  const headers = { "Content-Type": "application/json", "x-board-token": token };
-  const mapHref = `/?t=${encodeURIComponent(token)}&who=${encodeURIComponent(who)}`;
+  const headers = { "Content-Type": "application/json" };
+  const [mapHref, setMapHref] = useState("/");
 
   const count = useMemo(
     () => Object.values(choices).filter((c) => c.include && c.pickedId).length,
@@ -73,11 +73,12 @@ export default function ConfirmForm({
       return { extraction_id: e.id, include: c.include && !!place, place };
     });
     try {
-      const body = await requestJson<{ saved: number }>(`/api/sources/${source.id}/confirm`, {
+      const body = await requestJson<{ saved: number; place_url?: string }>(`/api/sources/${source.id}/confirm`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ who, selections }),
+        body: JSON.stringify({ selections }),
       });
+      setMapHref(body.place_url || "/");
       setDone(body.saved);
     } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
     finally { setSaving(false); }
@@ -88,12 +89,13 @@ export default function ConfirmForm({
     setReprocessing(true);
     setError(null);
     try {
-      const body = await requestJson<{ status: string }>("/api/share", {
+      const body = await requestJson<{ status: string; place_url?: string }>("/api/share", {
         method: "POST",
         headers,
-        body: JSON.stringify({ url: source.url, who, caption }),
+        body: JSON.stringify({ url: source.url, caption }),
       });
       if (body.status === "saved") {
+        setMapHref(body.place_url || "/");
         setDone(1);
       } else {
         window.location.reload();
@@ -106,9 +108,9 @@ export default function ConfirmForm({
     return (
       <main className="confirm">
         <h1>{done > 0 ? `${done}곳을 지도에 저장했어요` : "저장할 곳 없이 정리했어요"}</h1>
-        <p className="lead">단축어로 돌아가거나 지도를 열어 보세요.</p>
+        <p className="lead">함께 가고 싶은 장소를 지도에 담아뒀어요.</p>
         <a className="btn primary" href={mapHref}>
-          지도 열기
+          저장한 장소 보기
         </a>
       </main>
     );
@@ -117,14 +119,15 @@ export default function ConfirmForm({
   const noPlaces = extractions.every((e) => e.candidates.length === 0);
 
   return (
-    <main className="confirm">
-      <h1>
+    <main className="confirm"><ClientReady>
+      <PageHeader title="장소 확인" />
+      <h2>
         {extractions.length === 0
           ? "장소를 알려 주세요"
           : extractions.length > 1
             ? "남길 곳을 골라 주세요"
             : "어느 곳인지 골라 주세요"}
-      </h1>
+      </h2>
       <p className="lead">
         {extractions.length === 0 ? "캡션을 붙여넣거나 직접 검색하면 돼요." : "체크를 풀면 지도에 찍히지 않아요."}{" "}
         <a className="source-link" href={source.url} target="_blank" rel="noreferrer">
@@ -172,7 +175,6 @@ export default function ConfirmForm({
                   </label>
                 ))}
                 <ManualSearch
-                  token={token}
                   initial={[e.areaHint, e.name].filter(Boolean).join(" ")}
                   onPick={(p) =>
                     update(e.id, {
@@ -206,7 +208,7 @@ export default function ConfirmForm({
               <div className="pick-evidence" style={{ marginBottom: 6 }}>
                 또는 장소를 직접 검색하기
               </div>
-              <DirectAdd token={token} sourceId={source.id} who={who} onDone={() => setDone(1)} />
+              <DirectAdd sourceId={source.id} onDone={(href) => { setMapHref(href); setDone(1); }} />
             </div>
           )}
         </section>
@@ -221,11 +223,12 @@ export default function ConfirmForm({
           </button>
         </div>
       )}
-    </main>
+      <a className="return-link" href="/">우리 지도로 돌아가기</a>
+    </ClientReady></main>
   );
 }
 
-function ManualSearch({ token, initial, onPick }: { token: string; initial: string; onPick: (p: KakaoPlace) => void | Promise<void> }) {
+function ManualSearch({ initial, onPick }: { initial: string; onPick: (p: KakaoPlace) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(initial);
   const [results, setResults] = useState<KakaoPlace[] | null>(null);
@@ -236,7 +239,7 @@ function ManualSearch({ token, initial, onPick }: { token: string; initial: stri
     setBusy(true);
     setError(null);
     try {
-      const body = await requestJson<{ places: KakaoPlace[] }>(`/api/search?q=${encodeURIComponent(q)}`, { headers: { "x-board-token": token } });
+      const body = await requestJson<{ places: KakaoPlace[] }>(`/api/search?q=${encodeURIComponent(q)}`);
       setResults(body.places ?? []);
     } catch (e) { setError(e instanceof Error ? e.message : "검색하지 못했어요."); }
     finally { setBusy(false); }
@@ -290,19 +293,6 @@ function ManualSearch({ token, initial, onPick }: { token: string; initial: stri
 }
 
 /** 추출 결과가 아예 없을 때: 검색해서 바로 저장 */
-function DirectAdd({ token, sourceId, who, onDone }: { token: string; sourceId: string; who: string; onDone: () => void }) {
-  return (
-    <ManualSearch
-      token={token}
-      initial=""
-      onPick={async (p) => {
-        await requestJson(`/api/sources/${sourceId}/confirm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-board-token": token },
-          body: JSON.stringify({ who, selections: [], direct: p }),
-        });
-        onDone();
-      }}
-    />
-  );
+function DirectAdd({ sourceId, onDone }: { sourceId: string; onDone: (href: string) => void }) {
+  return <ManualPlaceSearch sourceId={sourceId} onSaved={(result) => onDone(result.place_url || "/")} />;
 }

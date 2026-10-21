@@ -9,12 +9,12 @@ import type { KakaoPlace } from "./types";
 
 export interface ShareInput {
   boardId: string;
-  token: string;
   text: string; // 공유 시트에서 넘어온 텍스트(링크 포함)
   who: string;
   caption?: string | null;
   images?: SourceContext["images"];
   retry?: boolean;
+  onProgress?: (stage: "caption" | "extract" | "search" | "save") => void;
 }
 
 /** 단축어가 읽는 응답. message는 알림으로 그대로 보여 줍니다. */
@@ -23,6 +23,7 @@ export interface ShareResponse {
   message: string;
   confirm_url?: string;
   source_id?: string;
+  place_url?: string;
 }
 
 const MAX_PLACES_PER_SOURCE = 8;
@@ -36,8 +37,8 @@ async function setSourceStatus(sourceId: string, status: string) {
   checkDb(error, "링크 상태 저장 실패");
 }
 
-export function confirmUrl(sourceId: string, token: string, who: string) {
-  return `${env.baseUrl()}/confirm/${sourceId}?t=${encodeURIComponent(token)}&who=${encodeURIComponent(who)}`;
+export function confirmUrl(sourceId: string) {
+  return `${env.baseUrl()}/confirm/${sourceId}`;
 }
 
 export function firstUrl(text: string): string | null {
@@ -46,40 +47,11 @@ export function firstUrl(text: string): string | null {
 }
 
 /** 장소를 지도에 저장. 같은 카카오 장소면 새로 만들지 않고 공유 기록만 추가합니다. */
-export async function savePlace(args: {
-  boardId: string;
-  sourceId: string;
-  extractionId: string | null;
-  place: KakaoPlace;
-  addedBy: string;
-}) {
-  const { boardId, sourceId, extractionId, place, addedBy } = args;
-  const { data: row, error } = await db()
-    .from("places")
-    .upsert(
-      {
-        board_id: boardId,
-        kakao_place_id: place.kakao_place_id,
-        name: place.name,
-        address: place.address,
-        lat: place.lat,
-        lng: place.lng,
-        category: place.category,
-        kakao_url: place.kakao_url,
-      },
-      { onConflict: "board_id,kakao_place_id" },
-    )
-    .select("id")
-    .single();
-  if (error || !row) throw new Error(`장소 저장 실패: ${error?.message}`);
-  const { error: linkError } = await db()
-    .from("source_places")
-    .upsert(
-      { source_id: sourceId, place_id: row.id, extraction_id: extractionId, added_by: addedBy },
-      { onConflict: "source_id,place_id,added_by", ignoreDuplicates: true },
-    );
-  checkDb(linkError, "원본 게시물 연결 실패");
-  return row.id as string;
+export async function savePlace(args: { boardId: string; sourceId: string | null; extractionId: string | null; place: KakaoPlace; addedBy: string }) {
+  const { data, error } = await db().rpc("dm_save_place", { p_board: args.boardId, p_place: args.place, p_added_by: args.addedBy, p_source: args.sourceId, p_extraction: args.extractionId });
+  checkDb(error, "장소 저장 실패");
+  if (!data) throw new Error("장소 저장 결과가 없습니다.");
+  return data as string;
 }
 
 export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Promise<ShareResponse> {
@@ -116,7 +88,9 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
             { onConflict: "source_id,place_id,added_by", ignoreDuplicates: true },
           );
         checkDb(error, "공유 기록 저장 실패");
-        return { status: "duplicate", message: "이미 지도에 있는 링크예요.", source_id: existing.id };
+        const { error: saveError } = await db().from("place_saves").upsert(links.map((l) => ({ board_id: input.boardId, place_id: l.place_id, added_by: input.who })), { onConflict: "place_id,added_by", ignoreDuplicates: true });
+        checkDb(saveError, "저장자 기록 실패");
+        return { status: "duplicate", message: "이미 지도에 있는 링크예요.", source_id: existing.id, place_url: `/?place=${links[0].place_id}` };
       }
       // 핀을 삭제했거나 이전 저장이 끝나지 않았다면 다시 처리합니다.
     }
@@ -124,12 +98,13 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       return {
         status: "confirm",
         message: "확인이 남아 있는 링크예요.",
-        confirm_url: confirmUrl(existing.id, input.token, input.who),
+        confirm_url: confirmUrl(existing.id),
         source_id: existing.id,
       };
     }
   }
 
+  input.onProgress?.("caption");
   // 캡션 확보
   let caption = manualCaption || existing?.caption || null;
   let method: "og" | "oembed" | "manual" | null = manualCaption ? "manual" : existing?.caption_method ?? null;
@@ -162,7 +137,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     return {
       status: "needs_caption",
       message: "캡션을 가져오지 못했어요. 열리는 화면에 캡션을 붙여넣어 주세요.",
-      confirm_url: data?.id ? confirmUrl(data.id, input.token, input.who) : undefined,
+      confirm_url: data?.id ? confirmUrl(data.id) : undefined,
       source_id: data?.id,
     };
   }
@@ -188,11 +163,13 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       images,
       videos: [],
     };
+    input.onProgress?.("extract");
     const { candidates, errors } = await extractPlaces(ctx, { llm });
     if (errors.length) console.error("장소 추출 실패", { sourceId, errors });
     if (candidates.length === 0 && errors.length) throw new Error("AI 장소 분석에 실패했어요. 잠시 후 다시 시도하거나 장소를 직접 검색해 주세요.");
     const top = candidates.slice(0, MAX_PLACES_PER_SOURCE);
 
+    input.onProgress?.("search");
     const resolved = await Promise.all(
       top.map(async (c) => ({ c, places: await resolveCandidate(c) })),
     );
@@ -223,7 +200,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
         message: top.length
           ? "장소 이름은 찾았지만 지도에서 못 찾았어요. 확인 화면에서 직접 검색해 주세요."
           : "장소 정보를 찾지 못했어요. 확인 화면에서 직접 검색해 주세요.",
-        confirm_url: confirmUrl(sourceId, input.token, input.who),
+        confirm_url: confirmUrl(sourceId),
         source_id: sourceId,
       };
     }
@@ -231,7 +208,8 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     // 장소가 하나이고 확실하면 바로 저장
     if (resolved.length === 1 && isConfident(resolved[0].c, resolved[0].places)) {
       const place = resolved[0].places[0];
-      await savePlace({
+      input.onProgress?.("save");
+      const placeId = await savePlace({
         boardId: input.boardId,
         sourceId,
         extractionId: inserted?.[0]?.id ?? null,
@@ -239,7 +217,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
         addedBy: input.who,
       });
       await setSourceStatus(sourceId, "done");
-      return { status: "saved", message: `${place.name}을(를) 지도에 저장했어요.`, source_id: sourceId };
+      return { status: "saved", message: `${place.name}을(를) 지도에 저장했어요.`, source_id: sourceId, place_url: `/?place=${placeId}` };
     }
 
     await setSourceStatus(sourceId, "pending_confirm");
@@ -247,7 +225,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     return {
       status: "confirm",
       message: n > 1 ? `장소 ${n}곳을 찾았어요. 남길 곳을 골라 주세요.` : "어느 지점인지 골라 주세요.",
-      confirm_url: confirmUrl(sourceId, input.token, input.who),
+      confirm_url: confirmUrl(sourceId),
       source_id: sourceId,
     };
   } catch (e) {
@@ -255,7 +233,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     await setSourceStatus(sourceId, "needs_review");
     console.error("링크 처리 실패", { sourceId, message: e instanceof Error ? e.message : String(e) });
     return { status: "error", message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId,
-      confirm_url: confirmUrl(sourceId, input.token, input.who) };
+      confirm_url: confirmUrl(sourceId) };
   }
 }
 

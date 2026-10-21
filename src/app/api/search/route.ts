@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized } from "@/lib/auth";
+import { boardFromRequest, unauthorized, accessError } from "@/lib/auth";
 import { keywordSearch } from "@/lib/kakao";
 
 export const runtime = "nodejs";
@@ -13,6 +13,6 @@ export async function GET(req: Request) {
     const places = await keywordSearch(q);
     return Response.json({ places: places.slice(0, 8) });
   } catch (e) {
-    return Response.json({ message: e instanceof Error ? e.message : "장소 검색에 실패했어요." }, { status: 502 });
+    return accessError(e);
   }
 }

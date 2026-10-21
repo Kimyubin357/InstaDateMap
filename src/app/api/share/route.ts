@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized } from "@/lib/auth";
+import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
 import { ingestShare } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
@@ -14,8 +14,9 @@ export async function POST(req: Request) {
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
+    requireIdentity(board);
 
-    let body: { url?: string; text?: string; who?: string; caption?: string; images?: unknown; retry?: boolean };
+    let body: { url?: string; text?: string; caption?: string; images?: unknown; retry?: boolean; stream?: boolean };
     try {
       body = await req.json();
     } catch {
@@ -34,19 +35,27 @@ export async function POST(req: Request) {
         return { mediaType, data: clean };
       });
 
-    const token = req.headers.get("x-board-token") || new URL(req.url).searchParams.get("t") || "";
-    const result = await ingestShare({
+    const input = {
       boardId: board.id,
-      token,
       text,
-      who: (typeof body.who === "string" && body.who || "익명").slice(0, 20),
+      who: board.who,
       caption: typeof body.caption === "string" ? body.caption : null,
       images,
       retry: body.retry === true,
-    });
+    };
+    if (body.stream === true) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({ async start(controller) {
+        const send = (data: unknown) => { try { controller.enqueue(encoder.encode(JSON.stringify(data) + "\n")); } catch { /* client left; finish the idempotent save */ } };
+        try { send({ type: "result", result: await ingestShare({ ...input, onProgress: (stage) => send({ type: "progress", stage }) }) }); }
+        catch (e) { send({ type: "result", result: { status: "error", message: e instanceof Error ? e.message : "저장하지 못했어요." } }); }
+        finally { try { controller.close(); } catch {} }
+      } });
+      return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
+    }
+    const result = await ingestShare(input);
     return Response.json(result, { status: result.status === "error" ? result.source_id ? 502 : 400 : 200 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return Response.json({ status: "error", message: `처리 중 오류: ${message}` }, { status: 500 });
+    return accessError(e);
   }
 }

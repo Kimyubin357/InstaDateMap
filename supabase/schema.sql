@@ -80,5 +80,6 @@ alter table extractions enable row level security;
 alter table places enable row level security;
 alter table source_places enable row level security;
 
--- 보드 하나 만들기. 실행 후 나오는 token을 단축어와 지도 주소에 씁니다.
+-- 보드 하나 만들기. token은 최초 PIN 설정 주소에 한 번만 사용합니다.
+-- 이어서 migrations/002_couple_access.sql을 적용하세요.
 insert into boards (name) values ('우리 데이트맵') returning id, token;

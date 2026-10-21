@@ -123,7 +123,7 @@ describe("공유 → 저장 흐름", () => {
     vi.mocked(fetchCaption).mockResolvedValueOnce({ caption: "코스: 어니언, 자연도소금빵, 없는집", method: "og", locationTag: null });
     const r = await ingestShare({ ...base, text: "https://www.instagram.com/reel/RRR/" }, llmFor(["어니언", "자연도소금빵", "없는집"]));
     expect(r.status).toBe("confirm");
-    expect(r.confirm_url).toBe(`https://app.test/confirm/${r.source_id}?t=tok&who=%EB%AF%BC%EC%A7%80`);
+    expect(r.confirm_url).toBe(`https://app.test/confirm/${r.source_id}`);
     expect(tables.extractions).toHaveLength(3);
 
     const [onion, bread, none] = ["어니언", "자연도소금빵", "없는집"].map((n) => tables.extractions.find((e) => e.raw_name === n)!);

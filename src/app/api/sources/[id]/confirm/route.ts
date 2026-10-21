@@ -1,4 +1,5 @@
-import { boardFromRequest, unauthorized } from "@/lib/auth";
+import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { confirmSelections, type Selection } from "@/lib/pipeline";
 import type { KakaoPlace } from "@/lib/types";
 
@@ -13,6 +14,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
+    requireIdentity(board);
     const body = (await req.json().catch(() => null)) as { who?: string; selections?: Selection[]; direct?: unknown } | null;
     if (!body || !Array.isArray(body.selections)) {
       return Response.json({ status: "error", message: "선택 내용이 없습니다." }, { status: 400 });
@@ -22,9 +24,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     const selections = body.selections.map((s) => ({ ...s, place: isPlace(s.place) ? s.place : null }));
     const direct = isPlace(body.direct) ? body.direct : null;
-    const saved = await confirmSelections(board.id, params.id, (typeof body.who === "string" && body.who || "익명").slice(0, 20), selections, direct);
-    return Response.json({ status: "ok", saved });
+    const saved = await confirmSelections(board.id, params.id, board.who, selections, direct);
+    const { data: links } = saved ? await db().from("source_places").select("place_id").eq("source_id", params.id).eq("added_by", board.who).limit(1) : { data: [] };
+    return Response.json({ status: "ok", saved, place_url: links?.[0] ? `/?place=${links[0].place_id}` : "/" });
   } catch (e) {
-    return Response.json({ status: "error", message: e instanceof Error ? e.message : String(e) }, { status: 400 });
+    return accessError(e);
   }
 }

@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized } from "@/lib/auth";
+import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -9,6 +9,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
+    requireIdentity(board);
     const body = (await req.json().catch(() => null)) as { status?: string; memo?: string } | null;
     if (!body || typeof body !== "object") return Response.json({ message: "수정 내용이 올바르지 않습니다." }, { status: 400 });
     const patch: Record<string, string> = {};
@@ -22,7 +23,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (error) return Response.json({ message: error.message }, { status: 400 });
     return Response.json({ ok: true });
   } catch (e) {
-    return Response.json({ message: e instanceof Error ? e.message : "수정하지 못했어요." }, { status: 500 });
+    return accessError(e);
   }
 }
 
@@ -30,10 +31,11 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
+    requireIdentity(board);
     const { error } = await db().from("places").delete().eq("id", params.id).eq("board_id", board.id);
     if (error) return Response.json({ message: error.message }, { status: 400 });
     return Response.json({ ok: true });
   } catch (e) {
-    return Response.json({ message: e instanceof Error ? e.message : "삭제하지 못했어요." }, { status: 500 });
+    return accessError(e);
   }
 }

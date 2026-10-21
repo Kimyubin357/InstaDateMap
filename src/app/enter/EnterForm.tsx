@@ -1,0 +1,26 @@
+"use client";
+import ClientReady from "@/components/ClientReady";
+import { useState } from "react";
+import Image from "next/image";
+import PinInput from "@/components/PinInput";
+import { requestJson } from "@/lib/client-request";
+export default function EnterForm({ configured, next }: { configured: boolean; next: string }) {
+  const [pin, setPin] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setError("");
+    try { const data = await requestJson<{ next: string }>("/api/access/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, remember, next }) }); window.location.replace(data.next); }
+    catch (e) { setError(e instanceof Error ? e.message : "다시 시도해 주세요."); setPin(""); }
+    finally { setBusy(false); }
+  }
+  return <main className="entry-page"><ClientReady><div className="wordmark">데이트맵<span aria-hidden="true">♥</span></div>
+    <div className="mascot"><Image src="/couple.png" alt="손을 맞잡은 두 캐릭터" width={1792} height={875} priority /></div>
+    <h1>우리만 아는 장소들</h1><p className="entry-subtitle">둘만의 PIN으로 우리 지도를 열어요.</p>
+    {configured ? <form onSubmit={submit} className="entry-form"><PinInput value={pin} onChange={setPin} />
+      <label className="remember"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />이 기기에서 기억하기</label>
+      {error && <p className="error" role="alert">{error}</p>}<button className="btn primary large" disabled={busy || pin.length !== 6}>{busy ? "지도 여는 중…" : "우리 지도 열기"}</button>
+    </form> : <div className="notice entry-notice"><b>우리만의 PIN을 정할 차례예요</b><p>처음 받은 지도 주소로 열면 사귄 날짜로 PIN을 만들 수 있어요.</p></div>}
+  </ClientReady></main>;
+}
