@@ -42,4 +42,7 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 @media(min-width:760px){.map-controls{right:28px;bottom:28px}.sheet{padding-top:20px}.sheet-handle{display:none}}
 .manual-recovery{margin-top:24px}.manual-recovery h3{font-size:17px}.confirm .notice{margin-top:18px}
 .confirm-save{margin:18px 0 24px}.confirm-save .btn{width:100%;font-size:17px}
-@media(max-width:759px){.memo,.caption-box{font-size:16px}}
+/* Keep app chrome at a stable scale; Kakao handles its own map gestures.
+   Scroll containers also opt out of browser pinch zoom without blocking scrolling. */
+html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
+@media(max-width:759px){.saved-search input,.list-heading select,.memo,.caption-box{font-size:16px}}
