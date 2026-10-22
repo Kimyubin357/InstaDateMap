@@ -4,6 +4,7 @@ import type { MapRegion } from "./map-regions";
 // Kakao levels increase as the map zooms out.
 export const CLUSTER_MIN_LEVEL = 4;
 export const DISTRICT_CLUSTER_LEVEL = 8;
+export const CITY_CLUSTER_LEVEL = 10;
 export interface ClusterPlace { id: string; status: PlaceStatus }
 export interface ScreenPoint { x: number; y: number }
 export interface MarkerSize { width: number; height: number }
@@ -24,7 +25,8 @@ export function clusterPlaces<T extends ClusterPlace>(places: readonly T[], proj
   const unique = [...new Map(places.map((place) => [place.id, place])).values()].sort((a, b) => a.id.localeCompare(b.id));
   const points = unique.map((place) => {
     const region = options.region(place), size = options.size(place), point = project(place);
-    const area = options.level >= DISTRICT_CLUSTER_LEVEL ? region?.district : region?.local;
+    const area = options.level >= CITY_CLUSTER_LEVEL ? region?.city :
+      options.level >= DISTRICT_CLUSTER_LEVEL ? region?.district : region?.local;
     return { place, ...point, area: area || null,
       left: point.x - size.width / 2 - 4, right: point.x + size.width / 2 + 4,
       top: point.y - size.height - 12, bottom: point.y - 4 };

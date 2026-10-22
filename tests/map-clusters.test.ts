@@ -5,7 +5,7 @@ import type { PlaceStatus } from "@/lib/types";
 
 const place = (id: string, x: number, y = 0, status: PlaceStatus = "wish") => ({ id, x, y, status });
 const project = (p: ScreenPoint) => p;
-const region: MapRegion = { district: "경기도 수원시 장안구", local: "경기도 수원시 장안구 정자1동" };
+const region: MapRegion = { city: "경기도 수원시", district: "경기도 수원시 장안구", local: "경기도 수원시 장안구 정자1동" };
 const clusterPlaces = <T extends ReturnType<typeof place>>(places: readonly T[], projection: (p: T) => ScreenPoint = project) =>
   cluster(places, projection, { level: 7, region: () => region, size: () => ({ width: 72, height: 32 }) });
 const memberships = (groups: ReturnType<typeof clusterPlaces>) => groups.map((group) => group.places.map((p) => p.id).sort()).sort();
@@ -73,25 +73,26 @@ describe("지도 숫자 핀 집계", () => {
 
 describe("행정구역과 실제 이름표 겹침", () => {
   const a = { ...place("a", 0), region };
-  const b = { ...place("b", 10), region: { district: region.district, local: "경기도 수원시 장안구 정자2동" } };
+  const b = { ...place("b", 10), region: { ...region, local: "경기도 수원시 장안구 정자2동" } };
   const groups = (items: typeof a[], level: number, width = 72) => cluster(items, project, { level, region: (p) => p.region, size: () => ({ width, height: 32 }) });
   it("멀리서는 같은 구의 다른 동을 묶고 가까이서는 동 경계를 지킴", () => {
     expect(groups([a, b], 8)).toHaveLength(1);
     expect(groups([a, b], 7)).toHaveLength(2);
     expect(groups([a, b], 4)).toHaveLength(2);
   });
-  it("시·구가 다르면 좌표가 같아도 묶지 않음", () => {
-    const other = { ...b, region: { district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 화서1동" } };
-    expect(groups([a, other], 12)).toHaveLength(2);
+  it("구 단위에서는 같은 시라도 구가 다르면 묶지 않음", () => {
+    const other = { ...b, region: { ...region, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 화서1동" } };
+    expect(groups([a, other], 9)).toHaveLength(2);
     expect(groups([a, other], 5)).toHaveLength(2);
   });
   it("같은 동 이름이 다른 시·구에 있어도 묶지 않음", () => {
-    const other = { ...b, region: { district: "경기도 성남시 분당구", local: "경기도 성남시 분당구 정자1동" } };
+    const other = { ...b, region: { city: "경기도 성남시", district: "경기도 성남시 분당구", local: "경기도 성남시 분당구 정자1동" } };
     expect(groups([a, other], 6)).toHaveLength(2);
+    expect(groups([a, other], 12)).toHaveLength(2);
   });
   it("행정구역을 모르는 장소는 같은 fallback으로 합치지 않음", () => {
     expect(cluster([a, b], project, { level: 10, region: () => null, size: () => ({ width: 72, height: 32 }) })).toHaveLength(2);
-    expect(cluster([a, b], project, { level: 7, region: () => ({ district: region.district, local: null }), size: () => ({ width: 72, height: 32 }) })).toHaveLength(2);
+    expect(cluster([a, b], project, { level: 7, region: () => ({ ...region, local: null }), size: () => ({ width: 72, height: 32 }) })).toHaveLength(2);
   });
   it("같은 구역이라도 이름표가 겹치지 않으면 각각 표시함", () => {
     expect(groups([a, { ...a, id: "b", x: 200 }], 10)).toHaveLength(2);
@@ -104,7 +105,32 @@ describe("행정구역과 실제 이름표 겹침", () => {
   });
   it("동 정보가 없을 때는 구 단위 축소에서만 묶음", () => {
     const items = [a, { ...a, id: "b" }];
-    const run = (level: number) => cluster(items, project, { level, region: () => ({ district: region.district, local: null }), size: () => ({ width: 72, height: 32 }) });
+    const run = (level: number) => cluster(items, project, { level, region: () => ({ ...region, local: null }), size: () => ({ width: 72, height: 32 }) });
     expect(run(8)).toHaveLength(1); expect(run(7)).toHaveLength(2);
+  });
+  it("세 구에 한 곳씩 있는 수원 장소도 멀리서는 3곳으로 묶고 구 단계에서는 나눔", () => {
+    const items = [a, { ...b, region: { ...region, district: "경기도 수원시 권선구", local: "경기도 수원시 권선구 권선1동" } },
+      { ...b, id: "c", x: 20, region: { ...region, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 화서1동" } }];
+    const wide = groups(items, 10);
+    expect(wide).toHaveLength(1); expect(wide[0].places).toHaveLength(3); expect(wide[0].region).toBe("경기도 수원시");
+    expect(groups(items, 9)).toHaveLength(3);
+  });
+  it("확대·축소로 시→구→동 단계가 바뀌어도 수와 방문 집계가 보존됨", () => {
+    const items = [a, { ...b, status: "visited" as const }, { ...b, id: "c", region: { ...region, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 화서1동" } }];
+    expect(groups(items, 10)).toHaveLength(1);
+    expect(groups(items, 8)).toHaveLength(2);
+    expect(groups(items, 7)).toHaveLength(3);
+    for (const level of [12, 9, 7, 3, 10]) {
+      const result = groups(items, level);
+      expect(result.flatMap((g) => g.places)).toHaveLength(3);
+      expect(result.reduce((sum, g) => sum + g.visited, 0)).toBe(1);
+    }
+  });
+  it("시 단위에서도 겹치지 않는 이름표와 다른 도시는 합치지 않음", () => {
+    expect(groups([a, { ...b, x: 200 }], 12)).toHaveLength(2);
+    expect(groups([a, { ...b, region: { city: "대전광역시", district: "대전광역시 동구", local: "대전광역시 동구 중앙동" } }], 12)).toHaveLength(2);
+  });
+  it("상위 도시를 확인하지 못한 곳을 시 단계에서 임의로 합치지 않음", () => {
+    expect(cluster([a, b], project, { level: 10, region: () => ({ ...region, city: null }), size: () => ({ width: 72, height: 32 }) })).toHaveLength(2);
   });
 });

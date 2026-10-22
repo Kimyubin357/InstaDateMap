@@ -1,4 +1,4 @@
-export interface MapRegion { district: string; local: string | null }
+export interface MapRegion { city: string | null; district: string; local: string | null }
 export interface RegionDocument {
   region_type: string; region_1depth_name: string; region_2depth_name: string;
   region_3depth_name: string;
@@ -10,10 +10,16 @@ export const regionPointKey = (p: RegionPoint) => `${p.lng}:${p.lat}`;
 export function administrativeRegion(documents: RegionDocument[]): MapRegion | null {
   const d = documents.find((d) => d.region_type === "H");
   if (!d?.region_1depth_name?.trim()) return null;
-  const district = [d.region_1depth_name, d.region_2depth_name].filter(Boolean).join(" ");
+  const province = d.region_1depth_name.trim(), subdivision = d.region_2depth_name?.trim() || "";
+  const district = [province, subdivision].filter(Boolean).join(" ");
   // Sejong has no district name. Its province-level city still forms a unique key.
-  if (!d.region_2depth_name && d.region_1depth_name !== "세종특별자치시") return null;
-  return { district, local: d.region_3depth_name ? `${district} ${d.region_3depth_name}` : null };
+  if (!subdivision && province !== "세종특별자치시") return null;
+  const cityOrCounty = subdivision.split(/\s+/)[0];
+  // A province's city may contain districts (수원시 장안구). Metropolitan
+  // cities contain districts directly; their counties still stay independent.
+  const city = /[시군]$/.test(cityOrCounty) ? `${province} ${cityOrCounty}` :
+    /(?:특별시|광역시|특별자치시)$/.test(province) ? province : null;
+  return { city, district, local: d.region_3depth_name ? `${district} ${d.region_3depth_name}` : null };
 }
 
 /** Kept with the mounted map, never in the place cache or authentication storage. */
