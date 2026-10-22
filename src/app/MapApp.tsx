@@ -13,8 +13,6 @@ import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
-import SafeAreaDiagnostic from "@/components/SafeAreaDiagnostic";
-import { navigateShell } from "@/lib/shell-navigation";
 type Overlay = "filters" | "pending" | "place" | null;
 const PENDING_LABEL: Record<string, string> = { pending_confirm: "지점 고르기", needs_review: "장소 확인하기", needs_caption: "정보 보태기" };
 const NO_PLACES: PlaceView[] = [];
@@ -23,7 +21,6 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const { store, notify } = useBoardSync(); const { snapshot: data, error, syncing } = useBoardState();
   const places = data?.places || NO_PLACES, pending = data?.pending || []; const board = data?.board || "우리 데이트맵", loaded = !!data;
   const navigation = useSearchParams().toString();
-  const diagnosing = active && new URLSearchParams(navigation).get("diagnostic") === "safe-area";
   const [view, setView] = useState<"map" | "list">("map");
   useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(view === "list" ? "/?view=list" : "/"); }, [active, view, navigation, onViewChange]);
   const [statuses, setStatuses] = useState<PlaceStatus[]>([...STATUS_ORDER]); const [category, setCategory] = useState("");
@@ -156,8 +153,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     return { top: (search?.bottom || 80) + 16, bottom: root.current.clientHeight - deck.offsetTop + 10 };
   }
   const all = statuses.length === STATUS_ORDER.length;
-  return <div ref={root} className={`app-root view-${view}${view === "map" && focused ? " has-place-card" : ""}${diagnosing ? " is-diagnosing" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${diagnosing ? " is-diagnosing" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} />}{diagnosing && <SafeAreaDiagnostic onClose={() => { const url = new URL(window.location.href); url.searchParams.delete("diagnostic"); navigateShell(url.pathname + url.search, true); }} />}</div>
+  return <div ref={root} className={`app-root view-${view}${view === "map" && focused ? " has-place-card" : ""}`}>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} />}</div>
     <h1 className="sr-only">{board}</h1>
     <div className="floating-filters"><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}

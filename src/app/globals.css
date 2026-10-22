@@ -221,15 +221,6 @@ button:enabled:active:is(.place-row,.unified-place-row,.recent-term){background:
 .has-place-card .map-feedback{bottom:calc(var(--map-bottom) + 182px)}
 @media(min-width:760px){.map-feedback{left:50%;right:auto;transform:translateX(-50%);width:480px}.has-place-card .map-feedback{bottom:calc(var(--map-bottom) + 188px)}}
 
-/* Diagnostic pixels share the map's exact bounds; leave page backgrounds and viewport metadata untouched. */
-.map-surface.is-diagnosing .map-canvas{visibility:hidden}
-.app-root.is-diagnosing>:not(.map-surface):not(.sr-only){visibility:hidden}
-.safe-area-diagnostic{position:absolute;inset:0;z-index:2;background:repeating-linear-gradient(135deg,#174b75 0 24px,#bd3459 24px 48px);border-top:3px solid #ffe17d}
-.safe-area-probe{position:absolute;visibility:hidden;pointer-events:none;width:0;height:0;padding-top:env(safe-area-inset-top,0px)}
-.safe-area-readout{position:absolute;top:calc(var(--search-top) + 124px);left:50%;transform:translateX(-50%);width:min(350px,calc(100% - 32px));max-height:calc(100% - var(--search-top) - 240px);overflow:auto;overscroll-behavior:contain;padding:18px;border-radius:20px;background:#fffffff5;box-shadow:0 6px 24px #0002;font-size:13px}
-.safe-area-readout h2{font-size:20px;margin:0 0 10px}.safe-area-readout p{margin:8px 0;line-height:1.65}.safe-area-readout .hint{font-size:11px}
-.safe-area-readout dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:16px 0;font-size:11px}.safe-area-readout dt{color:var(--ink-soft)}.safe-area-readout dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.safe-area-readout>.btn{width:100%;min-height:44px;font-size:14px}
-
 /* Installed apps have no browser toolbar: use the full viewport, including the status/home-indicator areas. */
 @media(display-mode:standalone){:root{--app-height:100vh}html,body{height:var(--app-height);min-height:var(--app-height)}}
 html[data-map-viewport=true],html[data-map-viewport=true] body{overflow:hidden}
