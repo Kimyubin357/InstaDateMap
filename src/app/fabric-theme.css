@@ -159,7 +159,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .seg{background:#e6dfcd;border:1px dashed var(--line);border-radius:24px;padding:3px;gap:3px}
 .seg button,.sheet .seg button{min-height:44px;border-radius:20px;font-size:17px;padding:7px 3px;font-weight:400}
 .seg button[aria-pressed=true]{background:var(--forest) var(--grain);color:var(--cream);box-shadow:none;outline:1px solid #fbf6e870;outline-offset:-3px}
-.sheet-place .sheet-heading-actions .icon-btn,.sheet-place .sheet-heading>.icon-btn{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
 .place-status{background:transparent;border:0;padding:0;gap:6px}
 .place-status-wish{--status-ink:#a3322c;--status-paper:#f3ddd3}
 .place-status-again{--status-ink:#77551b;--status-paper:#ede1bd}

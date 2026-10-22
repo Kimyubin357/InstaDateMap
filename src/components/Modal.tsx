@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import Icon from "./Icon";
 import { createPortal } from "react-dom";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
 import { layoutViewportHeight, visibleViewport } from "@/lib/viewport";
@@ -126,7 +125,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   }, [dragFromContent, variant]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    (ref.current?.querySelector<HTMLButtonElement>('[aria-label="닫기"]') || ref.current)?.focus({ preventScroll: true });
+    ref.current?.focus({ preventScroll: true });
     const keyboard = (e: KeyboardEvent) => {
       if (document.querySelector("dialog[data-app-dialog][open]")) return;
       if (e.key === "Escape") { e.preventDefault(); close.current(); }
@@ -141,9 +140,8 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
   if (typeof document === "undefined") return null;
-  const closeButton = variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>;
   return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""} ${className}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
     {variant === "resizable" && <div className="sheet-handle" tabIndex={0} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></div>}
-    <div className="sheet-heading"><h2>{title}</h2>{headerActions ? <div className="sheet-heading-actions">{headerActions}{closeButton}</div> : closeButton}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
+    <div className="sheet-heading"><h2>{title}</h2>{headerActions && <div className="sheet-heading-actions">{headerActions}</div>}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
 }

@@ -7,7 +7,7 @@ export function contentPullDecision(scrollTop: number, dx: number, dy: number): 
 }
 export function sheetStops(viewportHeight: number): [number, number, number] {
   const height = Math.max(1, viewportHeight);
-  return [Math.min(260, height * .35), height * .64, height * .92];
+  return [height * .48, height * .635, height * .92];
 }
 
 /** Positive velocity means dragging down; a short projection makes flicks feel natural. */
