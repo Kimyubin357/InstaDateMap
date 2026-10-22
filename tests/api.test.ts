@@ -13,6 +13,8 @@ vi.mock("@/lib/kakao", async (orig) => ({ ...await orig<typeof import("@/lib/kak
 import { POST } from "@/app/api/share/route";
 import { GET, POST as saveDirect } from "@/app/api/places/route";
 import { readShareResponse } from "@/lib/share-stream";
+import { withSavedPlace } from "@/lib/saved-place-server";
+import { POST as confirm } from "@/app/api/sources/[id]/confirm/route";
 
 const request = (body: unknown, token = "tok") => new Request("http://localhost/api/share", { method: "POST", headers: { "content-type": "application/json", cookie: `datemap_session=${token === "tok" ? "a".repeat(64) : token}`, origin: "http://localhost" }, body: JSON.stringify(body) });
 beforeEach(() => { reset(); tables.boards = [{ id: "b1", name: "테스트", token: "tok", auth_version: 1, member_names: ["테스트", "연인"] }]; tables.access_sessions = [{ token_hash: tokenHash("a".repeat(64)), board_id: "b1", purpose: "member", member_name: "테스트", auth_version: 1, expires_at: "2030-01-01T00:00:00Z" }]; });
@@ -62,6 +64,26 @@ describe("공유 HTTP API", () => {
 
 describe("직접 저장과 세션 저장자", () => {
   const body = { query: "도나스데이 수원본점", place_id: "978669489", who: "위조한 이름" };
+  it("저장 응답에 실제 DB 장소·저장자를 담고 중복 저장은 기존 상태와 메모 유지", async () => {
+    const first = await (await saveDirect(request(body))).json();
+    expect(first.saved_place).toMatchObject({ boardId: "b1", authVersion: 1, place: { id: tables.places[0].id, name: "도나스데이 본점", sharers: ["테스트"], sources: [] } });
+    tables.places[0].status = "visited"; tables.places[0].memo = "창가"; tables.access_sessions[0].member_name = "연인";
+    const second = await (await saveDirect(request(body))).json();
+    expect(second.saved_place.place).toMatchObject({ status: "visited", memo: "창가", sharers: ["테스트", "연인"] });
+  });
+  it("확인 후 저장과 스트리밍 링크 저장 모두 지도에 바로 쓸 장소 정보를 제공", async () => {
+    const shared = await readShareResponse(await POST(request({ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", stream: true })), () => {});
+    expect(shared.saved_place?.place).toMatchObject({ name: "도나스데이 본점", sources: [{ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", media_type: "reel" }] });
+    const res = await confirm(request({ selections: [], direct: { ...tables.places[0], kakao_place_id: "another", name: "다른 곳" } }), { params: { id: tables.sources[0].id } });
+    expect((await res.json()).saved_place).toMatchObject({ boardId: "b1", authVersion: 1, place: { sharers: ["테스트"] } });
+  });
+  it("저장 후 미리보기 조회 장애는 저장 실패로 바꾸지 않으며 다른 보드 장소를 노출하지 않음", async () => {
+    const saved = await (await saveDirect(request(body))).json();
+    const board = { id: "b1", authVersion: 1 } as import("@/lib/auth").Board;
+    failNext("place_saves", "select"); expect(await withSavedPlace(board, { place_url: saved.place_url })).toEqual({ place_url: saved.place_url });
+    tables.places[0].board_id = "b2";
+    expect(await withSavedPlace(board, { place_url: saved.place_url })).toEqual({ place_url: saved.place_url });
+  });
   it("링크 없이 저장하고 두 사람이 다시 저장하면 병합", async () => {
     const first = await saveDirect(request(body)); expect(first.status).toBe(200);
     expect((await first.json()).status).toBe("saved");

@@ -2,6 +2,7 @@ import { DeviceBoardCache, type SnapshotCache } from "./board-cache";
 import { cacheScope, isSnapshot, snapshotEtag, type BoardSnapshot, type SyncAccess } from "./sync-types";
 import type { PlaceView } from "./place-view";
 import { clearRecentSearches } from "./recent-searches";
+import type { SavedPlace } from "./saved-place";
 export interface BoardState { access: SyncAccess | null; snapshot: BoardSnapshot | null; syncing: boolean; error: string; connected: boolean }
 export const EMPTY_BOARD_STATE: BoardState = { access: null, snapshot: null, syncing: false, error: "", connected: false };
 export class BoardStore {
@@ -10,6 +11,7 @@ export class BoardStore {
   private generation = 0; private mutation = 0; private dirty = false; private flight: Promise<void> | null = null;
   private abort: AbortController | null = null; private debounce: ReturnType<typeof setTimeout> | undefined;
   private paused = false;
+  private confirmedRevision = "0";
   onUnauthorized: () => void = () => {};
   constructor(private cache: SnapshotCache = new DeviceBoardCache(), private fetcher: typeof fetch = (...args) => fetch(...args)) {}
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -25,6 +27,7 @@ export class BoardStore {
       return;
     }
     this.cancel(); const generation = ++this.generation;
+    this.confirmedRevision = "0";
     this.set({ ...EMPTY_BOARD_STATE, access });
     const cached = await this.cache.read(access).catch(() => null);
     if (generation !== this.generation) return;
@@ -69,6 +72,7 @@ export class BoardStore {
         if (!isSnapshot(data) || cacheScope(data) !== cacheScope(access)) throw new Error("장소 응답을 확인하지 못했어요.");
         const previous = this.state.snapshot;
         if (previous && BigInt(data.revision) < BigInt(previous.revision)) throw new Error("서버의 변경 순서를 다시 확인해야 해요. 기존 내용을 유지할게요.");
+        if (BigInt(data.revision) < BigInt(this.confirmedRevision)) throw new Error("저장 결과를 맞추는 중이에요. 저장한 장소는 그대로 보여드려요.");
         this.set({ snapshot: data, error: "" }); this.persist(data, generation);
       } catch (e) {
         if (generation === this.generation && !abort.signal.aborted) this.set({ error: e instanceof Error && !(e instanceof TypeError) ? e.message : "연결이 끊겼어요. 마지막으로 저장된 내용을 보여드려요." });
@@ -78,6 +82,18 @@ export class BoardStore {
   }
   private persist(snapshot: BoardSnapshot, generation = this.generation) {
     if (generation === this.generation && !this.paused) void this.cache.write(snapshot).catch(() => {});
+  }
+  acceptSavedPlace(saved?: SavedPlace) {
+    const { access, snapshot } = this.state;
+    if (!saved || this.paused || !access || !snapshot || cacheScope(saved) !== cacheScope(access) ||
+      !/^\d+$/.test(saved.revision) || BigInt(saved.revision) < BigInt(snapshot.revision) || BigInt(saved.revision) < BigInt(this.confirmedRevision) ||
+      !isSnapshot({ ...snapshot, places: [saved.place] })) return false;
+    this.mutation++;
+    this.confirmedRevision = saved.revision;
+    // Do not advance the full-list ETag with a partial update: other changes still need fetching.
+    const next = { ...snapshot, places: [saved.place, ...snapshot.places.filter((p) => p.id !== saved.place.id)] };
+    this.set({ snapshot: next, error: "" }); this.persist(next); this.schedule();
+    return true;
   }
   patchPlace(id: string, patch: Partial<Pick<PlaceView, "status" | "memo">>) {
     this.mutation++;

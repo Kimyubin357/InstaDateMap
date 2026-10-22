@@ -1,5 +1,6 @@
 import { RequestError } from "./client-request";
-export interface ShareResult { status: string; message: string; confirm_url?: string; source_id?: string; place_url?: string }
+import type { SavedPlace } from "./saved-place";
+export interface ShareResult { status: string; message: string; confirm_url?: string; source_id?: string; place_url?: string; saved_place?: SavedPlace }
 export async function readShareResponse(res: Response, progress: (stage: string) => void): Promise<ShareResult> {
   if (!res.ok || !res.headers.get("content-type")?.includes("application/x-ndjson")) {
     const body = await res.json();

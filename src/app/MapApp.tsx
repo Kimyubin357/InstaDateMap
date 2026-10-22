@@ -19,7 +19,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const router = useRouter();
   const { store } = useBoardSync(); const { snapshot: data, error, syncing } = useBoardState();
   const places = data?.places || NO_PLACES, pending = data?.pending || []; const board = data?.board || "우리 데이트맵", loaded = !!data;
-  const navigation = useSearchParams().toString(); const [arrivalReady, setArrivalReady] = useState(false);
+  const navigation = useSearchParams().toString();
   const [view, setView] = useState<"map" | "list">("map");
   useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(view === "list" ? "/?view=list" : "/"); }, [active, view, navigation, onViewChange]);
   const [statuses, setStatuses] = useState<PlaceStatus[]>([...STATUS_ORDER]); const [category, setCategory] = useState("");
@@ -66,9 +66,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (id && params.get("from") === "search") setFocusedId(id);
     setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null);
     const saved = params.get("saved"); setSavedArrival(saved); duplicateArrival.current = params.get("duplicate") === "1";
-    let cancelled = false;
-    if (saved) { setArrivalReady(false); void store.refresh().then(() => { if (!cancelled) setArrivalReady(true); }); }
-    return () => { cancelled = true; };
+    // Successful saves already supply this place. Only old responses / direct URLs need a fetch.
+    if (saved && !store.getSnapshot().snapshot?.places.some((p) => p.id === saved)) void store.refresh();
   }, [active, navigation, store]);
   useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listScroll.current; }, [view, loaded]);
   function open(kind: Exclude<Overlay, null>, id?: string) {
@@ -95,16 +94,17 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: selected.lat, lng: selected.lng });
   }, [active, navigation, selected?.id]);
   useEffect(() => {
-    if (!active || !loaded || !savedArrival || !arrivalReady || syncing || error) return;
+    if (!active || !loaded || !savedArrival) return;
     const place = places.find((p) => p.id === savedArrival);
+    if (!place && (syncing || error || !["0", "1"].includes(savedArrival))) return;
     setView("map"); setStatuses([...STATUS_ORDER]); setCategory("");
     setFocusedId(place?.id || null);
-    setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng } : { sequence: ++requestSequence.current, kind: "saved" });
+    setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true } : { sequence: ++requestSequence.current, kind: "saved" });
     setToast(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
     history.replaceState(history.state, "", url.pathname + url.search);
-  }, [active, loaded, places, savedArrival, arrivalReady, syncing, error]);
+  }, [active, loaded, places, savedArrival, syncing, error]);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 5000);

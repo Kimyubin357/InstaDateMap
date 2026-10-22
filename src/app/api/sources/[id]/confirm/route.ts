@@ -2,6 +2,7 @@ import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/
 import { db } from "@/lib/db";
 import { confirmSelections, type Selection } from "@/lib/pipeline";
 import type { KakaoPlace } from "@/lib/types";
+import { withSavedPlace } from "@/lib/saved-place-server";
 
 function isPlace(v: unknown): v is KakaoPlace {
   const p = v as KakaoPlace;
@@ -26,7 +27,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const direct = isPlace(body.direct) ? body.direct : null;
     const saved = await confirmSelections(board.id, params.id, board.who, selections, direct);
     const { data: links } = saved ? await db().from("source_places").select("place_id").eq("source_id", params.id).eq("added_by", board.who).limit(1) : { data: [] };
-    return Response.json({ status: "ok", saved, place_url: links?.[0] ? `/?place=${links[0].place_id}` : "/" });
+    return Response.json(await withSavedPlace(board, { status: "ok", saved, place_url: links?.[0] ? `/?place=${links[0].place_id}` : "/" }), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

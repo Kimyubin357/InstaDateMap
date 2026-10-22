@@ -15,7 +15,7 @@ export default function ManualPlaceSearch({ sourceId, onSaved }: { sourceId?: st
   async function save() {
     if (!picked || busy) return; setBusy(true); setError("");
     try {
-      const r = sourceId ? await requestJson<{ place_url: string }>(`/api/sources/${sourceId}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selections: [], direct: picked, query: searched }) }) :
+      const r = sourceId ? await requestJson<{ place_url: string; saved_place?: ShareResult["saved_place"] }>(`/api/sources/${sourceId}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selections: [], direct: picked, query: searched }) }) :
         await requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: searched, place_id: picked.kakao_place_id }) });
       // Link confirmation returns "ok"; expose the same saved/duplicate outcome as direct saves.
       onSaved({ ...r, status: "status" in r && r.status === "duplicate" ? "duplicate" : "saved", message: `${picked.name}을(를) 저장했어요.` });

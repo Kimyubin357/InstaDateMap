@@ -4,6 +4,7 @@ import { keywordSearch } from "@/lib/kakao";
 import { savePlace } from "@/lib/pipeline";
 import { boardRevision } from "@/lib/sync-server";
 import { snapshotEtag } from "@/lib/sync-types";
+import { withSavedPlace } from "@/lib/saved-place-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,6 @@ export async function POST(req: Request) {
     const { data: existing, error } = await db().from("places").select("id").eq("board_id", board.id).eq("kakao_place_id", place.kakao_place_id).maybeSingle();
     if (error) throw new Error("기존 장소를 확인하지 못했어요.");
     const id = await savePlace({ boardId: board.id, sourceId: null, extractionId: null, addedBy: board.who, place });
-    return Response.json({ status: existing ? "duplicate" : "saved", place_url: `/?place=${id}`, message: existing ? "이미 있는 장소에 저장한 마음을 더했어요." : `${place.name}을(를) 저장했어요.` });
+    return Response.json(await withSavedPlace(board, { status: existing ? "duplicate" : "saved", place_url: `/?place=${id}`, message: existing ? "이미 있는 장소에 저장한 마음을 더했어요." : `${place.name}을(를) 저장했어요.` }), { headers: { "Cache-Control": "no-store" } });
   } catch (e) { return accessError(e); }
 }

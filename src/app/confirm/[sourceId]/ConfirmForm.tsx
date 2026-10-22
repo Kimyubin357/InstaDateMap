@@ -11,6 +11,7 @@ import LinkRecovery from "@/components/LinkRecovery";
 import type { ShareResult } from "@/lib/share-stream";
 import { savedMapHref, shareDestination } from "@/lib/share-navigation";
 import { navigateShell } from "@/lib/shell-navigation";
+import { useBoardSync } from "@/components/BoardProvider";
 
 export interface ExtractionView {
   id: string;
@@ -43,6 +44,7 @@ export default function ConfirmForm({
   extractions: ExtractionView[];
 }) {
   const router = useRouter();
+  const { store } = useBoardSync();
   const [choices, setChoices] = useState<Record<string, Choice>>(() =>
     Object.fromEntries(
       extractions.map((e) => [
@@ -83,11 +85,12 @@ export default function ConfirmForm({
       return { extraction_id: e.id, include: c.include && !!place, place };
     });
     try {
-      const body = await requestJson<{ saved: number; place_url?: string }>(`/api/sources/${source.id}/confirm`, {
+      const body = await requestJson<{ saved: number; place_url?: string; saved_place?: ShareResult["saved_place"] }>(`/api/sources/${source.id}/confirm`, {
         method: "POST",
         headers,
         body: JSON.stringify({ selections }),
       });
+      store.acceptSavedPlace(body.saved_place);
       returnToMap(body.saved ? savedMapHref(body.place_url) : "/?saved=0");
     } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
     finally { setSaving(false); }
@@ -104,6 +107,7 @@ export default function ConfirmForm({
         body: JSON.stringify({ url: source.url, caption, images, retry: true }),
       });
       if (body.status === "saved" || body.status === "duplicate") {
+        store.acceptSavedPlace(body.saved_place);
         returnToMap(shareDestination(body)!);
       } else {
         setNotice(body.message);
@@ -272,5 +276,6 @@ function ManualSearch({ initial, onPick }: { initial: string; onPick: (p: KakaoP
 
 /** 추출 결과가 아예 없을 때: 검색해서 바로 저장 */
 function DirectAdd({ sourceId, onDone }: { sourceId: string; onDone: (href: string) => void }) {
-  return <ManualPlaceSearch sourceId={sourceId} onSaved={(result) => onDone(result.place_url || "/")} />;
+  const { store } = useBoardSync();
+  return <ManualPlaceSearch sourceId={sourceId} onSaved={(result) => { store.acceptSavedPlace(result.saved_place); onDone(result.place_url || "/"); }} />;
 }

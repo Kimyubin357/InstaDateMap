@@ -1,5 +1,6 @@
 import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
 import { ingestShare } from "@/lib/pipeline";
+import { withSavedPlace } from "@/lib/saved-place-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -47,14 +48,14 @@ export async function POST(req: Request) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({ async start(controller) {
         const send = (data: unknown) => { try { controller.enqueue(encoder.encode(JSON.stringify(data) + "\n")); } catch { /* client left; finish the idempotent save */ } };
-        try { send({ type: "result", result: await ingestShare({ ...input, onProgress: (stage) => send({ type: "progress", stage }) }) }); }
+        try { send({ type: "result", result: await withSavedPlace(board, await ingestShare({ ...input, onProgress: (stage) => send({ type: "progress", stage }) })) }); }
         catch (e) { send({ type: "result", result: { status: "error", message: e instanceof Error ? e.message : "저장하지 못했어요." } }); }
         finally { try { controller.close(); } catch {} }
       } });
       return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
     }
-    const result = await ingestShare(input);
-    return Response.json(result, { status: result.status === "error" ? result.source_id ? 502 : 400 : 200 });
+    const result = await withSavedPlace(board, await ingestShare(input));
+    return Response.json(result, { status: result.status === "error" ? result.source_id ? 502 : 400 : 200, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

@@ -77,9 +77,10 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
     try {
       const result = await requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: state.searched, place_id: picked.kakao_place_id }) });
       const destination = shareDestination(result); if (!destination) throw new Error("저장 결과를 확인하지 못했어요. 다시 시도해 주세요.");
+      store.acceptSavedPlace(result.saved_place);
       // Remove the confirmation-only history marker before replacing with the map.
       window.history.replaceState({ ...window.history.state, datemapSearchPick: false }, "", window.location.href);
-      setPicked(null); navigateShell(destination, true); void store.refresh();
+      setPicked(null); navigateShell(destination, true);
     } catch (error) {
       if (error && typeof error === "object" && "status" in error && error.status === 401) { void lock(); return; }
       setSaveError(error instanceof Error ? error.message : "저장하지 못했어요. 다시 시도해 주세요.");
