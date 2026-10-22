@@ -56,7 +56,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .pin-field>label,.remember{font-size:18px}
 .pin-cells>span{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:10px;font-size:25px;color:var(--forest)}
 .pin-control:focus-within .pin-cells>.current{border-color:var(--accent);box-shadow:0 0 0 2px #b92b2517}
-.pin-visibility{color:var(--forest)}
 .identity-option,.identity-option.person-1{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:18px;color:var(--forest);font-size:23px;min-width:0;padding:14px 10px;gap:8px}
 .identity-option.person-1{color:var(--accent)}
 .identity-portrait{width:96px;height:88px;object-fit:contain;flex:none}
