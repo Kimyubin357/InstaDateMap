@@ -4,9 +4,30 @@ import { loadScript } from "@/lib/scripts";
 import { STATUS_LABEL } from "@/lib/types";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
+import { CLUSTER_MIN_LEVEL, clusterPlaces } from "@/lib/map-clusters";
 export interface MapPosition { lat: number; lng: number; level: number }
 export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean };
 declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: () => void } } } }
+
+function clusterButton(total: number, visited: number) {
+  const button = document.createElement("button"); button.type = "button"; button.className = "cluster-pin";
+  button.dataset.total = String(total); button.dataset.visited = String(visited);
+  button.setAttribute("aria-label", `저장한 장소 ${total}곳, 가본 곳 ${visited}곳. 지도 확대`);
+  button.title = `저장 ${total}곳 · 방문 ${visited}/${total} · 눌러서 확대`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 56 56"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+  for (const kind of ["track", "progress"]) {
+    const circle = document.createElementNS(svg.namespaceURI, "circle");
+    for (const [key, value] of Object.entries({ cx: "28", cy: "28", r: "24", pathLength: "100", class: `cluster-ring-${kind}` })) circle.setAttribute(key, value);
+    if (kind === "progress") { circle.setAttribute("stroke-dasharray", `${visited / total * 100} 100`); circle.setAttribute("transform", "rotate(-90 28 28)"); }
+    svg.append(circle);
+  }
+  const count = document.createElement("span"); count.textContent = total.toLocaleString("ko-KR"); count.setAttribute("aria-hidden", "true");
+  if (total > 99) button.classList.add("cluster-pin-large");
+  button.append(svg, count);
+  return button;
+}
+
 export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
@@ -15,7 +36,9 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   focusPadding?: () => { top: number; bottom: number } | null;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
-  const markers = useRef<{ id: string; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
+  const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
+  const [level, setLevel] = useState(initialPosition?.level ?? 7);
+  const pendingMarkerFocus = useRef<string[]>();
   const position = useRef(initialPosition); const onMove = useRef(onPosition); onMove.current = onPosition;
   const pick = useRef(onPick); pick.current = onPick;
   const blank = useRef(onBlank); blank.current = onBlank;
@@ -72,11 +95,14 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
         position.current = { lat: p?.lat ?? 37.28, lng: p?.lng ?? 127.01, level: p?.level ?? 7 };
         const onBlank = () => blank.current?.();
         const onDrag = () => { cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined; };
+        const onZoom = () => setLevel(map.current.getLevel());
         k.event.addListener(map.current, "idle", rememberPosition);
         k.event.addListener(map.current, "click", onBlank);
         k.event.addListener(map.current, "dragstart", onDrag);
+        k.event.addListener(map.current, "zoom_changed", onZoom);
         cleanup = () => {
           k.event.removeListener(map.current, "idle", rememberPosition); k.event.removeListener(map.current, "click", onBlank); k.event.removeListener(map.current, "dragstart", onDrag);
+          k.event.removeListener(map.current, "zoom_changed", onZoom);
           markers.current.forEach((marker) => marker.overlay.setMap(null)); me.current?.setMap(null);
         };
         setReady(true);
@@ -86,25 +112,46 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   useEffect(() => {
     if (!ready) return;
     const k = window.kakao.maps;
+    const previousFocus = pendingMarkerFocus.current || markers.current.find((marker) => marker.button === document.activeElement)?.ids;
     markers.current.forEach((m) => m.overlay.setMap(null));
-    markers.current = places.map((p) => {
-      const button = document.createElement("button"); button.type = "button"; button.className = `pin ${p.status}${p.id === selectedId ? " active" : ""}`;
-      button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}`);
-      button.id = `${interactive ? "map" : "preview"}-place-${p.id}`;
-      const dot = document.createElement("i"); dot.className = "mark";
-      const label = document.createElement("span"); label.textContent = p.name; button.append(dot, label);
-      if (!interactive) { button.tabIndex = -1; button.setAttribute("aria-hidden", "true"); }
-      button.onclick = () => { k.event.preventMap(); if (interactive) pick.current(p.id); };
-      const marker = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === selectedId ? 5 : 1 });
-      marker.setMap(map.current); return { id: p.id, button, overlay: marker };
-    });
-  }, [places, ready]);
+    if (interactive && map.current.getLevel() >= CLUSTER_MIN_LEVEL) {
+      const projection = map.current.getProjection();
+      markers.current = clusterPlaces(places, (place) => projection.containerPointFromCoords(new k.LatLng(place.lat, place.lng))).map((group) => {
+        const button = clusterButton(group.places.length, group.visited);
+        const point = projection.coordsFromContainerPoint(new k.Point(group.x, group.y));
+        const ids = group.places.map((place) => place.id);
+        button.classList.toggle("active", ids.includes(focused.current || ""));
+        button.onclick = (event) => {
+          k.event.preventMap(); cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined;
+          if (event.detail === 0) pendingMarkerFocus.current = ids;
+          map.current.setLevel(Math.max(4, map.current.getLevel() - 2), { anchor: point, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
+        };
+        const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? 5 : 1 });
+        overlay.setMap(map.current); return { ids, button, overlay };
+      });
+    } else {
+      markers.current = places.map((p) => {
+        const button = document.createElement("button"); button.type = "button"; button.className = `pin ${p.status}${p.id === selectedId ? " active" : ""}`;
+        button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}`);
+        button.id = `${interactive ? "map" : "preview"}-place-${p.id}`;
+        const dot = document.createElement("i"); dot.className = "mark";
+        const label = document.createElement("span"); label.textContent = p.name; button.append(dot, label);
+        if (!interactive) { button.tabIndex = -1; button.setAttribute("aria-hidden", "true"); }
+        button.onclick = () => { k.event.preventMap(); if (interactive) pick.current(p.id); };
+        const marker = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === selectedId ? 5 : 1 });
+        marker.setMap(map.current); return { ids: [p.id], button, overlay: marker };
+      });
+    }
+    if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
+    pendingMarkerFocus.current = undefined;
+  }, [places, ready, level, interactive]);
   useEffect(() => {
     for (const marker of markers.current) {
-      marker.button.classList.toggle("active", marker.id === selectedId);
-      marker.overlay.setZIndex(marker.id === selectedId ? 5 : 1);
+      const selected = marker.ids.includes(selectedId || "");
+      marker.button.classList.toggle("active", selected);
+      marker.overlay.setZIndex(selected ? 5 : 1);
     }
-  }, [selectedId, places, ready]);
+  }, [selectedId, places, ready, level]);
   useEffect(() => {
     if (!ready) return;
     if (!fitted.current && places.length && active) {
