@@ -92,7 +92,8 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 /* Pending links stay below search, away from the connection notice at the bottom. */
 .view-list .empty-state.on-list{top:calc(var(--search-top) + 150px)}
 .view-map .toast,.view-list .toast,.sync-notice{top:auto;bottom:var(--map-bottom);left:16px;right:88px;width:auto;transform:none}
-.sync-notice{z-index:12}.loading-state,.app-error{top:calc(var(--search-top) + 80px)}
+.sync-notice{z-index:12}.loading-state,.app-error{top:calc(var(--search-top) + 124px)}
+.view-list .loading-state,.view-list .app-error{top:calc(var(--search-top) + 204px)}
 .persistent-search{position:fixed;inset:0 0 auto;height:var(--app-height);z-index:1;pointer-events:none}.persistent-search.is-away{visibility:hidden;pointer-events:none}
 .search-app{position:absolute;inset:0;background:transparent;pointer-events:none}
 .search-content-viewport{position:absolute;inset:0;pointer-events:none}

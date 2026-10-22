@@ -60,6 +60,7 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .identity-option,.identity-option.person-1{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:18px;color:var(--forest);font-size:23px;min-width:0;padding:14px 10px;gap:8px}
 .identity-option.person-1{color:var(--accent)}
 .identity-portrait{width:96px;height:88px;object-fit:contain;flex:none}
+.identity-fallback{display:flex;align-items:center;justify-content:center;color:var(--ink-soft)}
 .identity-name{max-width:100%;overflow-wrap:anywhere;line-height:1.35}
 
 /* Ink outlines float above the original, untinted Kakao map. */
