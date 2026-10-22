@@ -112,7 +112,9 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .status-tag.meh{background:#e4dfd4;color:#63594f}
 .list-heading{border-bottom:1px dashed var(--line)}
 .list-heading h2{font-size:22px}
-.list-heading select{font-size:17px;background:var(--cream);border:1px dashed var(--line);border-radius:8px;padding:7px 10px}
+.list-heading select,.list-filter{font-size:17px;background:var(--cream);color:var(--ink);border:1px dashed var(--line);border-radius:8px;padding:7px 10px;height:44px;line-height:1.2}
+.list-filter.is-active{color:var(--forest);border-color:var(--forest);background:#e0e7d6 var(--weave)}
+@media(max-width:380px){.list-heading{gap:6px}.list-heading h2{font-size:19px}.list-tools{gap:6px}.list-heading select,.list-filter{font-size:16px;padding-left:7px;padding-right:7px}}
 .place-row{background:none;border-bottom:1px dashed var(--line);gap:14px;padding:22px 0}
 .place-row .row-copy>strong,.places-list .place-row .row-copy>strong{font-size:23px;line-height:1.35;letter-spacing:0;font-weight:400}
 .row-meta{font-size:17px;line-height:1.45}
