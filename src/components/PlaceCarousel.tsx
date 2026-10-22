@@ -38,7 +38,7 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
       const id = nearest?.dataset.placeId;
       if (id && id !== latest.current.selectedId) {
         settledId.current = id;
-        if (container.contains(document.activeElement)) nearest?.focus({ preventScroll: true });
+        if (container.contains(document.activeElement)) nearest?.querySelector<HTMLButtonElement>(".place-card-main")?.focus({ preventScroll: true });
         latest.current.onSelect(id);
       }
     }, 120);
@@ -55,15 +55,17 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
       onPointerDown={(event) => { gesture.current = { x: event.clientX, y: event.clientY, moved: false }; }}
       onPointerMove={(event) => { if (gesture.current && Math.hypot(event.clientX - gesture.current.x, event.clientY - gesture.current.y) > 8) gesture.current.moved = true; }}
       onClickCapture={(event) => { if (gesture.current?.moved && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); } }}>
-      {places.map((place, i) => <button key={place.id} data-place-id={place.id} className={`place-card${place.id === selectedId ? " is-selected" : ""}`} tabIndex={place.id === selectedId ? 0 : -1} aria-label={`${place.name} 상세 보기`} aria-current={place.id === selectedId ? "true" : undefined} onClick={() => onOpen(place.id)}>
+      {places.map((place, i) => <article key={place.id} data-place-id={place.id} className={`place-card${place.id === selectedId ? " is-selected" : ""}`} aria-roledescription="슬라이드" aria-label={`${i + 1} / ${places.length}`}>
+        <button className="place-card-main" tabIndex={place.id === selectedId ? 0 : -1} aria-label={`${place.name} 상세 보기`} aria-current={place.id === selectedId ? "true" : undefined} onClick={() => onOpen(place.id)}>
         <span className={`status-tag ${place.status}`}>{STATUS_LABEL[place.status]}</span>
         <strong>{place.name}</strong><span className="card-meta">{placeMeta(place) || place.address || "저장한 장소"}</span>
         {place.memo && <span className="card-memo">{place.memo}</span>}
         <span className="card-bottom"><span className="card-sharer"><Icon name="user" width="13" />{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "우리의 장소"}</span><span className="card-count">{i + 1} / {places.length}</span></span>
         <span className="card-open"><Icon name="arrow" width="19" /></span>
-      </button>)}
+        </button>
+        <button className="icon-btn carousel-dismiss" tabIndex={place.id === selectedId ? 0 : -1} aria-label="장소 카드 닫기" onClick={onDismiss}><Icon name="close" width="17" /></button>
+      </article>)}
     </div>
-    <button className="icon-btn carousel-dismiss" aria-label="장소 카드 닫기" onClick={onDismiss}><Icon name="close" width="17" /></button>
     {places.length > 1 && <><button className="icon-btn carousel-step previous" aria-label="이전 장소" disabled={index <= 0} onClick={() => step(-1)}><Icon name="back" width="18" /></button><button className="icon-btn carousel-step next" aria-label="다음 장소" disabled={index >= places.length - 1} onClick={() => step(1)}><Icon name="chevron" width="18" /></button></>}
     <span className="sr-only" role="status">{index + 1} / {places.length}, {places[index]?.name}</span>
   </section>;
