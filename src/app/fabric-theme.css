@@ -45,19 +45,22 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .settings-row>svg:first-child{color:var(--forest)}
 .settings-section code{font-family:inherit;font-size:16px}
 
-/* PIN and identity: the existing couple illustration is kept until new artwork arrives. */
+/* Supplied entry artwork keeps its native proportions and transparent background. */
 .entry-page{padding-top:calc(var(--safe-t) + 62px)}
-.entry-page .mascot{margin-top:30px;margin-bottom:18px}
+.entry-page .entry-art{height:230px;margin:24px 0 18px;display:flex;align-items:center;justify-content:center}
+.entry-art img{position:static;transform:none;width:100%;height:100%;max-width:100%;object-fit:contain}
+.choose-page .wordmark.small{font-size:44px;margin:0}
+.choose-page .entry-art{height:210px;margin:20px 0 18px}
 .entry-page h1{font-size:33px;letter-spacing:0;font-weight:400}
 .entry-subtitle{font-size:18px;color:var(--ink-soft);margin-bottom:28px}
 .pin-field>label,.remember{font-size:18px}
 .pin-cells>span{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:10px;font-size:25px;color:var(--forest)}
 .pin-control:focus-within .pin-cells>.current{border-color:var(--accent);box-shadow:0 0 0 2px #b92b2517}
 .pin-visibility{color:var(--forest)}
-.identity-option,.identity-option.person-1{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:18px;color:var(--forest);font-size:23px}
+.identity-option,.identity-option.person-1{background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:18px;color:var(--forest);font-size:23px;min-width:0;padding:14px 10px;gap:8px}
 .identity-option.person-1{color:var(--accent)}
-.person-face{border-color:var(--forest);background:#e2e8d6;color:var(--forest)}
-.person-1 .person-face{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.identity-portrait{width:96px;height:88px;object-fit:contain;flex:none}
+.identity-name{max-width:100%;overflow-wrap:anywhere;line-height:1.35}
 
 /* Ink outlines float above the original, untinted Kakao map. */
 .unified-search-header form{
@@ -233,5 +236,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 }
 @media(max-height:740px){
   .entry-page{padding-top:calc(var(--safe-t) + 34px)}
-  .entry-page .mascot{margin-top:22px;height:150px;margin-bottom:12px}
+  .entry-page .entry-art{margin-top:16px;height:160px;margin-bottom:14px}
+  .choose-page .entry-art{height:150px}
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import PinInput from "@/components/PinInput";
 import { requestJson } from "@/lib/client-request";
+import pinCouple from "../../../public/illustrations/pin-couple.png";
 export default function EnterForm({ configured, next }: { configured: boolean; next: string }) {
   const router = useRouter();
   const [pin, setPin] = useState("");
@@ -18,7 +19,7 @@ export default function EnterForm({ configured, next }: { configured: boolean; n
     finally { setBusy(false); }
   }
   return <main className="entry-page"><ClientReady><div className="wordmark">데이트맵<span aria-hidden="true">♥</span></div>
-    <div className="mascot"><Image src="/couple.png" alt="손을 맞잡은 두 캐릭터" width={1792} height={875} priority /></div>
+    <div className="mascot entry-art"><Image src={pinCouple} alt="서로를 안고 있는 두 캐릭터" sizes="(max-height: 740px) 160px, 240px" priority /></div>
     <h1>우리만 아는 장소들</h1><p className="entry-subtitle">둘만의 PIN으로 우리 지도를 열어요.</p>
     {configured ? <form onSubmit={submit} className="entry-form"><PinInput value={pin} onChange={setPin} />
       <label className="remember"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />이 기기에서 기억하기</label>
