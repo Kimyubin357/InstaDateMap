@@ -1,0 +1,11 @@
+온글잎 박다현체 / Ownglyph PDH Regular, Version 1.0
+Copyright © 2023 VoyagerX, inc. & Dahyeon Park. All rights reserved.
+
+Font supplied by the project owner: 온글잎 박다현체.ttf
+The web copy uses WOFF2 compression. Glyphs and original font metadata are preserved.
+Official font page: https://www.ownglyph.com/trial/11ebf7f8-0997-4f03-a393-0959a07286aa
+Publisher: https://www.ownglyph.com
+
+Original copyright notice:
+Copyright © 2023 (주)보이저엑스 & 박다현, 모든 권리는 저작권자에게 있으며,
+이 파일을 수정하기 위해서는 반드시 (주)보이저엑스의 사전 허가를 받아야 합니다.
