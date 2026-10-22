@@ -18,9 +18,8 @@ export default function EnterForm({ configured, next }: { configured: boolean; n
     catch (e) { setError(e instanceof Error ? e.message : "다시 시도해 주세요."); setPin(""); }
     finally { setBusy(false); }
   }
-  return <main className="entry-page"><ClientReady><div className="wordmark">데이트맵<span aria-hidden="true">♥</span></div>
+  return <main className="entry-page"><ClientReady><div className="wordmark" role="heading" aria-level={1}>데이트맵<span aria-hidden="true">♥</span></div>
     <div className="mascot entry-art"><Image src={pinCouple} alt="서로를 안고 있는 두 캐릭터" sizes="(max-height: 740px) 160px, 240px" priority /></div>
-    <h1>우리만 아는 장소들</h1><p className="entry-subtitle">둘만의 PIN으로 우리 지도를 열어요.</p>
     {configured ? <form onSubmit={submit} className="entry-form"><PinInput value={pin} onChange={setPin} />
       <label className="remember"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />이 기기에서 기억하기</label>
       {error && <p className="error" role="alert">{error}</p>}<button className="btn primary large" disabled={busy || pin.length !== 6}>{busy ? "지도 여는 중…" : "우리 지도 열기"}</button>
