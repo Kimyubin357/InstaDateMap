@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "
 import Icon from "./Icon";
 import { createPortal } from "react-dom";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
+import { layoutViewportHeight, visibleViewport } from "@/lib/viewport";
 export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const body = useRef<HTMLDivElement>(null);
@@ -14,15 +15,15 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   useEffect(() => {
     const resize = () => {
       mobile.current = window.matchMedia("(max-width:759px)").matches;
-      const visibleHeight = window.visualViewport?.height || window.innerHeight;
-      stops.current = sheetStops(visibleHeight);
-      const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
-      const top = Math.max(0, Math.min(window.visualViewport?.offsetTop || 0, layoutHeight - visibleHeight));
-      setViewport((previous) => mobile.current ? previous?.top === top && previous.height === visibleHeight ? previous : { top, height: visibleHeight } : undefined);
+      const layoutHeight = layoutViewportHeight();
+      const editable = !!document.activeElement?.matches("input,textarea,[contenteditable=true]");
+      const { top, height } = visibleViewport(layoutHeight, window.visualViewport?.height || window.innerHeight, window.visualViewport?.offsetTop || 0, editable);
+      stops.current = sheetStops(height);
+      setViewport((previous) => mobile.current ? previous?.top === top && previous.height === height ? previous : { top, height } : undefined);
       setHeight(mobile.current && variant === "resizable" ? stops.current[stop.current] : undefined);
     };
-    resize(); window.addEventListener("resize", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
-    return () => { window.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
+    resize(); window.addEventListener("resize", resize); window.addEventListener("pageshow", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
+    return () => { window.removeEventListener("resize", resize); window.removeEventListener("pageshow", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
   }, [variant]);
   function revealInput() {
     const active = document.activeElement;

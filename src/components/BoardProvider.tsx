@@ -27,6 +27,10 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const viewport = useKeyboardViewport();
   const onMap = pathname === "/" || pathname === "/search";
+  useEffect(() => {
+    document.documentElement.dataset.mapViewport = String(onMap);
+    return () => { delete document.documentElement.dataset.mapViewport; };
+  }, [onMap]);
   const [backHref, setBackHref] = useState("/");
   const [homeHref, setHomeHref] = useState("/");
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
