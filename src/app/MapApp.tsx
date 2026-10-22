@@ -12,6 +12,7 @@ import PlaceCarousel from "@/components/PlaceCarousel";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type PlaceView } from "@/lib/place-view";
+import { categoryIcon } from "@/lib/place-presentation";
 type Overlay = "filters" | "pending" | "place" | null;
 const PENDING_LABEL: Record<string, string> = { pending_confirm: "지점 고르기", needs_review: "장소 확인하기", needs_caption: "정보 보태기" };
 const NO_PLACES: PlaceView[] = [];
@@ -109,7 +110,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!visible.some((p) => p.id === place.id)) reset();
     setView("map"); setFocusedId(place.id);
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng });
-    if (new URLSearchParams(window.location.search).get("from") === "search") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") !== "search" && params.get("view") !== "list" && history.state?.datemapOverlay) {
+      // The map is already the previous entry; consume the detail entry instead of duplicating it.
+      history.back(); setOverlay(null); setSelectedId(null);
+    } else if (params.get("from") === "search") {
       history.replaceState(history.state, "", "/"); setOverlay(null); setSelectedId(null);
     } else {
       const url = new URL(window.location.href); url.searchParams.delete("view"); url.searchParams.delete("place"); url.searchParams.delete("panel");
@@ -148,7 +153,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     <div className="floating-filters"><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {view === "list" && <div ref={list} className="places-list" onScroll={(e) => { listScroll.current = e.currentTarget.scrollTop; }}><div className="list-heading"><h2>저장한 장소</h2><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>
-      {visible.map((p) => <button key={p.id} className="place-row" onClick={() => open("place", p.id)}><span className={`category-icon ${p.category === "카페" ? "cafe" : "food"}`}><Icon name={p.category === "카페" ? "cup" : "food"} width="28" height="28" /></span><span className="row-copy"><strong>{p.name}</strong><span className="row-meta">{placeMeta(p)}{sort === "near" && origin ? ` · ${(distanceM(origin, p) / 1000).toFixed(1)}km` : ""}</span><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span><small className="row-sharer"><Icon name="user" width="12" height="12" />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small></span><Icon name="chevron" width="18" /></button>)}
+      {visible.map((p) => <button key={p.id} className="place-row" onClick={() => open("place", p.id)}><span className={`category-icon ${categoryIcon(p.category) === "cup" ? "cafe" : "food"}`}><Icon name={categoryIcon(p.category)} width="28" height="28" /></span><span className="row-copy"><strong>{p.name}</strong><span className="row-meta">{placeMeta(p)}{sort === "near" && origin ? ` · ${(distanceM(origin, p) / 1000).toFixed(1)}km` : ""}</span><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span><small className="row-sharer"><Icon name="user" width="12" height="12" />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small></span><Icon name="chevron" width="18" /></button>)}
     </div>}
     {loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>필터 초기화</button>}</div>}
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}

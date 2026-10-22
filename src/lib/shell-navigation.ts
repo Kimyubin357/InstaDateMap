@@ -8,6 +8,8 @@ export function shellDestination(href: string, origin: string): string | null {
 }
 /** Authenticated shell screens use existing memory; API authorization stays server-side. */
 export function navigateShell(href: string, replace = false) {
+  // Non-shell pages must let the router replace their server-rendered children.
+  if (!PATHS.has(window.location.pathname)) return false;
   const destination = shellDestination(href, window.location.origin);
   if (!destination) return false;
   if (destination !== window.location.pathname + window.location.search + window.location.hash) {

@@ -15,4 +15,13 @@ describe("서버 응답을 기다리지 않는 앱 화면 이동", () => {
     expect(navigateShell("/")).toBe(true); expect(history.pushState).toHaveBeenCalledTimes(1);
     expect(navigateShell("https://evil.test/")).toBe(false); expect(fetcher).not.toHaveBeenCalled();
   });
+  it("확인·입장 페이지에서는 라우터가 인증과 이전 페이지 교체를 처리하도록 남겨 둠", () => {
+    const history = { pushState: vi.fn(), replaceState: vi.fn() };
+    for (const pathname of ["/confirm/source-id", "/enter", "/setup"]) {
+      vi.stubGlobal("window", { history, location: { origin: "https://map.test", pathname, search: "", hash: "" } });
+      expect(navigateShell("/?saved=place-id", true)).toBe(false);
+      expect(navigateShell("/add")).toBe(false);
+    }
+    expect(history.pushState).not.toHaveBeenCalled(); expect(history.replaceState).not.toHaveBeenCalled();
+  });
 });
