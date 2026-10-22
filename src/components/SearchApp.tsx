@@ -86,7 +86,8 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
     } finally { setSaving(false); }
   }
   const query = state.query.trim();
-  return <div className={`search-app${active ? " is-search-active" : " is-search-idle"}${viewport.keyboard ? " keyboard-open" : ""}`} style={active && viewport.keyboard ? { height: viewport.height, top: viewport.top } : undefined} onKeyDown={(event) => { if (event.key === "Escape" && active && !picked) { event.preventDefault(); cancel(); } }}>
+  return <div className={`search-app${active ? " is-search-active" : " is-search-idle"}${viewport.keyboard ? " keyboard-open" : ""}`} onKeyDown={(event) => { if (event.key === "Escape" && active && !picked) { event.preventDefault(); cancel(); } }}>
+    <div className="search-content-viewport" style={active && viewport.keyboard ? { height: viewport.height, top: viewport.top, bottom: "auto" } : undefined}>
     <header className="unified-search-header">
       <form role="search" onClick={() => input.current?.focus({ preventScroll: true })} onSubmit={(e) => { e.preventDefault(); run(); }}><Icon name="search" width="20" /><input ref={input} aria-label="통합 장소 검색" placeholder="장소 이름, 지역으로 검색" value={active ? state.query : ""} onFocus={open} onChange={(e) => { open(); changeQuery(e.target.value); }} maxLength={100} enterKeyHint="search" autoComplete="off" />{active && state.query && <button type="button" className="icon-btn" aria-label="검색어 지우기" onClick={clear}><Icon name="close" width="20" /></button>}<button type="submit" className="sr-only">검색 실행</button></form>
       {active ? <button type="button" className="search-cancel" onClick={cancel}>취소</button> : <ShellLink href="/settings" className="icon-btn floating-settings" aria-label="우리 설정"><Icon name="settings" width="21" /></ShellLink>}
@@ -103,6 +104,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
           {state.busy ? <p className="search-hint" role="status">장소를 찾고 있어요…</p> : state.error ? <div className="search-failure" role="alert"><p>{state.error}</p><button className="btn" onClick={() => run()}>다시 검색</button></div> : !state.results ? <p className="search-hint">{query.length < 2 && !hasSearched ? "두 글자 이상 입력하거나 키보드의 검색을 눌러 주세요." : "입력한 이름으로 찾아볼게요…"}</p> : !fresh.length ? <p className="search-hint">{saved.length ? "추가로 찾은 장소는 없어요." : "검색 결과가 없어요. 지역이나 다른 이름으로 찾아보세요."}</p> : fresh.map((place) => <button className="unified-place-row" key={place.kakao_place_id} onClick={() => choose(place)} disabled={!snapshot}><span className="search-category"><Icon name={place.category.includes("카페") ? "cup" : "food"} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{place.address}</small></span><span className="search-add-icon" aria-label="주소 확인 후 저장"><Icon name="plus" width="21" /></span></button>)}
         </section>
       </>}
+    </div>
     </div>
     {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 중…" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p><span className="status-tag wish">가고 싶음으로 저장</span>{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
   </div>;

@@ -86,7 +86,9 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 .view-map .toast,.view-list .toast,.sync-notice{top:auto;bottom:calc(var(--filters-bottom) + 60px);left:16px;right:88px;width:auto;transform:none}
 .sync-notice{z-index:12}.loading-state,.app-error{top:calc(var(--search-top) + 80px)}
 .persistent-search{position:fixed;inset:0;z-index:1;pointer-events:none}.persistent-search.is-away{visibility:hidden;pointer-events:none}
-.search-app{position:absolute;inset:0;height:100dvh;background:transparent;pointer-events:none}
+.search-app{position:absolute;inset:0;background:transparent;pointer-events:none}
+.search-content-viewport{position:absolute;inset:0;pointer-events:none}
+.persistent-search.is-covering{background:#fff}
 .unified-search-header{position:absolute;z-index:2;top:var(--search-top);left:16px;right:16px;display:flex;align-items:center;gap:10px;pointer-events:auto}
 .unified-search-header form{min-width:0;flex:1;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-radius:28px;background:var(--ink);color:#fff;height:48px;box-shadow:0 3px 12px #45291f1f}
 .unified-search-header form:focus-within{box-shadow:0 0 0 3px #fb527233}

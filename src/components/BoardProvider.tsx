@@ -72,8 +72,8 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
   return <Context.Provider value={{ store, homeHref, suspended, suspend, resume, resetAccess, lock }}>
-    {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${onMap ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
-      <div className={`persistent-search${onMap ? "" : " is-away"}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
+    {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
+      <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
       {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} onPinChanged={setAccessNotice} /></div>}
       {accessNotice && pathname === "/settings" && <div className="toast" role="status"><span>{accessNotice}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setAccessNotice("")}><Icon name="close" width="16" /></button></div>}
