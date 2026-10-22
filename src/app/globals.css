@@ -183,10 +183,6 @@ button:enabled:active:is(.place-row,.unified-place-row,.recent-term){background:
 .sheet-place .sheet-heading>.icon-btn{position:absolute;right:30px;top:12px;width:32px;height:32px;border-radius:50%;background:#fffffff2;box-shadow:0 2px 10px #45291f1a}
 .sheet-place .sheet-heading-actions{position:absolute;right:30px;top:12px;display:flex;align-items:center;gap:8px}
 .sheet-place .sheet-heading-actions .icon-btn{width:40px;height:40px;border-radius:50%;background:#fffffff2;box-shadow:0 2px 10px #45291f1a}
-.place-options{position:relative}
-.place-options-menu{position:absolute;right:0;top:calc(100% + 8px);width:184px;padding:6px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 8px 32px #45291f24;animation:panel-in .12s ease-out}
-.place-delete-option{display:flex;align-items:center;gap:10px;min-height:48px;width:100%;padding:10px 12px;border:0;border-radius:11px;background:none;color:var(--danger);font-size:14px;font-weight:650;text-align:left}
-.place-delete-option:hover,.place-delete-option:focus-visible{background:#fff1f2}
 .sheet-delete-confirm{border-radius:30px 30px 0 0;padding-top:28px}
 .sheet-delete-confirm .sheet-heading{justify-content:center}.sheet-delete-confirm .sheet-heading h2{font-size:21px;letter-spacing:-.035em}
 .sheet-delete-confirm .sheet-body{padding-bottom:22px}

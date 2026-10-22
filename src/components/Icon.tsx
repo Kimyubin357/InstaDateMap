@@ -23,6 +23,7 @@ const paths = {
   image: "M2 3h20v18H2V3Zm0 14 6-7 6 7 4-4 4 4M17 7h.01", map: "m2 5 6-3 8 3 6-3v17l-6 3-8-3-6 3V5Zm6-3v17m8-14v17",
   list: "M8 6h14M8 12h14M8 18h14M2 6h.01M2 12h.01M2 18h.01",
   refresh: "M20 8a8 8 0 1 0 0 8M20 3v5h-5",
+  instagram: "M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm9 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm1.5-5.5h.01",
   clock: "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6l4 2",
 } as const;
 export default function Icon({ name, width = 22, height = width, ...props }: SVGProps<SVGSVGElement> & { name: keyof typeof paths }) {

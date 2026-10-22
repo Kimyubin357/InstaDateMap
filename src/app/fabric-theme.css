@@ -158,9 +158,20 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .seg button,.sheet .seg button{min-height:44px;border-radius:20px;font-size:17px;padding:7px 3px;font-weight:400}
 .seg button[aria-pressed=true]{background:var(--forest) var(--grain);color:var(--cream);box-shadow:none;outline:1px solid #fbf6e870;outline-offset:-3px}
 .sheet-place .sheet-heading-actions .icon-btn,.sheet-place .sheet-heading>.icon-btn{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
-.place-options-menu{background:var(--cream) var(--weave);border-style:dashed;box-shadow:0 6px 18px #382f2522}
-.place-delete-option{font-size:19px}
-.place-delete-option:hover,.place-delete-option:focus-visible{background:var(--accent-soft)}
+.place-status{background:transparent;border:0;padding:0;gap:6px}
+.place-status-wish{--status-ink:#a3322c;--status-paper:#f3ddd3}
+.place-status-again{--status-ink:#77551b;--status-paper:#ede1bd}
+.place-status-visited{--status-ink:#244b37;--status-paper:#e0e7d6}
+.place-status-meh{--status-ink:#63594f;--status-paper:#e4dfd4}
+.sheet .place-status button{background:var(--status-paper) var(--weave);color:var(--status-ink);border:1px dashed var(--status-ink);transition:background-color .15s,color .15s,transform .15s}
+.sheet .place-status button[aria-pressed=true]{background:var(--status-ink) var(--grain);color:var(--cream);border-style:solid;outline:1px solid #fbf6e8a6;outline-offset:-4px}
+.place-source-actions{display:flex;flex-direction:column;gap:12px;margin-top:22px;padding-top:20px;border-top:1px dashed var(--line)}
+.place-source-actions .hint{margin:0}
+.place-source-actions>.btn{min-height:50px;width:100%;padding:12px 14px;gap:10px}
+.place-source-actions .instagram-source-btn{background:linear-gradient(115deg,#833ab4,#c13584 50%,#c44328);color:#fff;border:0;font-size:20px;box-shadow:0 3px 10px #833ab41f}
+.instagram-source-btn>span{flex:1;text-align:left}
+.instagram-source-btn:focus-visible{outline-color:#833ab4}
+.place-source-actions .place-delete-btn{color:var(--danger);background:transparent;border:1px dashed var(--line);font-size:18px;box-shadow:none}
 .detail-map{border:1px dashed var(--line);border-radius:22px}
 .preview-map-button{font-size:15px;min-height:38px;padding:6px 10px;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
 .detail-title>h2{font-size:32px;line-height:1.3;letter-spacing:0;font-weight:400}
