@@ -37,6 +37,14 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 .sheet-handle{display:flex;align-items:center;justify-content:center;width:100%;height:36px;flex:none;padding:0;border:0;background:none;touch-action:none;cursor:grab}
 .sheet-handle:active{cursor:grabbing}
 .sheet-handle:focus-visible{outline:2px solid var(--accent);outline-offset:-5px;border-radius:12px}
+.action-dialog{position:fixed;inset:0;margin:auto;width:min(360px,calc(100vw - 40px));max-height:calc(100dvh - 48px);padding:26px 24px 24px;border:0;border-radius:26px;background:#fff;color:var(--ink);box-shadow:0 16px 64px #35201838;overflow:auto;overscroll-behavior:contain;text-align:center}
+.action-dialog[open]{display:block;animation:action-dialog-in .15s ease-out}.action-dialog::backdrop{background:#2f1f1966}
+.action-dialog form{margin:0}.action-dialog-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto 18px;border-radius:20px;background:var(--accent-soft);color:var(--accent-ink)}
+.action-dialog h2{font-size:21px;line-height:1.5;margin:0;overflow-wrap:anywhere}.action-dialog-content{font-size:14px;line-height:1.8;color:var(--ink-soft);margin-top:14px;overflow-wrap:anywhere}.action-dialog-content p{margin:0;white-space:pre-line}.action-dialog-content p+p{margin-top:14px}
+.action-dialog-actions{display:flex;gap:10px;margin-top:24px}.action-dialog-actions>.btn{flex:1;min-height:48px;border-radius:14px;font-size:16px;font-weight:700}.action-dialog-danger{color:#fff;background:var(--danger);border-color:var(--danger)}
+.action-dialog.is-destructive .action-dialog-icon,.action-dialog.tone-error .action-dialog-icon{color:var(--danger);background:#fff1f2}.action-dialog .delete-dialog-name{display:block;margin-bottom:5px;font-size:18px;line-height:1.5;color:var(--ink)}.action-dialog .delete-dialog-address{font-size:12px;margin-bottom:16px}.action-dialog .error{color:var(--danger);margin-top:14px}
+@keyframes action-dialog-in{from{opacity:.5;scale:.97}to{opacity:1;scale:1}}
+@media(prefers-reduced-motion:reduce){.action-dialog[open]{animation:none}}
 .sheet-handle .grabber{display:block;width:36px;height:4px;margin:0;border-radius:4px;background:#d5cecb}
 .sheet-heading{flex:none;padding:0 20px}
 .sheet-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 20px calc(var(--safe-b) + 24px)}

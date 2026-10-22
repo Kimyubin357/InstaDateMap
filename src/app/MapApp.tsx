@@ -17,7 +17,7 @@ const PENDING_LABEL: Record<string, string> = { pending_confirm: "지점 고르�
 const NO_PLACES: PlaceView[] = [];
 export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }: { who: string; kakaoKey: string; active: boolean; keyboard: boolean; onViewChange: (href: string) => void }) {
   const router = useRouter();
-  const { store } = useBoardSync(); const { snapshot: data, error, syncing } = useBoardState();
+  const { store, notify } = useBoardSync(); const { snapshot: data, error, syncing } = useBoardState();
   const places = data?.places || NO_PLACES, pending = data?.pending || []; const board = data?.board || "우리 데이트맵", loaded = !!data;
   const navigation = useSearchParams().toString();
   const [view, setView] = useState<"map" | "list">("map");
@@ -26,7 +26,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [overlay, setOverlay] = useState<Overlay>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [focusedId, setFocusedId] = useState<string | null>(null);
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false); const [toast, setToast] = useState("");
+  const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
   const duplicateArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
@@ -100,16 +100,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setView("map"); setStatuses([...STATUS_ORDER]); setCategory("");
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true } : { sequence: ++requestSequence.current, kind: "saved" });
-    setToast(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
+    notify(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
     history.replaceState(history.state, "", url.pathname + url.search);
   }, [active, loaded, places, savedArrival, syncing, error]);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 5000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
   function showPlaceOnMap(place: PlaceView) {
     if (!visible.some((p) => p.id === place.id)) reset();
     setView("map"); setFocusedId(place.id);
@@ -122,10 +117,10 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     }
   }
   function locate(forSort = false) {
-    if (!navigator.geolocation) { setToast("이 기기에서는 위치를 확인할 수 없어요."); return; }
-    setLocating(true); setToast("");
+    if (!navigator.geolocation) { notify("이 기기에서는 위치를 확인할 수 없어요.", "info"); return; }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition((p) => { const value = { lat: p.coords.latitude, lng: p.coords.longitude }; setOrigin(value); if (forSort) setSort("near"); else setMapLocation(value); setLocating(false); },
-      () => { setLocating(false); setToast("위치를 확인하지 못했어요. 위치 권한을 확인하거나 최근 저장순으로 봐 주세요."); }, { timeout: 12000, maximumAge: 30000 });
+      () => { setLocating(false); notify("위치를 확인하지 못했어요. 위치 권한을 확인하거나 최근 저장순으로 봐 주세요.", "info"); }, { timeout: 12000, maximumAge: 30000 });
   }
   function reset() { setStatuses([...STATUS_ORDER]); setCategory(""); }
   function toggleStatus(status: PlaceStatus) {
@@ -162,8 +157,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {view === "map" && focused && <PlaceCarousel places={mapPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} />
-    {toast && <div className="toast" role="status"><span>{toast}</span><button className="icon-btn" aria-label="알림 닫기" onClick={() => setToast("")}><Icon name="close" width="16" /></button></div>}
-    {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); setFocusedId(null); close(); }} />}
+    {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); setFocusedId(null); close(); setOverlay(null); setSelectedId(null); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
     {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant="compact" onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}><h3>우리의 상태</h3><div className="filter-options"><button className="chip" aria-pressed={all} onClick={() => setStatuses([...STATUS_ORDER])}>전체</button>{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={!all && statuses.includes(s)} onClick={() => toggleStatus(s)}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}
     {overlay === "pending" && <Modal title="조금만 더 확인해요" onClose={close}><p className="lead">지점을 고르거나 장소 정보를 보태면 저장할 수 있어요.</p><div className="pending-list">{pending.map((p) => <Link key={p.id} href={`/confirm/${p.id}`} className="pending-row"><div><strong>{PENDING_LABEL[p.status] || "장소 확인하기"}</strong><small>{p.shared_by}님이 발견한 링크</small><span>{p.url.replace("https://www.instagram.com/", "")}</span></div><Icon name="chevron" /></Link>)}</div></Modal>}

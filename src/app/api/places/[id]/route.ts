@@ -32,9 +32,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);
-    const { error } = await db().from("places").delete().eq("id", params.id).eq("board_id", board.id);
-    if (error) return Response.json({ message: error.message }, { status: 400 });
-    return Response.json({ ok: true });
+    const { data, error } = await db().from("places").delete().eq("id", params.id).eq("board_id", board.id).select("id");
+    if (error || !Array.isArray(data)) return Response.json({ message: "장소를 삭제하지 못했어요. 연결을 확인하고 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    // An absent row is also complete: retrying after a lost response must remain safe.
+    return Response.json({ ok: true, deleted_id: params.id, already_deleted: data.length === 0 }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

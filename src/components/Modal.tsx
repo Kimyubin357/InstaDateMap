@@ -127,6 +127,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     const previous = document.activeElement as HTMLElement | null;
     (ref.current?.querySelector<HTMLButtonElement>('[aria-label="닫기"]') || ref.current)?.focus({ preventScroll: true });
     const keyboard = (e: KeyboardEvent) => {
+      if (document.querySelector("dialog[data-app-dialog][open]")) return;
       if (e.key === "Escape") { e.preventDefault(); close.current(); }
       if (e.key !== "Tab") return;
       const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, [tabindex="0"]') ?? []).filter((el) => el.getClientRects().length);
