@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BoardStore, EMPTY_BOARD_STATE } from "@/lib/board-store";
 import { connectBoardSync } from "@/lib/sync-connection";
@@ -11,6 +11,7 @@ import useKeyboardViewport from "./useKeyboardViewport";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
 import ActionDialog from "./ActionDialog";
+import Feedback, { type ToastNotice } from "./Feedback";
 
 function AddPanel() {
   const url = useSearchParams().get("url") || "";
@@ -34,14 +35,19 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const [backHref, setBackHref] = useState("/");
   const [homeHref, setHomeHref] = useState("/");
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
-  const notify = (message: string, tone: "success" | "error" | "info" = "success") => setNotice({ message, tone });
+  const [toast, setToast] = useState<ToastNotice | null>(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const notify = useCallback((message: string, tone: "success" | "error" | "info" = "success") => {
+    if (tone === "error") { setToast(null); setNotice({ message, tone }); }
+    else { setNotice(null); setToast({ message, tone }); }
+  }, []);
   useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };
   const resume = () => { setSuspended(false); store.resume(); };
-  const lock = async () => { setNotice(null); suspend(); await store.forget(); try { sessionStorage.removeItem("datemap-view"); } catch {} announceAccess("locked"); window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
+  const lock = async () => { setNotice(null); setToast(null); suspend(); await store.forget(); try { sessionStorage.removeItem("datemap-view"); } catch {} announceAccess("locked"); window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
   const resetAccess = async (broadcast = true) => {
-    setNotice(null);
-    suspend(); await store.forget(); if (broadcast) announceAccess("changed");
+    setNotice(null); setToast(null);
+    suspend(); await store.forget({ keepShell: true }); if (broadcast) announceAccess("changed");
     try {
       const res = await fetch("/api/access/context", { cache: "no-store" });
       if (res.status === 401 || res.status === 409) { await lock(); return; }
@@ -82,6 +88,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
       {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} onPinChanged={notify} /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
+      <Feedback toast={toast} onDismiss={dismissToast} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
     </>}
     {children}
   </Context.Provider>;

@@ -4,9 +4,9 @@ import { createPortal } from "react-dom";
 import Icon from "./Icon";
 
 /** Native modal focus and hit testing stay separate from the draggable sheet below. */
-export default function ActionDialog({ title, message, children, onClose, onConfirm = onClose, confirmLabel = "확인", cancelLabel, busy = false, destructive = false, tone = "success" }: {
+export default function ActionDialog({ title, message, children, onClose, onConfirm = onClose, confirmLabel = "확인", cancelLabel, busy = false, busyLabel = "처리 중…", destructive = false, tone = "success" }: {
   title: string; message?: string; children?: ReactNode; onClose: () => void; onConfirm?: () => void | Promise<void>;
-  confirmLabel?: string; cancelLabel?: string; busy?: boolean; destructive?: boolean; tone?: "success" | "error" | "info";
+  confirmLabel?: string; cancelLabel?: string; busy?: boolean; busyLabel?: string; destructive?: boolean; tone?: "success" | "error" | "info";
 }) {
   const ref = useRef<HTMLDialogElement>(null); const id = useId();
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function ActionDialog({ title, message, children, onClose, onConf
       <span className="action-dialog-icon"><Icon name={destructive ? "trash" : tone === "error" ? "close" : tone === "info" ? "pin" : "check"} width="27" /></span>
       <h2 id={`${id}-title`}>{title}</h2>
       {(message || children) && <div id={`${id}-content`} className="action-dialog-content">{message && <p>{message}</p>}{children}</div>}
-      <div className="action-dialog-actions">{cancelLabel && <button type="button" className="btn" autoFocus disabled={busy} onClick={onClose}>{cancelLabel}</button>}<button type="submit" className={`btn ${destructive ? "action-dialog-danger" : "primary"}`} autoFocus={!cancelLabel} disabled={busy}>{busy ? "삭제 중…" : confirmLabel}</button></div>
+      <div className="action-dialog-actions">{cancelLabel && <button type="button" className="btn" autoFocus disabled={busy} onClick={onClose}>{cancelLabel}</button>}<button type="submit" className={`btn ${destructive ? "action-dialog-danger" : "primary"}`} autoFocus={!cancelLabel} disabled={busy}>{busy ? busyLabel : confirmLabel}</button></div>
     </form>
   </dialog>, document.body);
 }

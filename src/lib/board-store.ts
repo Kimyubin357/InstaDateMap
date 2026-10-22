@@ -24,6 +24,7 @@ export class BoardStore {
     this.paused = false;
     if (this.state.access && cacheScope(this.state.access) === cacheScope(access)) {
       if (this.state.access.who !== access.who || this.state.access.expiresAt !== access.expiresAt) this.set({ access });
+      if (!this.state.snapshot) void this.refresh();
       return;
     }
     this.cancel(); const generation = ++this.generation;
@@ -109,5 +110,10 @@ export class BoardStore {
   suspend() { ++this.generation; this.paused = true; this.cancel(); this.set({ connected: false, syncing: false }); }
   resume() { this.paused = false; void this.refresh(); }
   private cancel() { clearTimeout(this.debounce); this.abort?.abort(); this.flight = null; this.dirty = false; }
-  async forget() { ++this.generation; this.paused = true; this.cancel(); clearRecentSearches(); this.set(EMPTY_BOARD_STATE); await this.cache.clear().catch(() => {}); }
+  async forget({ keepShell = false }: { keepShell?: boolean } = {}) {
+    ++this.generation; this.paused = true; this.cancel(); clearRecentSearches();
+    // PIN rotation keeps only shell metadata mounted; cached content is cleared and requests stay paused.
+    this.set({ ...EMPTY_BOARD_STATE, access: keepShell ? this.state.access : null });
+    await this.cache.clear().catch(() => {});
+  }
 }

@@ -29,3 +29,10 @@ it("알림의 더 높은 변경 번호만 반영하고 권한 만료 시 캐시 
   const { store, stop } = setup(vi.fn(async () => new Response('event: change\ndata: {"revision":"2"}\n\nevent: change\ndata: {"revision":"4"}\n\nevent: expired\ndata: {}\n\n')) as typeof fetch);
   await vi.advanceTimersByTimeAsync(0); expect(store.schedule).toHaveBeenCalledOnce(); expect(store.onUnauthorized).toHaveBeenCalledOnce(); stop();
 });
+it("PIN 재인증을 위해 중단한 이전 연결의 늦은 401은 기기를 잠그지 않음", async () => {
+  let resolve!: (response: Response) => void;
+  const pending = new Promise<Response>((done) => { resolve = done; });
+  const { store, stop } = setup(vi.fn(() => pending) as typeof fetch);
+  store.isSuspended = () => true; resolve(new Response(null, { status: 401 }));
+  await vi.advanceTimersByTimeAsync(0); expect(store.onUnauthorized).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0); stop();
+});

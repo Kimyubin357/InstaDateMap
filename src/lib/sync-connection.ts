@@ -22,11 +22,12 @@ export function connectBoardSync(store: BoardStore) {
   const startFallback = () => { if (!fallback) fallback = setInterval(() => { if (visible()) void store.refresh(); }, 30000); };
   const stopFallback = () => { clearInterval(fallback); fallback = undefined; };
   const open = async () => {
-    if (disposed || !visible() || controller) return;
+    if (disposed || !visible() || controller || store.isSuspended()) return;
     const sequence = ++run, abort = new AbortController(); controller = abort; let healthy = false;
     startFallback();
     try {
       const res = await fetch("/api/sync/events", { cache: "no-store", credentials: "same-origin", signal: abort.signal });
+      if (disposed || sequence !== run || abort.signal.aborted || store.isSuspended()) return;
       if (res.status === 401 || res.status === 409) { store.onUnauthorized(); return; }
       if (!res.ok || !res.body) throw new Error("sync unavailable");
       await readSyncEvents(res.body, (event, data) => {
@@ -42,7 +43,8 @@ export function connectBoardSync(store: BoardStore) {
     } catch { /* Preserve the snapshot and use conditional requests until reconnected. */ }
     finally {
       if (sequence === run) { controller = null; store.connected(false); }
-      if (!disposed && sequence === run && visible()) {
+      if (store.isSuspended()) stopFallback();
+      if (!disposed && sequence === run && visible() && !store.isSuspended()) {
         startFallback(); const delay = healthy ? 300 : [1000, 2000, 5000, 10000, 30000][Math.min(failures++, 4)];
         retry = setTimeout(() => { void open(); }, delay);
       }

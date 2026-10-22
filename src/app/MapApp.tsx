@@ -29,12 +29,6 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string } | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timer);
-  }, [toast]);
   const duplicateArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
   const list = useRef<HTMLDivElement>(null);
@@ -107,7 +101,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setView("map"); setStatuses([...STATUS_ORDER]); setCategory("");
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true } : { sequence: ++requestSequence.current, kind: "saved" });
-    setToast({ message: savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요." });
+    notify(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
     history.replaceState(history.state, "", url.pathname + url.search);
@@ -159,15 +153,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     <div className="floating-filters"><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {view === "list" && <div ref={list} className="places-list" onScroll={(e) => { listScroll.current = e.currentTarget.scrollTop; }}><div className="list-heading"><h2>저장한 장소</h2><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>
-      {visible.map((p) => <button key={p.id} className="place-row" onClick={() => open("place", p.id)}><span className={`category-icon ${categoryIcon(p.category) === "cup" ? "cafe" : "food"}`}><Icon name={categoryIcon(p.category)} width="28" height="28" /></span><span className="row-copy"><strong>{p.name}</strong><span className="row-meta">{placeMeta(p)}{sort === "near" && origin ? ` · ${(distanceM(origin, p) / 1000).toFixed(1)}km` : ""}</span><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span><small className="row-sharer"><Icon name="user" width="12" height="12" />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small></span><Icon name="chevron" width="18" /></button>)}
+      {visible.map((p) => <button key={p.id} className="place-row" onClick={() => open("place", p.id)}><span className={`category-icon category-${categoryIcon(p.category)}`}><Icon name={categoryIcon(p.category)} width="28" height="28" /></span><span className="row-copy"><strong>{p.name}</strong><span className="row-meta">{placeMeta(p)}{sort === "near" && origin ? ` · ${(distanceM(origin, p) / 1000).toFixed(1)}km` : ""}</span><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span><small className="row-sharer"><Icon name="user" width="12" height="12" />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small></span><Icon name="chevron" width="18" /></button>)}
     </div>}
     {loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>필터 초기화</button>}</div>}
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
     {error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
-    {(toast || (error && loaded)) && <div className="map-feedback">
-      {error && loaded && <div className="sync-notice" role="status"><span>{error} 마지막 조회 내용을 유지하고 있어요.</span><button className="text-btn" onClick={() => void store.refresh()}>다시 연결</button></div>}
-      {toast && <div className="toast" role="status"><Icon name="check" width="18" /><span>{toast.message}</span><button className="icon-btn" aria-label="저장 알림 닫기" onClick={() => setToast(null)}><Icon name="close" width="16" /></button></div>}
-    </div>}
     {view === "map" && focused && <PlaceCarousel places={mapPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} />

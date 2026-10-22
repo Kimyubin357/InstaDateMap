@@ -11,6 +11,25 @@ const response = (data = snapshot()) => Response.json(data);
 function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promise<T>((r) => { resolve = r; }); return { resolve, promise }; }
 afterEach(() => vi.useRealTimers());
 describe("기기 조회 캐시와 서버 일치", () => {
+  it("PIN 재인증 동안 화면 정보만 유지하며 장소·기기 캐시는 지우고 요청은 중단", async () => {
+    const pending = deferred<Response>(), disk = cache(snapshot()), fetcher = vi.fn(() => pending.promise);
+    const store = new BoardStore(disk, fetcher as typeof fetch); await store.authorize(access); await Promise.resolve();
+    const seen: unknown[] = []; const unsubscribe = store.subscribe(() => seen.push(store.getSnapshot().access));
+    await store.forget({ keepShell: true });
+    expect(store.getSnapshot().access).toEqual(access); expect(store.getSnapshot().snapshot).toBeNull(); expect(store.isSuspended()).toBe(true); expect(disk.clear).toHaveBeenCalledOnce();
+    pending.resolve(response(snapshot("2"))); await Promise.resolve(); await Promise.resolve();
+    expect(store.getSnapshot().snapshot).toBeNull(); expect(disk.write).not.toHaveBeenCalled(); expect(seen).not.toContain(null);
+    unsubscribe(); await store.forget(); expect(store.getSnapshot().access).toBeNull();
+  });
+  it("동일 인증 버전 재확인도 비운 목록을 다시 조회하고 새 버전에는 옛 목록을 쓰지 않음", async () => {
+    const disk = cache(), fetcher = vi.fn(async () => response()), store = new BoardStore(disk, fetcher as typeof fetch);
+    await store.authorize(access); await store.refresh(); const before = fetcher.mock.calls.length;
+    await store.forget({ keepShell: true }); await store.authorize(access); await store.refresh();
+    expect(fetcher.mock.calls.length).toBeGreaterThan(before); expect(store.getSnapshot().snapshot?.authVersion).toBe(1);
+    await store.forget({ keepShell: true }); fetcher.mockImplementation(async () => response({ ...snapshot(), authVersion: 2 }));
+    await store.authorize({ ...access, authVersion: 2 }); await store.refresh();
+    expect(store.getSnapshot().access?.authVersion).toBe(2); expect(store.getSnapshot().snapshot?.authVersion).toBe(2); store.suspend();
+  });
   it("서버에서 저장한 장소를 전체 조회보다 먼저 표시·보관하고 목록 ETag는 유지", async () => {
     const pending = deferred<Response>(), disk = cache(snapshot());
     const store = new BoardStore(disk, vi.fn(() => pending.promise) as typeof fetch);
