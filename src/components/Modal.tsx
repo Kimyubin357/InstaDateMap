@@ -2,14 +2,15 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import Icon from "./Icon";
 import { createPortal } from "react-dom";
-import { sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
-export default function Modal({ title, children, onClose, variant = "resizable", footer, className = "", initialStop = 1 }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; className?: string; initialStop?: SheetStop }) {
+import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
+export default function Modal({ title, children, onClose, variant = "resizable", footer, className = "", initialStop = 1, dragFromContent = false }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
+  const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
   const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
   const suppressClickUntil = useRef(0);
-  const drag = useRef<{ id: number; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
+  const drag = useRef<{ id: number; source: "handle" | "content"; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
   useEffect(() => {
     const resize = () => {
       mobile.current = window.matchMedia("(max-width:759px)").matches;
@@ -32,32 +33,96 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   }
   useEffect(() => { revealInput(); }, [viewport]);
   function snap(next: SheetStop) { stop.current = next; setHeight(stops.current[next]); }
-  function start(e: PointerEvent<HTMLButtonElement>) {
-    if (!mobile.current || !e.isPrimary || e.button !== 0) return;
-    drag.current = { id: e.pointerId, startY: e.clientY, height: ref.current!.getBoundingClientRect().height, lastY: e.clientY, lastTime: e.timeStamp, velocity: 0, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
+  function beginDrag(id: number, y: number, time: number, source: "handle" | "content") {
+    drag.current = { id, source, startY: y, height: ref.current!.getBoundingClientRect().height, lastY: y, lastTime: time, velocity: 0, moved: false };
   }
-  function move(e: PointerEvent<HTMLButtonElement>) {
-    const current = drag.current; if (!current || current.id !== e.pointerId) return;
-    const delta = e.clientY - current.startY;
+  function moveDrag(id: number, y: number, time: number) {
+    const current = drag.current; if (!current || current.id !== id) return;
+    const delta = y - current.startY;
     if (Math.abs(delta) > 5) { current.moved = true; setDragging(true); }
     if (!current.moved) return;
-    e.preventDefault();
-    const elapsed = e.timeStamp - current.lastTime;
-    if (elapsed > 0) current.velocity = (e.clientY - current.lastY) / elapsed;
-    current.lastY = e.clientY; current.lastTime = e.timeStamp;
+    const elapsed = time - current.lastTime;
+    if (elapsed > 0) current.velocity = (y - current.lastY) / elapsed;
+    current.lastY = y; current.lastTime = time;
     setHeight(Math.max(32, Math.min(stops.current[2] + 20, current.height - delta)));
   }
-  function finish(e: PointerEvent<HTMLButtonElement>, cancelled = false) {
-    const current = drag.current; if (!current || current.id !== e.pointerId) return;
+  function finishDrag(id: number, y: number, time: number, cancelled = false) {
+    const current = drag.current; if (!current || current.id !== id) return;
     drag.current = undefined; setDragging(false);
     if (!current.moved) return;
     suppressClickUntil.current = Date.now() + 300;
-    const velocity = e.timeStamp - current.lastTime > 100 ? 0 : current.velocity;
-    const target = cancelled ? stop.current : settleSheet(current.height - (e.clientY - current.startY), velocity, stops.current);
+    const velocity = time - current.lastTime > 100 ? 0 : current.velocity;
+    const target = cancelled ? stop.current : settleSheet(current.height - (y - current.startY), velocity, stops.current);
     if (target === null) { snap(stop.current); close.current(); }
     else snap(target);
   }
+  function start(e: PointerEvent<HTMLButtonElement>) {
+    if (!mobile.current || !e.isPrimary || e.button !== 0) return;
+    beginDrag(e.pointerId, e.clientY, e.timeStamp, "handle");
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function move(e: PointerEvent<HTMLButtonElement>) {
+    if (drag.current?.source !== "handle") return;
+    e.preventDefault();
+    moveDrag(e.pointerId, e.clientY, e.timeStamp);
+  }
+  function finish(e: PointerEvent<HTMLButtonElement>, cancelled = false) {
+    if (drag.current?.source === "handle") finishDrag(e.pointerId, e.clientY, e.timeStamp, cancelled);
+  }
+  useEffect(() => {
+    const container = body.current;
+    if (!dragFromContent || variant !== "resizable" || !container) return;
+    let candidate: { id: number; x: number; y: number; time: number } | undefined;
+    const cancel = () => {
+      candidate = undefined;
+      const current = drag.current;
+      if (current?.source === "content") finishDrag(current.id, current.lastY, current.lastTime, true);
+    };
+    const startContent = (event: TouchEvent) => {
+      candidate = undefined;
+      if (event.touches.length !== 1) { cancel(); return; }
+      if (!mobile.current || drag.current || container.scrollTop > 1 || !(event.target instanceof Element)) return;
+      if (event.target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+      for (let node = event.target; node !== container && node; node = node.parentElement!) {
+        if (node.scrollHeight > node.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(node).overflowY)) return;
+      }
+      const touch = event.touches[0];
+      candidate = { id: touch.identifier, x: touch.clientX, y: touch.clientY, time: event.timeStamp };
+    };
+    const moveContent = (event: TouchEvent) => {
+      const selection = window.getSelection();
+      if (event.touches.length !== 1 || selection && !selection.isCollapsed) { cancel(); return; }
+      const touch = event.touches[0];
+      if (candidate) {
+        const decision = contentPullDecision(container.scrollTop, touch.clientX - candidate.x, touch.clientY - candidate.y);
+        if (decision === "pending") return;
+        if (decision === "scroll" || !event.cancelable) { candidate = undefined; return; }
+        beginDrag(candidate.id, candidate.y, candidate.time, "content"); candidate = undefined;
+      }
+      if (drag.current?.source !== "content" || drag.current.id !== touch.identifier) return;
+      if (!event.cancelable) { cancel(); return; }
+      event.preventDefault(); container.scrollTop = 0;
+      moveDrag(touch.identifier, touch.clientY, event.timeStamp);
+    };
+    const endContent = (event: TouchEvent) => {
+      candidate = undefined;
+      const current = drag.current; if (current?.source !== "content") return;
+      const touch = Array.from(event.changedTouches).find((value) => value.identifier === current.id);
+      if (!touch) return;
+      if (event.cancelable) event.preventDefault();
+      finishDrag(touch.identifier, touch.clientY, event.timeStamp);
+    };
+    // Claim only the downward edge pull; regular content scrolling stays native.
+    container.addEventListener("touchstart", startContent, { passive: true });
+    container.addEventListener("touchmove", moveContent, { passive: false });
+    container.addEventListener("touchend", endContent, { passive: false });
+    container.addEventListener("touchcancel", cancel, { passive: true });
+    return () => {
+      container.removeEventListener("touchstart", startContent); container.removeEventListener("touchmove", moveContent);
+      container.removeEventListener("touchend", endContent); container.removeEventListener("touchcancel", cancel);
+      if (drag.current?.source === "content") drag.current = undefined;
+    };
+  }, [dragFromContent, variant]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     (ref.current?.querySelector<HTMLButtonElement>('[aria-label="닫기"]') || ref.current)?.focus({ preventScroll: true });
@@ -78,5 +143,5 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     {variant === "resizable" && <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onClick={() => { if (Date.now() >= suppressClickUntil.current) snap(stop.current === 2 ? 0 : (stop.current + 1) as SheetStop); }}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>}
-    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div className="sheet-body">{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
+    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
 }

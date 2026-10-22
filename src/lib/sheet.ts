@@ -1,4 +1,10 @@
 export type SheetStop = 0 | 1 | 2;
+/** Leave native scrolling alone until a new, clearly downward pull starts at the top. */
+export function contentPullDecision(scrollTop: number, dx: number, dy: number): "pending" | "scroll" | "sheet" {
+  if (scrollTop > 1) return "scroll";
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return "pending";
+  return dy > Math.abs(dx) * 1.2 ? "sheet" : "scroll";
+}
 export function sheetStops(viewportHeight: number): [number, number, number] {
   const height = Math.max(1, viewportHeight);
   return [Math.min(260, height * .35), height * .64, height * .92];
