@@ -203,7 +203,6 @@ export default function ConfirmForm({
 
       {error && <p className="error">{error}</p>}
 
-      <a className="return-link" href="/">우리 지도로 돌아가기</a>
       </>}
     </ClientReady></main>
   );
