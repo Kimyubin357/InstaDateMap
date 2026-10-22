@@ -64,7 +64,7 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     catch (e) { setError(e instanceof Error ? e.message : "삭제하지 못했어요. 다시 시도해 주세요."); }
     finally { deleteRequest.current = false; setBusy(false); }
   }
-  return <><Modal title={place.name} className="sheet-place" initialStop={2} dragFromContent onClose={busy || deleting || leaving ? () => {} : () => requestLeave("close")}
+  return <><Modal title={place.name} className="sheet-place" initialStop={1} dragFromContent onClose={busy || deleting || leaving ? () => {} : () => requestLeave("close")}
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}>

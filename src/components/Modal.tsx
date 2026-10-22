@@ -10,7 +10,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
   const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
   const suppressClickUntil = useRef(0);
-  const drag = useRef<{ id: number; source: "handle" | "content"; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
+  const drag = useRef<{ id: number; source: "handle" | "content"; stop: SheetStop; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
   useEffect(() => {
     const resize = () => {
       mobile.current = window.matchMedia("(max-width:759px)").matches;
@@ -34,7 +34,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   useEffect(() => { revealInput(); }, [viewport]);
   function snap(next: SheetStop) { stop.current = next; setHeight(stops.current[next]); }
   function beginDrag(id: number, y: number, time: number, source: "handle" | "content") {
-    drag.current = { id, source, startY: y, height: ref.current!.getBoundingClientRect().height, lastY: y, lastTime: time, velocity: 0, moved: false };
+    drag.current = { id, source, stop: stop.current, startY: y, height: ref.current!.getBoundingClientRect().height, lastY: y, lastTime: time, velocity: 0, moved: false };
   }
   function moveDrag(id: number, y: number, time: number) {
     const current = drag.current; if (!current || current.id !== id) return;
@@ -44,7 +44,8 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     const elapsed = time - current.lastTime;
     if (elapsed > 0) current.velocity = (y - current.lastY) / elapsed;
     current.lastY = y; current.lastTime = time;
-    setHeight(Math.max(32, Math.min(stops.current[2] + 20, current.height - delta)));
+    const minimum = current.stop > 0 ? stops.current[current.stop - 1] : 32;
+    setHeight(Math.max(minimum, Math.min(stops.current[2] + 20, current.height - delta)));
   }
   function finishDrag(id: number, y: number, time: number, cancelled = false) {
     const current = drag.current; if (!current || current.id !== id) return;
@@ -52,7 +53,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     if (!current.moved) return;
     suppressClickUntil.current = Date.now() + 300;
     const velocity = time - current.lastTime > 100 ? 0 : current.velocity;
-    const target = cancelled ? stop.current : settleSheet(current.height - (y - current.startY), velocity, stops.current);
+    const target = cancelled ? current.stop : settleSheet(current.height - (y - current.startY), velocity, stops.current, { stop: current.stop, height: current.height });
     if (target === null) { snap(stop.current); close.current(); }
     else snap(target);
   }

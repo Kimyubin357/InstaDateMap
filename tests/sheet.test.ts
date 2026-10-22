@@ -11,15 +11,37 @@ describe("손잡이로 조절하는 바텀시트", () => {
   });
   it("천천히 놓으면 가까운 단계로 멈추고 위로 끌면 펼침", () => {
     const stops = sheetStops(844);
-    expect(settleSheet(270, 0, stops)).toBe(0);
-    expect(settleSheet(535, 0, stops)).toBe(1);
-    expect(settleSheet(720, -.5, stops)).toBe(2);
+    expect(settleSheet(270, 0, stops, { stop: 0, height: stops[0] })).toBe(0);
+    expect(settleSheet(535, 0, stops, { stop: 0, height: stops[0] })).toBe(1);
+    expect(settleSheet(720, -.5, stops, { stop: 1, height: stops[1] })).toBe(2);
   });
-  it("아래로 끝까지 내리거나 충분히 빠르게 내리면 닫음", () => {
+  it("최소 높이에서 아래로 끝까지 내리거나 충분히 빠르게 내리면 닫음", () => {
     const stops = sheetStops(844);
-    expect(settleSheet(100, 0, stops)).toBeNull();
-    expect(settleSheet(250, 1, stops)).toBeNull();
-    expect(settleSheet(250, 0, stops)).toBe(0);
+    expect(settleSheet(100, 0, stops, { stop: 0, height: stops[0] })).toBeNull();
+    expect(settleSheet(250, 1, stops, { stop: 0, height: stops[0] })).toBeNull();
+    expect(settleSheet(250, 0, stops, { stop: 0, height: stops[0] })).toBe(0);
+  });
+  it("최대에서 내리면 거리와 속도에 관계없이 중간에 멈춤", () => {
+    for (const viewport of [320, 560, 844, 1100]) {
+      const stops = sheetStops(viewport);
+      for (const distance of [6, 40, viewport]) for (const speed of [0, .5, 3, 20]) {
+        expect(settleSheet(stops[2] - distance, speed, stops, { stop: 2, height: stops[2] })).toBe(1);
+      }
+    }
+  });
+  it("중간에서 강하게 당겨도 최소에 먼저 멈추고 다음 제스처에서 닫음", () => {
+    const stops = sheetStops(844);
+    const minimum = settleSheet(50, 3, stops, { stop: 1, height: stops[1] });
+    expect(minimum).toBe(0);
+    expect(settleSheet(50, 3, stops, { stop: minimum!, height: stops[minimum!] })).toBeNull();
+  });
+  it("이동 애니메이션 중 시작한 작은 아래 당기기도 한 단계만 내림", () => {
+    const stops = sheetStops(844);
+    expect(settleSheet(640, 0, stops, { stop: 1, height: 650 })).toBe(0);
+  });
+  it("반대 방향으로 돌아온 손가락의 마지막 속도만으로 단계를 건너뛰지 않음", () => {
+    const stops = sheetStops(844);
+    expect(settleSheet(stops[2] + 10, 3, stops, { stop: 2, height: stops[2] })).toBe(1);
   });
 });
 

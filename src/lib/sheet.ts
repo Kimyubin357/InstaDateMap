@@ -10,11 +10,13 @@ export function sheetStops(viewportHeight: number): [number, number, number] {
   return [height * .48, height * .635, height * .92];
 }
 
-/** Positive velocity means dragging down; a short projection makes flicks feel natural. */
-export function settleSheet(height: number, velocity: number, stops: readonly number[]): SheetStop | null {
+/** A downward gesture visits the next stop; only the lowest stop can dismiss. */
+export function settleSheet(height: number, velocity: number, stops: readonly number[], start: { stop: SheetStop; height: number }): SheetStop | null {
+  const lower = Math.max(0, start.stop - 1) as SheetStop;
+  if (start.stop > 0 && height < start.height - 5) return lower;
   const projected = height - Math.max(-2, Math.min(2, velocity)) * 160;
-  if (projected < stops[0] * .55) return null;
+  if (projected < stops[0] * .55) return start.stop === 0 ? null : lower;
   let nearest: SheetStop = 0;
   for (const index of [1, 2] as const) if (Math.abs(stops[index] - projected) < Math.abs(stops[nearest] - projected)) nearest = index;
-  return nearest;
+  return Math.max(lower, nearest) as SheetStop;
 }
