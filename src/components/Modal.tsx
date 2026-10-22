@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "
 import Icon from "./Icon";
 import { createPortal } from "react-dom";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
-export default function Modal({ title, children, onClose, variant = "resizable", footer, className = "", initialStop = 1, dragFromContent = false }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
@@ -56,17 +56,17 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     if (target === null) { snap(stop.current); close.current(); }
     else snap(target);
   }
-  function start(e: PointerEvent<HTMLButtonElement>) {
+  function start(e: PointerEvent<HTMLDivElement>) {
     if (!mobile.current || !e.isPrimary || e.button !== 0) return;
     beginDrag(e.pointerId, e.clientY, e.timeStamp, "handle");
     e.currentTarget.setPointerCapture(e.pointerId);
   }
-  function move(e: PointerEvent<HTMLButtonElement>) {
+  function move(e: PointerEvent<HTMLDivElement>) {
     if (drag.current?.source !== "handle") return;
     e.preventDefault();
     moveDrag(e.pointerId, e.clientY, e.timeStamp);
   }
-  function finish(e: PointerEvent<HTMLButtonElement>, cancelled = false) {
+  function finish(e: PointerEvent<HTMLDivElement>, cancelled = false) {
     if (drag.current?.source === "handle") finishDrag(e.pointerId, e.clientY, e.timeStamp, cancelled);
   }
   useEffect(() => {
@@ -139,9 +139,9 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
   if (typeof document === "undefined") return null;
-  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""} ${className}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role="dialog" aria-modal="true" aria-label={title}>
-    {variant === "resizable" && <button className="sheet-handle" type="button" aria-label="패널 크기 조절" onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
-      onClick={() => { if (Date.now() >= suppressClickUntil.current) snap(stop.current === 2 ? 0 : (stop.current + 1) as SheetStop); }}
-      onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></button>}
-    <div className="sheet-heading"><h2>{title}</h2>{variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
+  const closeButton = variant === "resizable" && <button className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="close" /></button>;
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""} ${className}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
+    {variant === "resizable" && <div className="sheet-handle" tabIndex={0} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
+      onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></div>}
+    <div className="sheet-heading"><h2>{title}</h2>{headerActions ? <div className="sheet-heading-actions">{headerActions}{closeButton}</div> : closeButton}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
 }

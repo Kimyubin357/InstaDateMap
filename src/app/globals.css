@@ -36,6 +36,7 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 .sheet.is-dragging{transition:none;user-select:none}
 .sheet-handle{display:flex;align-items:center;justify-content:center;width:100%;height:36px;flex:none;padding:0;border:0;background:none;touch-action:none;cursor:grab}
 .sheet-handle:active{cursor:grabbing}
+.sheet-handle:focus-visible{outline:2px solid var(--accent);outline-offset:-5px;border-radius:12px}
 .sheet-handle .grabber{display:block;width:36px;height:4px;margin:0;border-radius:4px;background:#d5cecb}
 .sheet-heading{flex:none;padding:0 20px}
 .sheet-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 20px calc(var(--safe-b) + 24px)}
@@ -169,6 +170,18 @@ button:enabled:active,a.btn:active,a.icon-btn:active,.save-fab:active,.bottom-na
 .sheet-place .sheet-heading{position:relative;height:0;padding:0;z-index:2}
 .sheet-place .sheet-heading>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .sheet-place .sheet-heading>.icon-btn{position:absolute;right:30px;top:12px;width:32px;height:32px;border-radius:50%;background:#fffffff2;box-shadow:0 2px 10px #45291f1a}
+.sheet-place .sheet-heading-actions{position:absolute;right:30px;top:12px;display:flex;align-items:center;gap:8px}
+.sheet-place .sheet-heading-actions .icon-btn{width:40px;height:40px;border-radius:50%;background:#fffffff2;box-shadow:0 2px 10px #45291f1a}
+.place-options{position:relative}
+.place-options-menu{position:absolute;right:0;top:calc(100% + 8px);width:184px;padding:6px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 8px 32px #45291f24;animation:panel-in .12s ease-out}
+.place-delete-option{display:flex;align-items:center;gap:10px;min-height:48px;width:100%;padding:10px 12px;border:0;border-radius:11px;background:none;color:var(--danger);font-size:14px;font-weight:650;text-align:left}
+.place-delete-option:hover,.place-delete-option:focus-visible{background:#fff1f2}
+.sheet-delete-confirm{border-radius:30px 30px 0 0;padding-top:28px}
+.sheet-delete-confirm .sheet-heading{justify-content:center}.sheet-delete-confirm .sheet-heading h2{font-size:21px;letter-spacing:-.035em}
+.sheet-delete-confirm .sheet-body{padding-bottom:22px}
+.delete-confirm-content{padding-top:22px;text-align:center}.delete-confirm-icon{display:flex;align-items:center;justify-content:center;width:64px;height:64px;margin:0 auto 18px;border-radius:22px;background:#fff1f2;color:var(--danger)}
+.delete-confirm-content>strong{display:block;font-size:22px;line-height:1.4;overflow-wrap:anywhere}.delete-confirm-address{font-size:13px;line-height:1.6;color:var(--ink-soft);margin:6px 0 0}.delete-confirm-description{font-size:14px;line-height:1.8;color:var(--ink-soft);margin:20px 0 0}
+.delete-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.delete-confirm-actions>.btn{min-height:50px;border-radius:16px;font-size:16px;font-weight:700}.delete-confirm-submit{background:var(--danger);border-color:var(--danger);color:white}
 .sheet-place .sheet-handle{height:30px}.sheet-place .sheet-handle .grabber{width:40px;background:#d2c8c2}
 .sheet-place .sheet-body{padding:0 20px 20px;scrollbar-width:thin}
 .detail-map{position:relative;width:100%;height:clamp(150px,23dvh,210px);border-radius:25px;overflow:hidden;background:var(--mist);isolation:isolate;flex:none}
