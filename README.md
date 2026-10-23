@@ -46,6 +46,8 @@ PIN 화면에는 없던 주소 표시와 Safari 버튼이 지도에서 나타난
 
 ## 새로 설치
 
+실행 환경은 **Node.js 24.x**, Next.js 16.4.2, React 19.3.1입니다. Vercel에서도 `package.json`의 Node.js 24.x 설정을 사용합니다. 의존성 버전은 `package-lock.json`으로 고정하며, 기존 설치를 재현할 때는 `npm ci`를 사용합니다. 이번 프레임워크 업데이트 자체에는 추가 DB 마이그레이션이 필요하지 않습니다.
+
 1. Supabase 프로젝트를 만들고 `supabase/schema.sql`, `supabase/migrations/002_couple_access.sql`, `supabase/migrations/003_board_sync.sql` 순서로 실행합니다. 초기 스키마에서 받은 보드 토큰은 최초 설정에만 씁니다.
 2. `.env.example`을 `.env.local`로 복사하고 다음 값을 채웁니다.
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`: 서버 전용 Supabase 키

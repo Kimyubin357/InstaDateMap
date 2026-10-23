@@ -2,6 +2,9 @@
   "name": "datemap",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -15,16 +18,16 @@
     "@anthropic-ai/sdk": "^0.137.0",
     "@supabase/supabase-js": "^2.118.0",
     "@vercel/functions": "^3.10.3",
-    "next": "14.2.35",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",
     "@types/node": "^22.0.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@types/web-push": "^3.6.4",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

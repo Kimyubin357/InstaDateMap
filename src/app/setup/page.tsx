@@ -5,9 +5,10 @@ import { db } from "@/lib/db";
 import SetupForm from "./SetupForm";
 import { suggestedMemberNames } from "@/lib/member-names";
 export const dynamic = "force-dynamic";
-export default async function SetupPage({ searchParams }: { searchParams: { next?: string } }) {
+export default async function SetupPage({ searchParams: query }: { searchParams: Promise<{ next?: string }> }) {
+  const searchParams = await query;
   let session;
-  try { session = await setupSession(pageRequest()); } catch { redirect("/enter"); }
+  try { session = await setupSession(await pageRequest()); } catch { redirect("/enter"); }
   const { data: board } = await db().from("boards").select("pin_hash, auth_version").eq("id", session.board_id).single();
   if (!board || board.pin_hash || board.auth_version !== session.auth_version) redirect("/enter");
   const [sources, saves] = await Promise.all([

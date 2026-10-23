@@ -5,8 +5,9 @@ export const runtime = "nodejs";
 
 const STATUSES = new Set(["wish", "visited", "again", "meh"]);
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
+    const params = await route;
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);
@@ -27,8 +28,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
+    const params = await route;
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);

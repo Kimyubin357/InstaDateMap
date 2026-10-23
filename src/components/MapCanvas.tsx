@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { loadScript } from "@/lib/scripts";
+import { loadKakaoMaps } from "@/lib/map-sdk";
+import "@/app/map-recovery.css";
 import { STATUS_LABEL } from "@/lib/types";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
@@ -48,17 +49,18 @@ function lookupRegion(services: any, point: RegionPoint) {
   });
 }
 
-export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding }: {
+export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
   viewRequest: MapViewRequest | null;
   onBlank?: () => void; interactive?: boolean;
   focusPadding?: () => { top: number; bottom: number } | null;
+  onShowList?: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
   const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
   const [level, setLevel] = useState(initialPosition?.level ?? 7);
-  const pendingMarkerFocus = useRef<string[]>();
+  const pendingMarkerFocus = useRef<string[] | undefined>(undefined);
   const [regions] = useState(() => new MapRegionCache());
   const [regionVersion, setRegionVersion] = useState(0);
   const [lookupRetry, setLookupRetry] = useState(0);
@@ -66,13 +68,17 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   const position = useRef(initialPosition); const onMove = useRef(onPosition); onMove.current = onPosition;
   const pick = useRef(onPick); pick.current = onPick;
   const blank = useRef(onBlank); blank.current = onBlank;
-  const cancelMotion = useRef<() => void>();
+  const cancelMotion = useRef<(() => void) | undefined>(undefined);
   const moving = useRef(false);
   const padding = useRef(focusPadding); padding.current = focusPadding;
   const focused = useRef(selectedId); focused.current = selectedId;
-  const framedPlace = useRef<{ lat: number; lng: number }>();
+  const framedPlace = useRef<{ lat: number; lng: number } | undefined>(undefined);
   const fitted = useRef(!!initialPosition); const [ready, setReady] = useState(false); const [error, setError] = useState("");
-  const appliedRequest = useRef<number>();
+  const [loadAttempt, setLoadAttempt] = useState(0); const [loading, setLoading] = useState(true);
+  const automaticRetryUsed = useRef(false);
+  const [onlineVersion, setOnlineVersion] = useState(0);
+  const latestOnlineVersion = useRef(0); const attemptOnlineVersion = useRef(0);
+  const appliedRequest = useRef<number | undefined>(undefined);
   const layoutSize = useRef({ width: 0, height: 0 });
   function placeCenter(point: { lat: number; lng: number }) {
     const k = window.kakao.maps, target = new k.LatLng(point.lat, point.lng), insets = padding.current?.();
@@ -106,33 +112,53 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     rememberPosition();
   }
   useEffect(() => {
+    // Keep reconnects that arrive while the SDK is loading or this map is hidden.
+    const rememberReconnect = () => setOnlineVersion(++latestOnlineVersion.current);
+    window.addEventListener("online", rememberReconnect);
+    return () => window.removeEventListener("online", rememberReconnect);
+  }, []);
+  useEffect(() => {
     let cancelled = false;
     let cleanup = () => {};
-    if (!apiKey) { setError("지도를 준비하지 못했어요. 잠시 리스트로 확인해 주세요."); return; }
-    loadScript(`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(apiKey)}&autoload=false&libraries=services`, "kakao-sdk")
-      .then(() => window.kakao.maps.load(() => {
+    attemptOnlineVersion.current = latestOnlineVersion.current;
+    setLoading(true); setReady(false);
+    if (!apiKey) { setLoading(false); setError("지도를 준비하지 못했어요."); return; }
+    loadKakaoMaps(apiKey)
+      .then((k) => {
         if (cancelled || !el.current || map.current) return;
-        const k = window.kakao.maps; const p = position.current;
+        const p = position.current;
         layoutSize.current = { width: el.current.clientWidth, height: el.current.clientHeight };
-        map.current = new k.Map(el.current, { center: new k.LatLng(p?.lat ?? 37.28, p?.lng ?? 127.01), level: p?.level ?? 7, draggable: interactive, scrollwheel: interactive, disableDoubleClickZoom: !interactive });
-        if (!interactive) map.current.setZoomable(false);
+        const instance = new k.Map(el.current, { center: new k.LatLng(p?.lat ?? 37.28, p?.lng ?? 127.01), level: p?.level ?? 7, draggable: interactive, scrollwheel: interactive, disableDoubleClickZoom: !interactive });
+        map.current = instance;
         position.current = { lat: p?.lat ?? 37.28, lng: p?.lng ?? 127.01, level: p?.level ?? 7 };
         const onBlank = () => blank.current?.();
         const onDrag = () => { cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined; };
-        const onZoom = () => setLevel(map.current.getLevel());
-        k.event.addListener(map.current, "idle", rememberPosition);
-        k.event.addListener(map.current, "click", onBlank);
-        k.event.addListener(map.current, "dragstart", onDrag);
-        k.event.addListener(map.current, "zoom_changed", onZoom);
+        const onZoom = () => setLevel(instance.getLevel());
         cleanup = () => {
-          k.event.removeListener(map.current, "idle", rememberPosition); k.event.removeListener(map.current, "click", onBlank); k.event.removeListener(map.current, "dragstart", onDrag);
-          k.event.removeListener(map.current, "zoom_changed", onZoom);
+          k.event.removeListener(instance, "idle", rememberPosition); k.event.removeListener(instance, "click", onBlank); k.event.removeListener(instance, "dragstart", onDrag);
+          k.event.removeListener(instance, "zoom_changed", onZoom);
           markers.current.forEach((marker) => marker.overlay.setMap(null)); me.current?.setMap(null);
+          markers.current = []; me.current = null; map.current = null;
+          el.current?.replaceChildren();
         };
-        setReady(true);
-      })).catch(() => setError("지도를 불러오지 못했어요. 연결을 확인하거나 리스트로 봐 주세요."));
+        if (!interactive) instance.setZoomable(false);
+        k.event.addListener(instance, "idle", rememberPosition);
+        k.event.addListener(instance, "click", onBlank);
+        k.event.addListener(instance, "dragstart", onDrag);
+        k.event.addListener(instance, "zoom_changed", onZoom);
+        setLevel(instance.getLevel()); setError(""); setLoading(false); setReady(true);
+      }).catch(() => {
+        if (cancelled) return;
+        cleanup(); setLoading(false); setError("지도를 불러오지 못했어요.");
+      });
     return () => { cancelled = true; cancelMotion.current?.(); cleanup(); };
-  }, [apiKey]);
+  }, [apiKey, loadAttempt]);
+  useEffect(() => {
+    if (ready || loading || !error || !apiKey || !active || automaticRetryUsed.current
+      || onlineVersion <= attemptOnlineVersion.current || navigator.onLine === false) return;
+    automaticRetryUsed.current = true;
+    setLoadAttempt((attempt) => attempt + 1);
+  }, [ready, loading, error, apiKey, active, onlineVersion]);
   useEffect(() => {
     if (!ready || !interactive || !active || level < CLUSTER_MIN_LEVEL) return;
     let cancelled = false; let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -257,5 +283,10 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       } else { map.current.setLevel(4); map.current.setCenter(placeCenter(viewRequest)); rememberPosition(); }
     }
   }, [ready, active, viewRequest, places]);
-  return <><div ref={el} className="map-canvas" aria-label={interactive ? "저장한 장소 지도" : "장소 위치 미리보기"} />{error && <div className="map-notice" role="status">{error}</div>}</>;
+  return <><div ref={el} className="map-canvas" aria-label={interactive ? "저장한 장소 지도" : "장소 위치 미리보기"} />{error && <div className={`map-recovery${interactive ? "" : " map-recovery-preview"}`} aria-busy={loading}>
+    <p role="status">{loading ? "지도를 다시 불러오는 중…" : error}</p>
+    {interactive && !loading && <p className="map-recovery-hint">연결을 확인하고 다시 시도해 주세요.</p>}
+    <div className="map-recovery-actions">{apiKey && <button className="btn" disabled={loading} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{interactive ? "지도 다시 불러오기" : "다시 시도"}</button>}
+      {interactive && onShowList && <button className="text-btn" onClick={onShowList}>리스트로 보기</button>}</div>
+  </div>}</>;
 }

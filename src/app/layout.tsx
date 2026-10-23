@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import "./fabric-theme.css";
 import BoardProvider from "@/components/BoardProvider";
+import EdgeNavigationGuard from "@/components/EdgeNavigationGuard";
 
 const dahyun = localFont({
   src: "../../public/fonts/ownglyph-park-dahyun.woff2",
@@ -31,7 +32,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className={dahyun.variable}>
-      <body><BoardProvider>{children}</BoardProvider></body>
+      <body><EdgeNavigationGuard /><BoardProvider>{children}</BoardProvider></body>
     </html>
   );
 }

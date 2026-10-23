@@ -10,7 +10,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
   const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
   const suppressClickUntil = useRef(0);
-  const drag = useRef<{ id: number; source: "handle" | "content"; stop: SheetStop; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean }>();
+  const drag = useRef<{ id: number; source: "handle" | "content"; stop: SheetStop; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean } | undefined>(undefined);
   useEffect(() => {
     const resize = () => {
       mobile.current = window.matchMedia("(max-width:759px)").matches;

@@ -12,8 +12,9 @@ function isPlace(v: unknown): v is KakaoPlace {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
+    const params = await route;
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);

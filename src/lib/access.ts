@@ -34,11 +34,11 @@ export function setSessionCookie(response: NextResponse, token: string, remember
     sameSite: "lax", path: "/", ...(setup ? { maxAge: 600 } : remember ? { maxAge: 90 * 86400 } : {}) });
   return response;
 }
-export function pageRequest() {
-  return new Request("http://localhost/", { headers: { cookie: cookies().toString() } });
+export async function pageRequest() {
+  return new Request("http://localhost/", { headers: { cookie: (await cookies()).toString() } });
 }
 export async function requirePageBoard(next = "/", identity = true) {
-  const board = await boardFromRequest(pageRequest());
+  const board = await boardFromRequest(await pageRequest());
   if (!board) redirect(`/enter?next=${encodeURIComponent(safeNext(next))}`);
   if (identity && !board.who) redirect(`/choose?next=${encodeURIComponent(safeNext(next))}`);
   return board;

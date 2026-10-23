@@ -3,7 +3,8 @@ import { legacyRedirect, requirePageBoard } from "@/lib/access";
 import type { KakaoPlace } from "@/lib/types";
 import ConfirmForm, { type ExtractionView } from "./ConfirmForm";
 export const dynamic = "force-dynamic";
-export default async function ConfirmPage({ params, searchParams }: { params: { sourceId: string }; searchParams: { t?: string } }) {
+export default async function ConfirmPage({ params: route, searchParams: query }: { params: Promise<{ sourceId: string }>; searchParams: Promise<{ t?: string }> }) {
+  const [params, searchParams] = await Promise.all([route, query]);
   const next = `/confirm/${params.sourceId}`; legacyRedirect(searchParams.t, next);
   const board = await requirePageBoard(next);
   const { data: source, error } = await db().from("sources").select("id, url, status, caption, shared_by").eq("id", params.sourceId).eq("board_id", board.id).maybeSingle();

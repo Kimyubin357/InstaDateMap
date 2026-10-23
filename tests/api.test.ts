@@ -74,7 +74,7 @@ describe("직접 저장과 세션 저장자", () => {
   it("확인 후 저장과 스트리밍 링크 저장 모두 지도에 바로 쓸 장소 정보를 제공", async () => {
     const shared = await readShareResponse(await POST(request({ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", stream: true })), () => {});
     expect(shared.saved_place?.place).toMatchObject({ name: "도나스데이 본점", sources: [{ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", media_type: "reel" }] });
-    const res = await confirm(request({ selections: [], direct: { ...tables.places[0], kakao_place_id: "another", name: "다른 곳" } }), { params: { id: tables.sources[0].id } });
+    const res = await confirm(request({ selections: [], direct: { ...tables.places[0], kakao_place_id: "another", name: "다른 곳" } }), { params: Promise.resolve({ id: tables.sources[0].id }) });
     expect((await res.json()).saved_place).toMatchObject({ boardId: "b1", authVersion: 1, place: { sharers: ["테스트"] } });
   });
   it("저장 후 미리보기 조회 장애는 저장 실패로 바꾸지 않으며 다른 보드 장소를 노출하지 않음", async () => {

@@ -8,8 +8,8 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
   places: PlaceView[]; selectedId: string; onSelect: (id: string) => void; onOpen: (id: string) => void; onDismiss: () => void;
 }) {
   const rail = useRef<HTMLDivElement>(null);
-  const settledId = useRef<string>(); const timer = useRef<ReturnType<typeof setTimeout>>();
-  const gesture = useRef<{ x: number; y: number; moved: boolean }>();
+  const settledId = useRef<string | undefined>(undefined); const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const gesture = useRef<{ x: number; y: number; moved: boolean } | undefined>(undefined);
   const latest = useRef({ places, selectedId, onSelect }); latest.current = { places, selectedId, onSelect };
   const ids = places.map((place) => place.id).join(",");
   function align(id: string, smooth = false) {
