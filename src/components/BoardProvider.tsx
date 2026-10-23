@@ -10,6 +10,7 @@ import SearchApp from "./SearchApp";
 import useKeyboardViewport from "./useKeyboardViewport";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
+import TrashPlaces from "./TrashPlaces";
 import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice } from "./Feedback";
 
@@ -87,6 +88,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
       {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} onPinChanged={notify} /></div>}
+      {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       <Feedback toast={toast} onDismiss={dismissToast} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
     </>}

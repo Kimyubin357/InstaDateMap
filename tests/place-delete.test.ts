@@ -75,3 +75,22 @@ it("purge failures retain records and do not expose raw DB errors", async () => 
   expect(response.ok).toBe(false); expect(await response.text()).not.toContain("sensitive database");
   expect(tables.places).toHaveLength(2);
 });
+
+it("restore returns the confirmed place with memo, status, sharers and sources for immediate map update", async () => {
+  Object.assign(tables.places[0], { name: "어부의딸", kakao_place_id: "123", lat: 37.5, lng: 127, status: "again", memo: "토요일 · 주차 가능", created_at: "2026-10-01" });
+  tables.sources = [{ id: "s1", board_id: "b1", url: "https://www.instagram.com/p/ABC/", media_type: "post" }];
+  tables.source_places[0].added_by = "우리"; tables.board_sync = [{ board_id: "b1", revision: "8" }];
+  await DELETE(request(), route);
+  const response = await restore(trashRequest("POST", tables.places[0].deleted_at), route);
+  expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(await response.json()).toMatchObject({ ok: true, saved_place: { boardId: "b1", authVersion: 1, revision: "8", place: {
+    id: "p1", memo: "토요일 · 주차 가능", status: "again", sharers: ["우리", "서로"], sources: [{ url: "https://www.instagram.com/p/ABC/", media_type: "post" }],
+  } } });
+});
+it("preview read failure preserves a successful restore so a full refresh can recover", async () => {
+  await DELETE(request(), route); const stamp = tables.places[0].deleted_at;
+  failNext("places", "select");
+  const response = await restore(trashRequest("POST", stamp), route);
+  expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ ok: true });
+  expect(tables.places[0].deleted_at).toBeNull();
+});
