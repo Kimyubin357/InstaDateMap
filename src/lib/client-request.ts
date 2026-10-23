@@ -31,6 +31,6 @@ export async function requestJson<T>(url: string, init: RequestInit & { timeoutM
   if (!body) throw new ConnectionError("서버 응답을 읽지 못했어요.");
   return body as T;
   }, { signal, timeoutMs });
-  if (init?.method && !["GET", "HEAD"].includes(init.method.toUpperCase()) && /^\/api\/(places|sources|share)(\/|$)/.test(url)) boardChanged();
+  if (init?.method && !["GET", "HEAD"].includes(init.method.toUpperCase()) && /^\/api\/(places|sources|share|trash)(\/|$)/.test(url)) boardChanged();
   return body;
 }

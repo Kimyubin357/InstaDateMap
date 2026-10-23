@@ -1,3 +1,4 @@
+import { AnalysisError, analysisMessage } from "./analysis-issue";
 import { db } from "./db";
 import { env } from "./env";
 import { detectMediaType, fetchCaption, normalizeInstagramUrl } from "./instagram";
@@ -25,6 +26,7 @@ export interface ShareInput {
 export interface ShareResponse {
   status: "saved" | "confirm" | "needs_caption" | "needs_review" | "duplicate" | "error" | "busy";
   message: string;
+  code?: string;
   confirm_url?: string;
   source_id?: string;
   source_version?: string;
@@ -66,6 +68,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
   const claimed = await db().rpc("dm_begin_source", { p_board: input.boardId, p_url: url, p_media: detectMediaType(url), p_who: input.who, p_owner: input.owner, p_retry: !!(input.retry || manualCaption || images.length) });
   checkDb(claimed.error, "링크 저장 실패");
   if (claimed.data.outcome === "busy") return { status: "busy", message: SOURCE_MESSAGES.SOURCE_BUSY };
+  if (claimed.data.outcome === "trashed") return { status: "error", message: "이 링크의 장소는 삭제한 장소에 있어요. 설정에서 복구해 주세요." };
   const existing = claimed.data.source;
   const sourceId = existing.id as string;
   if (claimed.data.outcome === "duplicate" || claimed.data.outcome === "resume") {
@@ -73,14 +76,14 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       // 연인이 이미 공유한 링크면 "둘 다 저장함"이 되도록 내 공유 기록도 남깁니다.
       const { data: links, error: linksError } = await db()
         .from("source_places")
-        .select("place_id, extraction_id")
-        .eq("source_id", existing.id);
+        .select("place_id, extraction_id, places!inner(deleted_at)")
+        .is("places.deleted_at", null).eq("source_id", existing.id);
       checkDb(linksError, "공유 기록 조회 실패");
       if (links?.length) {
         const { error } = await db()
           .from("source_places")
           .upsert(
-            links.map((l) => ({ ...l, source_id: existing.id, added_by: input.who })),
+            links.map((l) => ({ place_id: l.place_id, extraction_id: l.extraction_id, source_id: existing.id, added_by: input.who })),
             { onConflict: "source_id,place_id,added_by", ignoreDuplicates: true },
           );
         checkDb(error, "공유 기록 저장 실패");
@@ -93,9 +96,10 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     if (existing.status === "pending_confirm" || existing.status === "needs_review" || existing.status === "needs_caption") {
       return {
         status: existing.status === "pending_confirm" ? "confirm" : existing.status,
-        message: existing.status === "pending_confirm" ? "확인이 남아 있는 링크예요. 지점을 골라 저장하거나 다른 방법으로 다시 찾을 수 있어요."
+        code: analysisMessage(existing.recovery_reason) ? existing.recovery_reason : undefined,
+        message: analysisMessage(existing.recovery_reason) ?? (existing.status === "pending_confirm" ? "확인이 남아 있는 링크예요. 지점을 골라 저장하거나 다른 방법으로 다시 찾을 수 있어요."
           : existing.status === "needs_caption" ? "아직 게시물 내용을 읽지 못한 링크예요. 캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요."
-          : "장소 확인이 필요한 링크예요. 다시 시도하거나 캡션·스크린샷·직접 검색으로 이어갈 수 있어요.",
+          : "장소 확인이 필요한 링크예요. 다시 시도하거나 캡션·스크린샷·직접 검색으로 이어갈 수 있어요."),
         confirm_url: confirmUrl(existing.id),
         source_id: existing.id, source_version: existing.analysis_version,
       };
@@ -128,6 +132,8 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     };
     input.onProgress?.("extract");
     const { candidates, errors } = await extractPlaces(ctx, { llm });
+    const issue = errors.find((error) => error.code)?.code;
+    if (!candidates.length && issue) throw new AnalysisError(issue);
     if (errors.length) console.error("장소 추출 실패", { sourceId, errors });
     if (candidates.length === 0 && errors.length) throw new Error("AI 장소 분석에 실패했어요. 잠시 후 다시 시도하거나 장소를 직접 검색해 주세요.");
     const top = candidates.slice(0, MAX_PLACES_PER_SOURCE);
@@ -152,19 +158,20 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     const withPlaces = resolved.filter((r) => r.places.length > 0);
 
     if (withPlaces.length === 0) {
-      await finish("needs_review", rows);
+      await finish("needs_review", rows, false, issue ?? null);
       return {
         status: "needs_review",
-        message: top.length
+        code: issue,
+        message: analysisMessage(issue) ?? (top.length
           ? "장소 이름은 찾았지만 지도에서 못 찾았어요. 확인 화면에서 직접 검색해 주세요."
-          : "장소 정보를 찾지 못했어요. 확인 화면에서 직접 검색해 주세요.",
+          : "장소 정보를 찾지 못했어요. 확인 화면에서 직접 검색해 주세요."),
         confirm_url: confirmUrl(sourceId),
         source_id: sourceId, source_version: existing.analysis_version,
       };
     }
 
     // 장소가 하나이고 확실하면 바로 저장
-    if (resolved.length === 1 && isConfident(resolved[0].c, resolved[0].places)) {
+    if (!issue && resolved.length === 1 && isConfident(resolved[0].c, resolved[0].places)) {
       const place = resolved[0].places[0];
       input.onProgress?.("save");
       const result = await finish("done", rows, true);
@@ -173,20 +180,21 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       return { status: "saved", message: `${place.name}을(를) 지도에 저장했어요.`, source_id: sourceId, source_version: existing.analysis_version, place_url: `/?place=${placeId}` };
     }
 
-    await finish("pending_confirm", rows);
+    await finish("pending_confirm", rows, false, issue ?? null);
     const n = resolved.length;
     return {
       status: "confirm",
-      message: n > 1 ? `장소 ${n}곳을 찾았어요. 남길 곳을 골라 주세요.` : "어느 지점인지 골라 주세요.",
+      code: issue,
+      message: issue ? `${analysisMessage(issue)} 확인 가능한 후보는 아래에 남겼어요.` : n > 1 ? `장소 ${n}곳을 찾았어요. 남길 곳을 골라 주세요.` : "어느 지점인지 골라 주세요.",
       confirm_url: confirmUrl(sourceId),
       source_id: sourceId, source_version: existing.analysis_version,
     };
   } catch (e) {
     // 실패한 링크도 지도에서 다시 찾거나 직접 검색할 수 있어야 합니다.
-    try { await finish("needs_review", null, false, "interrupted"); }
+    try { await finish("needs_review", null, false, e instanceof AnalysisError ? e.code : "interrupted"); }
     catch { console.warn("중단된 링크 복구 대기", { sourceId }); }
     console.error("링크 처리 실패", { sourceId, message: e instanceof Error ? e.message : String(e) });
-    return { status: "error", message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId, source_version: existing.analysis_version,
+    return { status: "error", code: e instanceof AnalysisError ? e.code : undefined, message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId, source_version: existing.analysis_version,
       confirm_url: confirmUrl(sourceId) };
   }
 }

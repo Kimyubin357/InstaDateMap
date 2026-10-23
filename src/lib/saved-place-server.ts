@@ -11,7 +11,7 @@ export async function withSavedPlace<T extends { place_url?: string }>(board: Bo
     // Keep the earlier revision: a concurrent newer snapshot must win over this partial response.
     const revision = await boardRevision(board.id);
     const [place, links, saves] = await Promise.all([
-      db().from("places").select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at").eq("board_id", board.id).eq("id", id).maybeSingle(),
+      db().from("places").select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at").is("deleted_at", null).eq("board_id", board.id).eq("id", id).maybeSingle(),
       db().from("source_places").select("added_by, sources!inner(id, url, media_type, board_id)").eq("place_id", id).eq("sources.board_id", board.id),
       db().from("place_saves").select("added_by, added_at").eq("board_id", board.id).eq("place_id", id),
     ]);

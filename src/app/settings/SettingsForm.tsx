@@ -7,6 +7,7 @@ import Icon from "@/components/Icon";
 import { requestJson } from "@/lib/client-request";
 import { useBoardSync } from "@/components/BoardProvider";
 import ActionDialog from "@/components/ActionDialog";
+import TrashSettings from "@/components/TrashSettings";
 import PushSettings from "@/components/PushSettings";
 export default function SettingsForm({ who, names, onPinChanged }: { who: string; names: string[]; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
@@ -29,6 +30,7 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
   return <main className="form-page"><ClientReady><PageHeader title="우리 설정" /><section className="settings-section"><h2>이 기기의 주인</h2><p className="lead">장소를 저장할 때 이 이름으로 남겨요.</p><div className="seg two">{names.map((n) => <button key={n} disabled={busy} aria-pressed={name === n} onClick={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); sync.notify(`${n}님의 기기로 기억할게요.`); } }}>{n}</button>)}</div></section>
     <section className="settings-section"><button className="settings-row" disabled={busy} onClick={() => setEditing(!editing)} aria-expanded={editing} aria-controls="pin-change-form"><Icon name="lock" /><span>둘만의 PIN 바꾸기</span><Icon name="chevron" /></button>
     {editing && <form id="pin-change-form" className="stack" aria-busy={busy} onSubmit={async (e) => { e.preventDefault(); const res = await action("/api/access/pin", { currentPin, newPin, confirmPin }); if (res) { setCurrent(""); setNew(""); setConfirm(""); setEditing(false); } }}><p className="hint">다른 기기에서는 새 PIN으로 다시 열어 주세요.</p><PinInput label="현재 PIN" value={currentPin} onChange={setCurrent} /><PinInput label="새 PIN" value={newPin} onChange={setNew} /><PinInput label="새 PIN 한 번 더" value={confirmPin} onChange={setConfirm} /><button className="btn primary" disabled={busy || currentPin.length !== 6 || newPin.length !== 6 || newPin !== confirmPin}>{busy ? "바꾸는 중…" : "새 PIN으로 바꾸기"}</button></form>}</section>
+    <TrashSettings />
     <PushSettings />
     <section className="settings-section"><button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span>이 기기 잠그기</span></button><p className="hint">다음에 열 때 PIN을 다시 입력해요.</p></section>
     <section className="settings-section"><h2>인스타에서 더 쉽게 저장하기</h2><p className="hint">공유 단축어에서 인스타 링크를 받아 이 앱의 <code>/add?url=공유링크</code> 주소를 열어 주세요. 예전 단축어는 새 방식으로 바꿔야 해요.</p></section>

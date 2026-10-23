@@ -1,3 +1,4 @@
+import { analysisMessage } from "@/lib/analysis-issue";
 import { AccessError, accessError, boardFromRequest, requireIdentity, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizeInstagramUrl } from "@/lib/instagram";
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
     if (kakaoId !== null) {
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(kakaoId)) throw new AccessError("장소 정보가 올바르지 않아요.");
-      const place = await db().from("places").select("id").eq("board_id", board.id).eq("kakao_place_id", kakaoId).maybeSingle();
+      const place = await db().from("places").select("id").is("deleted_at", null).eq("board_id", board.id).eq("kakao_place_id", kakaoId).maybeSingle();
       check(place.error);
       if (!place.data) return reply(empty);
       const save = await db().from("place_saves").select("place_id").eq("board_id", board.id).eq("place_id", place.data.id).eq("added_by", board.who).maybeSingle();
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
     const candidate = rawUrl?.match(/https?:\/\/[^\s"'<>]+/)?.[0];
     const url = candidate ? normalizeInstagramUrl(candidate) : null;
     if (rawUrl !== null && (rawUrl.length > 4000 || !url)) throw new AccessError("인스타그램 게시물이나 릴스 링크를 입력해 주세요.");
-    const query = db().from("sources").select("id, status, analysis_version").eq("board_id", board.id);
+    const query = db().from("sources").select("id, status, analysis_version, recovery_reason").eq("board_id", board.id);
     const source = await (sourceId !== null ? query.eq("id", sourceId) : query.eq("url", url!)).maybeSingle();
     check(source.error);
     if (!source.data) return reply(empty);
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
     ]);
     check(extractions.error); check(links.error);
     const ids = [...new Set((links.data ?? []).map((link) => link.place_id as string))];
-    const places = ids.length ? await db().from("places").select("id, kakao_place_id").eq("board_id", board.id).in("id", ids) : { data: [], error: null };
+    const places = ids.length ? await db().from("places").select("id, kakao_place_id").is("deleted_at", null).eq("board_id", board.id).in("id", ids) : { data: [], error: null };
     check(places.error);
     const currentPlaces = new Map((places.data ?? []).map((place) => [place.id, place]));
     const linked = (links.data ?? []).flatMap((link) => {
@@ -65,7 +66,8 @@ export async function GET(req: Request) {
       result = await withSavedPlace(board, { status: "saved", message: "저장한 장소를 확인했어요.", source_id: currentSource.id, place_url: `/?place=${encodeURIComponent(first.place_id)}` });
     } else if (["pending_confirm", "needs_review", "needs_caption"].includes(currentSource.status)) {
       result = { status: currentSource.status === "pending_confirm" ? "confirm" : currentSource.status,
-        message: "링크 처리 결과를 확인했어요. 남은 확인을 이어서 해 주세요.", source_id: currentSource.id, source_version: source.data.analysis_version, confirm_url: `/confirm/${currentSource.id}` };
+        code: analysisMessage(source.data.recovery_reason) ? source.data.recovery_reason : undefined,
+        message: analysisMessage(source.data.recovery_reason) ?? "링크 처리 결과를 확인했어요. 남은 확인을 이어서 해 주세요.", source_id: currentSource.id, source_version: source.data.analysis_version, confirm_url: `/confirm/${currentSource.id}` };
     }
     return reply({ result, source: currentSource, selections, linked });
   } catch (error) { return accessError(error); }

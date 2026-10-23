@@ -1,3 +1,4 @@
+import { geminiFailure } from "./analysis-issue";
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
 
@@ -51,7 +52,7 @@ export const callGemini: LlmCall = async (system, content) => {
     },
   );
   if (!res.ok) {
-    throw new Error(`Gemini 호출 실패 (${res.status}): ${(await res.text()).slice(0, 300)}`);
+    throw geminiFailure(res.status, await res.json().catch(() => null));
   }
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];

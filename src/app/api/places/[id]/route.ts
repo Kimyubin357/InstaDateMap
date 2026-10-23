@@ -15,7 +15,7 @@ export async function GET(req: Request, { params: route }: { params: Promise<{ i
       return response;
     }
     requireIdentity(board);
-    const { data, error } = await db().from("places").select("id, status, memo, memo_version, memo_updated_by").eq("id", params.id).eq("board_id", board.id).maybeSingle();
+    const { data, error } = await db().from("places").select("id, status, memo, memo_version, memo_updated_by").is("deleted_at", null).eq("id", params.id).eq("board_id", board.id).maybeSingle();
     if (error) return Response.json({ message: "장소의 최신 내용을 확인하지 못했어요. 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
     if (!data) return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
     return Response.json({ place: { id: data.id, status: data.status, memo: data.memo, memo_version: data.memo_version, memo_updated_by: data.memo_updated_by } }, { headers: { "Cache-Control": "no-store" } });
@@ -55,10 +55,9 @@ export async function DELETE(req: Request, { params: route }: { params: Promise<
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);
-    const { data, error } = await db().from("places").delete().eq("id", params.id).eq("board_id", board.id).select("id");
-    if (error || !Array.isArray(data)) return Response.json({ message: "장소를 삭제하지 못했어요. 연결을 확인하고 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
-    // An absent row is also complete: retrying after a lost response must remain safe.
-    return Response.json({ ok: true, deleted_id: params.id, already_deleted: data.length === 0 }, { headers: { "Cache-Control": "no-store" } });
+    const { data, error } = await db().rpc("dm_trash_place", { p_board: board.id, p_id: params.id, p_who: board.who, p_action: "trash" });
+    if (error || !data?.ok) return Response.json({ message: "장소를 삭제하지 못했어요. 연결을 확인하고 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

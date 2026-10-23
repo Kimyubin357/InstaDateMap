@@ -101,7 +101,7 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     try {
       const result = await deletion.run(() => requestJson<{ ok: boolean; deleted_id: string }>(`/api/places/${place.id}`, { method: "DELETE" }), () => verifyDeletedPlace(place.id), () => setError("응답이 늦어지고 있어요. 삭제 여부를 확인할게요."));
       if (result.ok !== true || result.deleted_id !== place.id) throw new Error("삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.");
-      onDelete(); notify("장소를 삭제했어요.");
+      onDelete(); notify("삭제한 장소로 옮겼어요.");
     }
     catch (e) { if (e instanceof RequestError && [401, 409].includes(e.status)) { void lock(); return; } setError(e instanceof Error ? e.message : "삭제하지 못했어요. 다시 시도해 주세요."); }
     finally { deleteRequest.current = false; setBusy(false); }
@@ -125,6 +125,6 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     </div>
     </Modal>{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); if (destination === "map") onShowMap(); else onClose(); }} />}
     {deleting && <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel="취소" confirmLabel="삭제하기" busy={busy} busyLabel="삭제 중…" onClose={dismissDelete} onConfirm={remove}>
-      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>두 사람의 지도에서 삭제돼요.<br />이 장소의 메모와 저장 기록도 함께 사라져요.</p>{error && <p className="error" role="alert">{error}</p>}
+      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>두 사람의 지도에서 삭제돼요.<br />설정의 ‘삭제한 장소’에서 메모와 저장 기록까지 복구할 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
     </ActionDialog>}</>;
 }

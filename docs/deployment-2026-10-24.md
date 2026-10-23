@@ -35,3 +35,14 @@
 두 CLI는 사용자 폴더 `.codex/tools/deployment-cli/node_modules/.bin/`에 설치했다. Vercel은 Windows 기본 설정 경로의 파일 이동 오류 때문에 `--global-config C:/Users/Kong/.codex/tools/deployment-cli/vercel-auth`를 지정해야 한다. Supabase는 기본 로그인 저장소를 사용한다.
 
 최초 운영 반영은 현재 작업 폴더의 수정본을 Vercel CLI로 업로드해 수행했다.
+
+
+## 추가 운영 반영: 삭제한 장소와 Gemini 사용 한도
+
+- 사용자 추가 요청에 따라 설정의 삭제한 장소·복구·영구 삭제, Gemini 한도 거부 사유 안내를 구현했다. B01은 제외로 기록했고 R08–R12 보류를 유지했다.
+- `006_place_trash.sql`을 운영 Supabase에 적용했다. 적용 전후 장소 6개·저장자 기록 6개·원본 연결 4개와 각 데이터 지문이 일치했다. 테스트를 위해 운영 장소를 삭제하거나 추가하지 않았다.
+- `dm_trash_place`는 service_role만 실행할 수 있고 anon 실행 권한이 없음을 확인했다. 삭제한 장소 수는 적용 직후 0개였다.
+- Vercel 배포 `dpl_7Qo71fce44AnfDTx5AnSiudKMQVN`은 `READY`, `production`이며 `https://insta-date-map.vercel.app`에 연결했다.
+- 홈페이지와 manifest HTTP 200, 인증 없는 `/api/trash` HTTP 401을 확인했다. 기존 `datemap-push-retry`(5분)와 `datemap-recover-links`(1분)는 활성 상태를 유지한다.
+- 자동 테스트 433개·타입 검사·운영 빌드 통과. 로컬 운영 빌드와 합성 Postgres DB를 연결한 모바일·데스크톱 브라우저 점검 26개를 통과했다. 삭제→목록 숨김→설정 복구→메모·상태 유지→영구 삭제, 확인 취소, Gemini 사유의 대기함·확인 화면·응답 유실 재조회 보존을 확인했다. 브라우저 예외와 모의 DB 오류는 없었다.
+- 브라우저 검증은 설치된 Playwright/Chrome과 로컬 테스트 DB를 연결하는 기존 QA 도구를 재사용했다. 실제 Gemini 무료 한도를 소진시키거나 iPhone PWA 실기기 검증을 수행하지는 않았다.

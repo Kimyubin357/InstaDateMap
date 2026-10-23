@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const [placeResult, linkResult, pendingResult, saveResult] = await Promise.all([
       db()
         .from("places")
-        .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at")
+        .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at").is("deleted_at", null)
         .eq("board_id", board.id)
         .order("created_at", { ascending: false }),
       db()
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     const places = await keywordSearch(body.query.trim());
     const place = places.find((p) => p.kakao_place_id === body.place_id);
     if (!place) throw new AccessError("검색 결과가 바뀌었어요. 다시 검색해서 골라 주세요.", 409);
-    const { data: existing, error } = await db().from("places").select("id").eq("board_id", board.id).eq("kakao_place_id", place.kakao_place_id).maybeSingle();
+    const { data: existing, error } = await db().from("places").select("id").is("deleted_at", null).eq("board_id", board.id).eq("kakao_place_id", place.kakao_place_id).maybeSingle();
     if (error) throw new Error("기존 장소를 확인하지 못했어요.");
     const id = await savePlace({ boardId: board.id, sourceId: null, extractionId: null, addedBy: board.who, place });
     return Response.json(await withSavedPlace(board, { status: existing ? "duplicate" : "saved", place_url: `/?place=${id}`, message: existing ? "이미 있는 장소에 저장한 마음을 더했어요." : `${place.name}을(를) 저장했어요.` }), { headers: { "Cache-Control": "no-store" } });

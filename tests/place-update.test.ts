@@ -44,7 +44,7 @@ describe("장소 수정 결과 확인", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." });
-    expect(tables.places.map((place) => place.id)).toEqual(["p2"]);
+    expect(tables.places.filter((place) => !place.deleted_at).map((place) => place.id)).toEqual(["p2"]);
   });
 
   it("다른 보드의 장소도 해당 보드 안에서는 없는 장소로 처리하고 수정하지 않음", async () => {

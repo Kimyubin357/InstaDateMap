@@ -17,6 +17,7 @@ vi.mock("@/lib/kakao", async (orig) => {
   return { ...real, resolveCandidate: vi.fn(async (c: { name: string }) => db[c.name] ?? []) };
 });
 
+import { AnalysisError } from "@/lib/analysis-issue";
 import { confirmSelections, ingestShare } from "@/lib/pipeline";
 import { fetchCaption } from "@/lib/instagram";
 import { resolveCandidate } from "@/lib/kakao";
@@ -164,5 +165,31 @@ describe("공유 → 저장 흐름", () => {
   it("인스타 링크가 아니면 에러", async () => {
     const r = await ingestShare({ ...base, text: "https://naver.com" }, llmFor([]));
     expect(r.status).toBe("error");
+  });
+});
+
+describe("Gemini 사용 한도 안내", () => {
+  it("무료 일일 한도를 대기함에 보존하고 같은 요청의 이미지 분석을 중단", async () => {
+    const llm = vi.fn(async () => { throw new AnalysisError("gemini_free_daily_quota"); });
+    const result = await ingestShare({ ...base, text: "https://www.instagram.com/p/QUOTA/", caption: "어니언", images: [{ mediaType: "image/png", data: "test" }] }, llm);
+    expect(result).toMatchObject({ status: "error", code: "gemini_free_daily_quota" });
+    expect(result.message).toContain("무료 분석의 하루 사용량");
+    expect(tables.sources[0]).toMatchObject({ status: "needs_review", recovery_reason: "gemini_free_daily_quota" });
+    expect(llm).toHaveBeenCalledTimes(1);
+    const resumed = await ingestShare({ ...base, text: "https://www.instagram.com/p/QUOTA/" }, llm);
+    expect(resumed.message).toBe(result.message); expect(resumed.code).toBe(result.code);
+  });
+  it("일부 후보가 나온 뒤 이미지 분석이 제한되면 자동 저장하지 않고 후보와 이유를 함께 보존", async () => {
+    const llm = vi.fn().mockResolvedValueOnce(JSON.stringify({ places: [{ name: "어니언", confidence: 0.9 }] })).mockRejectedValueOnce(new AnalysisError("gemini_rate_limit"));
+    const result = await ingestShare({ ...base, text: "https://www.instagram.com/p/PARTIAL/", caption: "어니언", images: [{ mediaType: "image/png", data: "test" }] }, llm);
+    expect(result).toMatchObject({ status: "confirm", code: "gemini_rate_limit" });
+    expect(tables.extractions).toHaveLength(1); expect(tables.places ?? []).toHaveLength(0);
+    expect(tables.sources[0].recovery_reason).toBe("gemini_rate_limit");
+  });
+  it("삭제한 장소로 연결되는 링크는 재분석하지 않고 복구 위치 안내", async () => {
+    const input = { ...base, text: "https://www.instagram.com/p/TRASH/", caption: "어니언" };
+    await ingestShare(input, llmFor(["어니언"])); tables.places[0].deleted_at = new Date().toISOString();
+    const llm = vi.fn(llmFor(["어니언"]));
+    expect((await ingestShare(input, llm)).message).toContain("설정에서 복구"); expect(llm).not.toHaveBeenCalled();
   });
 });

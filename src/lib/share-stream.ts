@@ -1,6 +1,6 @@
 import { ConnectionError, RequestError, withRequestDeadline } from "./client-request";
 import type { SavedPlace } from "./saved-place";
-export interface ShareResult { status: string; message: string; confirm_url?: string; source_id?: string; source_version?: string; place_url?: string; saved_place?: SavedPlace }
+export interface ShareResult { status: string; code?: string; message: string; confirm_url?: string; source_id?: string; source_version?: string; place_url?: string; saved_place?: SavedPlace }
 export function requestShare(body: unknown, progress: (stage: string) => void): Promise<ShareResult> {
   return withRequestDeadline(async (signal) => {
     try {

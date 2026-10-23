@@ -12,6 +12,8 @@ class Q {
   private failed(op: string) { const i = failures.findIndex((f) => f.table === this.t && f.op === op); if (i >= 0) this.failure = { message: failures.splice(i, 1)[0].message }; return !!this.failure; }
   select(value = "") { this.selection = value; return this; }
   eq(k: string, v: any) { this.filters.push((r) => k.split(".").reduce((a, key) => a?.[key], r) === v); return this; }
+  is(k: string, v: any) { this.filters.push((r) => k.split(".").reduce((a, key) => a?.[key], r) == v); return this; }
+  not(k: string, op: string, v: any) { this.filters.push((r) => r[k] != v); return this; }
   in(k: string, vs: any[]) { this.filters.push((r) => vs.includes(r[k])); return this; }
   order(k = "", opts?: { ascending?: boolean }) { this.sortKey = k; this.ascending = opts?.ascending !== false; return this; }
   limit(n: number) { this.max = n; return this; }
@@ -32,6 +34,7 @@ class Q {
     if (this.result) return this.result;
     let all = tables[this.t];
     if (this.selection.includes("sources!inner")) all = all.map((r) => ({ ...r, sources: tables.sources?.find((s) => s.id === r.source_id) })).filter((r) => r.sources);
+    if (this.selection.includes("places!inner")) all = all.map((r) => ({ ...r, places: tables.places?.find((p) => p.id === r.place_id) })).filter((r) => r.places);
     let rows = all.filter((r) => this.filters.every((f) => f(r)));
     if (this.sortKey) rows = [...rows].sort((a, b) => String(a[this.sortKey] ?? "").localeCompare(String(b[this.sortKey] ?? "")) * (this.ascending ? 1 : -1));
     rows = rows.slice(0, this.max);
@@ -50,9 +53,23 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
   const snapshot = structuredClone(tables);
   const check = (r: { error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); };
   try {
+    if (name === "dm_trash_place") {
+      const row = tables.places?.find((r) => r.id === p.p_id && r.board_id === p.p_board);
+      if (!row) return { data: p.p_action === "restore" ? { code: "PLACE_NOT_FOUND" } : { ok: true, deleted_id: p.p_id, already_deleted: true }, error: null };
+      if (p.p_action === "trash") {
+        const already = !!row.deleted_at;
+        if (!already) check(await new Q("places").update({ deleted_at: new Date().toISOString(), deleted_by: p.p_who, memo_version: (row.memo_version ?? 0)+1 }).eq("id", row.id));
+        return { data: { ok: true, deleted_id: row.id, already_deleted: already }, error: null };
+      }
+      if (!row.deleted_at) return { data: p.p_action === "restore" ? { ok: true, restored_id: row.id } : { code: "TRASH_CHANGED" }, error: null };
+      if (row.deleted_at !== p.p_expected) return { data: { code: "TRASH_CHANGED" }, error: null };
+      if (p.p_action === "restore") check(await new Q("places").update({ deleted_at: null, deleted_by: null, memo_version: (row.memo_version ?? 0)+1 }).eq("id", row.id));
+      else check(await new Q("places").delete().eq("id", row.id));
+      return { data: { ok: true }, error: null };
+    }
     if (name === "dm_patch_place") {
       const row = tables.places?.find((r) => r.id === p.p_id && r.board_id === p.p_board);
-      if (!row) return { data: { code: "PLACE_NOT_FOUND" }, error: null };
+      if (!row || row.deleted_at) return { data: { code: "PLACE_NOT_FOUND" }, error: null };
       if ("memo" in p.p_patch && p.p_expected !== (row.memo_version ?? 0)) return { data: { code: "MEMO_CONFLICT", memo: row.memo || "", memo_version: row.memo_version ?? 0, memo_updated_by: row.memo_updated_by }, error: null };
       const patch = { ...p.p_patch, ...("memo" in p.p_patch ? { memo_version: (row.memo_version ?? 0) + 1, memo_updated_by: p.p_who } : {}) };
       check(await new Q("places").update(patch).eq("id", row.id));
@@ -66,7 +83,7 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       let r = tables.sources?.find((r) => r.board_id === p.p_board && r.url === p.p_url);
       if (!r) { const result = await new Q("sources").upsert({ board_id: p.p_board, url: p.p_url, media_type: p.p_media, shared_by: p.p_who, status: "needs_review" }).single(); check(result); r = result.data; }
       if (new Date(r.work_until).getTime() > Date.now() && (r.status === "processing" || r.work_owner !== p.p_owner)) return { data: { outcome: "busy" }, error: null };
-      if (r.status === "done" && tables.source_places?.some((l) => l.source_id === r!.id)) return { data: { outcome: "duplicate", source: { ...r } }, error: null };
+      if (r.status === "done" && tables.source_places?.some((l) => l.source_id === r!.id)) return { data: { outcome: tables.source_places.some((l) => l.source_id === r!.id && tables.places?.some((place) => place.id === l.place_id && !place.deleted_at)) ? "duplicate" : "trashed", source: { ...r } }, error: null };
       if (new Date(r.work_until).getTime() > Date.now() && r.work_owner === p.p_owner && !p.p_retry) return { data: { outcome: "resume", source: { ...r } }, error: null };
       Object.assign(r, { status: "processing", work_owner: p.p_owner, work_until: new Date(Date.now()+90000).toISOString(), analysis_version: `v${++seq}`, recovery_reason: null });
       return { data: { outcome: "started", source: { ...r } }, error: null };
@@ -114,6 +131,7 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
     if (name === "dm_save_place") {
       if (p.p_source && !tables.sources?.some((s) => s.id === p.p_source && s.board_id === p.p_board)) throw Error("이 보드의 링크가 아닙니다.");
       if (p.p_extraction && !tables.extractions?.some((e) => e.id === p.p_extraction && e.source_id === p.p_source)) throw Error("이 링크의 장소 후보가 아닙니다.");
+      if (tables.places?.some((r) => r.board_id === p.p_board && r.kakao_place_id === p.p_place.kakao_place_id && r.deleted_at)) throw Error("삭제한 장소에 있어요. 설정의 삭제한 장소에서 먼저 복구해 주세요.");
       const result = await new Q("places").upsert({ board_id: p.p_board, ...p.p_place }).select().single(); check(result);
       check(await new Q("place_saves").upsert({ board_id: p.p_board, place_id: result.data.id, added_by: p.p_added_by }, { ignoreDuplicates: true }));
       if (p.p_source) check(await new Q("source_places").upsert({ source_id: p.p_source, place_id: result.data.id, extraction_id: p.p_extraction, added_by: p.p_added_by }, { ignoreDuplicates: true }));

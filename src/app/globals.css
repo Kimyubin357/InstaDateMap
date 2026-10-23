@@ -238,3 +238,9 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 
 .memo-conflict { margin: 16px 0 12px; padding: 14px; border: 1px solid var(--line, #cbbfad); border-radius: 12px; background: var(--paper, #fffaf1); }
 .memo-conflict-current { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; user-select: text; }
+
+.trash-place { padding: 16px 0; border-bottom: 1px solid var(--line, #e6e0d8); overflow-wrap: anywhere; }
+.trash-place h3 { margin: 0 0 6px; font-size: 16px; }
+.trash-memo { white-space: pre-wrap; max-height: 100px; overflow: auto; font-size: 14px; }
+.trash-actions { display: flex; gap: 10px; margin-top: 12px; }
+.trash-actions .btn { flex: 1; min-height: 44px; }
