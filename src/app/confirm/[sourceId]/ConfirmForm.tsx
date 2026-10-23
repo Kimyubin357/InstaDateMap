@@ -4,7 +4,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { KakaoPlace } from "@/lib/types";
 import { requestJson } from "@/lib/client-request";
+import { CHECKING_SAVE, VerifiedWrite } from "@/lib/verified-write";
+import { verifyConfirmation, verifySharedLink, type ConfirmSaved } from "@/lib/save-recovery";
 import ManualPlaceSearch from "@/components/ManualPlaceSearch";
+import InlineManualSearch from "@/components/InlineManualSearch";
 import PageHeader from "@/components/PageHeader";
 import ClientReady from "@/components/ClientReady";
 import LinkRecovery from "@/components/LinkRecovery";
@@ -61,6 +64,9 @@ export default function ConfirmForm({
   const [shots, setShots] = useState<string[]>([]);
   const [manual, setManual] = useState(false);
   const [notice, setNotice] = useState("");
+  const [confirmationWrite] = useState(() => new VerifiedWrite<ConfirmSaved>());
+  const [reprocessWrite] = useState(() => new VerifiedWrite<ShareResult>());
+  const pending = confirmationWrite.pending || reprocessWrite.pending;
 
   const headers = { "Content-Type": "application/json" };
   function returnToMap(href: string) { setLeaving(true); router.replace(href); }
@@ -74,9 +80,10 @@ export default function ConfirmForm({
     setChoices((cur) => ({ ...cur, [id]: { ...cur[id], ...patch } }));
 
   async function save() {
-    if (saving || reprocessing || leaving) return;
+    if (saving || reprocessing || leaving || reprocessWrite.pending) return;
     setSaving(true);
     setError(null);
+    setNotice(confirmationWrite.pending ? CHECKING_SAVE : "");
     const selections = extractions.map((e) => {
       const c = choices[e.id];
       const all = [...e.candidates, ...c.extra];
@@ -84,27 +91,29 @@ export default function ConfirmForm({
       return { extraction_id: e.id, include: c.include && !!place, place };
     });
     try {
-      const body = await requestJson<{ saved: number; place_url?: string; saved_place?: ShareResult["saved_place"] }>(`/api/sources/${source.id}/confirm`, {
+      const body = await confirmationWrite.run(() => requestJson<ConfirmSaved>(`/api/sources/${source.id}/confirm`, {
         method: "POST",
         headers,
         body: JSON.stringify({ selections }),
-      });
+      }), () => verifyConfirmation(source.id, selections), () => setNotice(CHECKING_SAVE));
       store.acceptSavedPlace(body.saved_place);
       returnToMap(body.saved ? savedMapHref(body.place_url) : "/?saved=0");
     } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
-    finally { setSaving(false); }
+    finally { setSaving(false); setNotice(""); }
   }
 
   async function reprocess(images = shots) {
-    if (saving || reprocessing || leaving) return;
+    if (saving || reprocessing || leaving || confirmationWrite.pending) return;
     setReprocessing(true);
     setError(null);
+    setNotice(reprocessWrite.pending ? CHECKING_SAVE : "");
+    let retryAfter = 0;
     try {
-      const body = await requestJson<ShareResult>("/api/share", {
+      const body = await reprocessWrite.run(() => { retryAfter = Date.now() + 65000; return requestJson<ShareResult>("/api/share", {
         method: "POST",
         headers,
         body: JSON.stringify({ url: source.url, caption, images, retry: true }),
-      });
+      }); }, () => verifySharedLink(source.url, retryAfter), () => setNotice(CHECKING_SAVE));
       if (body.status === "saved" || body.status === "duplicate") {
         store.acceptSavedPlace(body.saved_place);
         returnToMap(shareDestination(body)!);
@@ -112,7 +121,7 @@ export default function ConfirmForm({
         setNotice(body.message);
         router.refresh();
       }
-    } catch (e) { setError(e instanceof Error ? e.message : "다시 찾지 못했어요."); }
+    } catch (e) { setNotice(""); setError(e instanceof Error ? e.message : "다시 찾지 못했어요."); }
     finally { setReprocessing(false); }
   }
 
@@ -134,6 +143,7 @@ export default function ConfirmForm({
         </a>
       </p>
 
+      <fieldset disabled={saving || reprocessing || pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} aria-label="저장할 장소 선택">
       {extractions.map((e) => {
         const c = choices[e.id];
         const options = [...e.candidates, ...c.extra];
@@ -173,7 +183,7 @@ export default function ConfirmForm({
                     </span>
                   </label>
                 ))}
-                <ManualSearch
+                <InlineManualSearch
                   initial={[e.areaHint, e.name].filter(Boolean).join(" ")}
                   onPick={(p) =>
                     update(e.id, {
@@ -188,87 +198,25 @@ export default function ConfirmForm({
           </section>
         );
       })}
+      </fieldset>
 
       {extractions.length > 0 && (
         <div className="confirm-save">
-          <button className="btn primary" disabled={saving || reprocessing} onClick={save}>
-            {saving ? "저장 중…" : count > 0 ? `${count}곳 지도에 저장` : "아무것도 저장하지 않기"}
+          <button className="btn primary" disabled={saving || reprocessing || reprocessWrite.pending} onClick={save}>
+            {saving ? "저장 확인 중…" : confirmationWrite.pending ? "저장 확인·재시도" : count > 0 ? `${count}곳 지도에 저장` : "아무것도 저장하지 않기"}
           </button>
         </div>
       )}
-      {noPlaces && <LinkRecovery caption={caption} onCaption={setCaption} busy={saving || reprocessing} shotCount={shots.length} onRetry={() => reprocess()} onCaptionSubmit={() => reprocess()} onScreenshots={async (images) => { setShots(images); await reprocess(images); }} onSearch={() => setManual(true)} />}
+      {noPlaces && !pending && <LinkRecovery caption={caption} onCaption={setCaption} busy={saving || reprocessing} shotCount={shots.length} onRetry={() => reprocess()} onCaptionSubmit={() => reprocess()} onScreenshots={async (images) => { setShots(images); await reprocess(images); }} onSearch={() => setManual(true)} />}
+      {reprocessWrite.pending && <button className="btn" disabled={reprocessing || saving} onClick={() => reprocess()}>처리 결과 확인·재시도</button>}
       {reprocessing && <p className="hint" role="status">보태주신 정보로 장소를 다시 찾고 있어요…</p>}
       {notice && <p className="notice" role="status">{notice}</p>}
-      {manual && noPlaces && <section className="manual-recovery"><h3>장소 이름으로 직접 찾기</h3><DirectAdd sourceId={source.id} onDone={(href) => returnToMap(savedMapHref(href))} /></section>}
+      {manual && noPlaces && !pending && <section className="manual-recovery"><h3>장소 이름으로 직접 찾기</h3><DirectAdd sourceId={source.id} onDone={(href) => returnToMap(savedMapHref(href))} /></section>}
 
       {error && <p className="error">{error}</p>}
 
       </>}
     </ClientReady></main>
-  );
-}
-
-function ManualSearch({ initial, onPick }: { initial: string; onPick: (p: KakaoPlace) => void | Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState(initial);
-  const [results, setResults] = useState<KakaoPlace[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function run() {
-    setBusy(true);
-    setError(null);
-    try {
-      const body = await requestJson<{ places: KakaoPlace[] }>(`/api/search?q=${encodeURIComponent(q)}`);
-      setResults(body.places ?? []);
-    } catch (e) { setError(e instanceof Error ? e.message : "검색하지 못했어요."); }
-    finally { setBusy(false); }
-  }
-
-  if (!open) {
-    return (
-      <button className="btn" style={{ fontSize: 14, padding: 9 }} onClick={() => setOpen(true)}>
-        여기 없어요, 직접 검색
-      </button>
-    );
-  }
-  return (
-    <div>
-      <div className="search-row">
-        <input
-          className="field"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-          aria-label="장소 검색어"
-        />
-        <button className="btn" style={{ flex: "none", padding: "9px 14px" }} onClick={run} disabled={busy}>
-          검색
-        </button>
-      </div>
-      {results && results.length === 0 && <p className="pick-evidence">검색 결과가 없어요.</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-      {results?.map((p) => (
-        <button
-          key={p.kakao_place_id}
-          className="option"
-          style={{ width: "100%", marginTop: 6, background: "var(--paper)", textAlign: "left" }}
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try { await onPick(p); setOpen(false); }
-            catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했어요."); }
-            finally { setBusy(false); }
-          }}
-        >
-          <span>
-            {p.name}
-            <small>{p.address}</small>
-          </span>
-        </button>
-      ))}
-    </div>
   );
 }
 

@@ -5,6 +5,25 @@ export const runtime = "nodejs";
 
 const STATUSES = new Set(["wish", "visited", "again", "meh"]);
 
+export async function GET(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
+  try {
+    const params = await route;
+    const board = await boardFromRequest(req);
+    if (!board) {
+      const response = unauthorized();
+      response.headers.set("Cache-Control", "no-store");
+      return response;
+    }
+    requireIdentity(board);
+    const { data, error } = await db().from("places").select("id, status, memo").eq("id", params.id).eq("board_id", board.id).maybeSingle();
+    if (error) return Response.json({ message: "장소의 최신 내용을 확인하지 못했어요. 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    if (!data) return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ place: { id: data.id, status: data.status, memo: data.memo } }, { headers: { "Cache-Control": "no-store" } });
+  } catch (e) {
+    return accessError(e);
+  }
+}
+
 export async function PATCH(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
     const params = await route;
@@ -20,9 +39,10 @@ export async function PATCH(req: Request, { params: route }: { params: Promise<{
     }
     if (body.memo !== undefined) patch.memo = String(body.memo).slice(0, 500);
     if (Object.keys(patch).length === 0) return Response.json({ message: "수정할 내용이 없습니다." }, { status: 400 });
-    const { error } = await db().from("places").update(patch).eq("id", params.id).eq("board_id", board.id);
+    const { data, error } = await db().from("places").update(patch).eq("id", params.id).eq("board_id", board.id).select("id").maybeSingle();
     if (error) return Response.json({ message: error.message }, { status: 400 });
-    return Response.json({ ok: true });
+    if (!data) return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

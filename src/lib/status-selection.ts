@@ -1,4 +1,5 @@
 import type { PlaceStatus } from "./types";
+import { UnconfirmedWriteError } from "./verified-write";
 
 /** Show the latest choice immediately; serialize writes so an older request cannot win. */
 export class StatusSelection {
@@ -32,6 +33,7 @@ export class StatusSelection {
       try { await this.save(target); this.confirmed = target; changed = true; lastError = null; }
       catch (error) {
         lastError = error;
+        if (error instanceof UnconfirmedWriteError) { this.wanted = this.confirmed; break; }
         if (this.wanted === target) this.wanted = this.confirmed;
       }
       this.publish(this.wanted, true);

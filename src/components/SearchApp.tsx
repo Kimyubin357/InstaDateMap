@@ -8,6 +8,8 @@ import ShellLink from "./ShellLink";
 import { PlaceSearch, unifiedResults } from "@/lib/place-search";
 import { RecentSearches } from "@/lib/recent-searches";
 import { requestJson } from "@/lib/client-request";
+import { CHECKING_SAVE, VerifiedWrite } from "@/lib/verified-write";
+import { verifyDirectSave } from "@/lib/save-recovery";
 import { shareDestination } from "@/lib/share-navigation";
 import type { ShareResult } from "@/lib/share-stream";
 import type { KakaoPlace } from "@/lib/types";
@@ -19,6 +21,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   const state = useSyncExternalStore(search.subscribe, search.getSnapshot, search.getSnapshot);
   const [history] = useState(() => new RecentSearches(access!)); const [recent, setRecent] = useState(() => history.read());
   const [picked, setPicked] = useState<KakaoPlace | null>(null); const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState("");
+  const [write, setWrite] = useState(() => new VerifiedWrite<ShareResult>());
   const input = useRef<HTMLInputElement>(null), scroll = useRef<HTMLDivElement>(null), scrollTop = useRef(0);
   const returnHref = useRef(backHref); const [hasSearched, setHasSearched] = useState(false);
   search.onUnauthorized = () => { void lock(); };
@@ -65,6 +68,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
     window.history.replaceState(window.history.state, "", "/search"); input.current?.focus();
   }
   function choose(place: KakaoPlace) {
+    setWrite(new VerifiedWrite<ShareResult>());
     record(); input.current?.blur(); setSaveError(""); setPicked(place);
     window.history.pushState({ ...window.history.state, datemapSearchPick: true }, "", window.location.href);
   }
@@ -76,7 +80,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   async function save() {
     if (!picked || saving) return; setSaving(true); setSaveError("");
     try {
-      const result = await requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: state.searched, place_id: picked.kakao_place_id }) });
+      const result = await write.run(() => requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: state.searched, place_id: picked.kakao_place_id }) }), () => verifyDirectSave(picked.kakao_place_id), () => setSaveError(CHECKING_SAVE));
       const destination = shareDestination(result); if (!destination) throw new Error("저장 결과를 확인하지 못했어요. 다시 시도해 주세요.");
       store.acceptSavedPlace(result.saved_place);
       // Remove the confirmation-only history marker before replacing with the map.
@@ -108,6 +112,6 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
       </>}
     </div>
     </div>
-    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 중…" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p><span className="status-tag wish">가고 싶음으로 저장</span>{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
+    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 확인 중…" : write.pending ? "저장 확인·재시도" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p><span className="status-tag wish">가고 싶음으로 저장</span>{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
   </div>;
 }

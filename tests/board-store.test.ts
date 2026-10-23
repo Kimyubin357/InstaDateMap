@@ -11,6 +11,71 @@ const response = (data = snapshot()) => Response.json(data);
 function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promise<T>((r) => { resolve = r; }); return { resolve, promise }; }
 afterEach(() => vi.useRealTimers());
 describe("기기 조회 캐시와 서버 일치", () => {
+  it.each(["headers", "body"])("목록 %s 응답이 멈춰도 캐시를 보존하고 시간 초과 안내 후 다시 갱신할 수 있음", async (phase) => {
+    vi.useFakeTimers();
+    const never = new Promise<never>(() => {}), disk = cache(snapshot());
+    const stalledBody = Response.json({}); vi.spyOn(stalledBody, "json").mockImplementation(() => never);
+    const fetcher = vi.fn<typeof fetch>().mockImplementationOnce(async () => phase === "headers" ? never : stalledBody)
+      .mockResolvedValueOnce(response(snapshot("2", "다시 받은 메모")));
+    const store = new BoardStore(disk, fetcher); await store.authorize(access);
+    await vi.advanceTimersByTimeAsync(14999);
+    expect(store.getSnapshot().syncing).toBe(true); expect(store.getSnapshot().snapshot).toEqual(snapshot());
+    await vi.advanceTimersByTimeAsync(1);
+    expect(store.getSnapshot().syncing).toBe(false);
+    expect(store.getSnapshot().error).toContain("응답이 늦어지고 있어요");
+    expect(store.getSnapshot().snapshot).toEqual(snapshot()); expect(disk.write).not.toHaveBeenCalled();
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    await store.refresh();
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(store.getSnapshot().syncing).toBe(false);
+    expect(store.getSnapshot().error).toBe(""); expect(store.getSnapshot().snapshot).toEqual(snapshot("2", "다시 받은 메모"));
+    store.suspend(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("시간 초과된 이전 응답이 나중에 와도 재시도로 받은 목록과 디스크를 덮지 않음", async () => {
+    vi.useFakeTimers();
+    const old = deferred<Response>(), disk = cache(snapshot());
+    const fetcher = vi.fn<typeof fetch>().mockReturnValueOnce(old.promise).mockResolvedValueOnce(response(snapshot("2", "최신 목록")));
+    const store = new BoardStore(disk, fetcher); await store.authorize(access);
+    await vi.advanceTimersByTimeAsync(15000); await store.refresh();
+    expect(store.getSnapshot().snapshot).toEqual(snapshot("2", "최신 목록"));
+    // A timed-out request is abandoned regardless of the revision in its late response.
+    old.resolve(response(snapshot("99", "버려야 할 응답"))); await vi.advanceTimersByTimeAsync(0);
+    expect(store.getSnapshot().snapshot).toEqual(snapshot("2", "최신 목록"));
+    expect(disk.write).toHaveBeenCalledTimes(1); expect(disk.write).toHaveBeenLastCalledWith(snapshot("2", "최신 목록"));
+    store.suspend();
+  });
+
+  it("갱신 중 받은 이벤트는 시간 초과로 기존 대기를 끝낸 뒤 별도 조회로 복구", async () => {
+    vi.useFakeTimers();
+    const disk = cache(snapshot()), fetcher = vi.fn<typeof fetch>().mockImplementationOnce(async () => new Promise<never>(() => {}))
+      .mockResolvedValueOnce(response(snapshot("2", "상대방의 새 메모")));
+    const store = new BoardStore(disk, fetcher), errors: string[] = [];
+    const unsubscribe = store.subscribe(() => { if (store.getSnapshot().error) errors.push(store.getSnapshot().error); });
+    await store.authorize(access);
+    const settled = vi.fn(); void store.refresh().then(settled);
+    store.schedule(); await vi.advanceTimersByTimeAsync(250);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(14750);
+    expect(errors.some((error) => error.includes("응답이 늦어지고 있어요"))).toBe(true);
+    expect(settled).toHaveBeenCalledOnce(); expect(store.getSnapshot().syncing).toBe(false);
+    expect(store.getSnapshot().snapshot).toEqual(snapshot()); expect(fetcher).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(249); expect(fetcher).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(store.getSnapshot().syncing).toBe(false);
+    expect(store.getSnapshot().snapshot).toEqual(snapshot("2", "상대방의 새 메모"));
+    unsubscribe(); store.suspend();
+  });
+
+  it("잠금 취소는 실패 알림 없이 대기를 끝내며 늦은 요청도 목록을 복원하지 않음", async () => {
+    vi.useFakeTimers();
+    const disk = cache(snapshot()), fetcher = vi.fn<typeof fetch>(async () => new Promise<never>(() => {}));
+    const store = new BoardStore(disk, fetcher); await store.authorize(access); await vi.advanceTimersByTimeAsync(0);
+    await store.forget(); await vi.advanceTimersByTimeAsync(15000);
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(store.getSnapshot().syncing).toBe(false); expect(store.getSnapshot().error).toBe("");
+    expect(store.getSnapshot().snapshot).toBeNull(); expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("PIN 재인증 동안 화면 정보만 유지하며 장소·기기 캐시는 지우고 요청은 중단", async () => {
     const pending = deferred<Response>(), disk = cache(snapshot()), fetcher = vi.fn(() => pending.promise);
     const store = new BoardStore(disk, fetcher as typeof fetch); await store.authorize(access); await Promise.resolve();

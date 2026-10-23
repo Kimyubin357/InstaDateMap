@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { StatusSelection } from "@/lib/status-selection";
+import { UnconfirmedWriteError } from "@/lib/verified-write";
 function deferred() {
   let resolve!: () => void, reject!: (error: Error) => void;
   const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
@@ -36,6 +37,15 @@ describe("즉시 표시하는 장소 상태", () => {
     selection.select("again"); selection.select("meh"); first.reject(new Error("첫 요청 실패"));
     await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2)); expect(selection.getSnapshot().status).toBe("meh");
     last.resolve(); await vi.waitFor(() => expect(saved).toHaveBeenCalledOnce()); expect(failed).not.toHaveBeenCalled();
+  });
+  it("응답 유실로 저장 여부가 미확인이면 뒤에 선택한 상태를 이어서 보내지 않음", async () => {
+    const first = deferred(), write = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(undefined), saved = vi.fn(), failed = vi.fn();
+    const selection = new StatusSelection("wish", write, saved, failed);
+    selection.select("again"); selection.select("visited"); selection.select("meh");
+    const unknown = new UnconfirmedWriteError(); first.reject(unknown);
+    await vi.waitFor(() => expect(selection.getSnapshot().pending).toBe(false));
+    expect(write).toHaveBeenCalledOnce(); expect(write).toHaveBeenCalledWith("again");
+    expect(selection.getSnapshot().status).toBe("wish"); expect(saved).not.toHaveBeenCalled(); expect(failed).toHaveBeenCalledWith(unknown);
   });
   it("저장 중 늦게 도착한 조회가 선택을 되돌리지 않음", async () => {
     const request = deferred(); const selection = new StatusSelection("wish", () => request.promise, vi.fn(), vi.fn());

@@ -16,6 +16,22 @@ describe("통합 검색 결과", () => {
   it("카카오 ID 없는 기존 장소도 이름으로 검색", () => {
     expect(unifiedResults([place("1", { kakao_place_id: null })], "식당", []).saved).toHaveLength(1);
   });
+  it("업종만 일치한 카카오 결과는 저장된 장소 검색에 추가하지 않음", () => {
+    const saved = place("1", { name: "온기식당", address: "서울 중구 세종대로 1", memo: "창가 자리", category: "한식" });
+    const result = unifiedResults([saved], "한식", [candidate("1"), candidate("new")]);
+    expect(result.saved).toEqual([]);
+    expect(result.fresh.map((p) => p.kakao_place_id)).toEqual(["new"]);
+  });
+  it.each(["온기식당", "세종대로", "창가 자리"])("상호명·주소·메모 %s로 찾은 저장 장소는 한 번만 표시", (query) => {
+    const saved = place("1", { name: "온기식당", address: "서울 중구 세종대로 1", memo: "창가 자리", category: "한식" });
+    const result = unifiedResults([saved], query, [candidate("1")]);
+    expect(result.saved).toEqual([saved]);
+    expect(result.fresh).toEqual([]);
+  });
+  it("업종과 같은 단어라도 저장된 상호명이나 메모에 있으면 검색", () => {
+    const saved = place("1", { name: "온기식당", category: "음식점", memo: "한식 먹고 싶을 때" });
+    expect(unifiedResults([saved], "한식", []).saved).toEqual([saved]);
+  });
 });
 describe("검색 요청과 복귀", () => {
   it("두 글자부터 350ms 묶어서 검색하고 지우면 대기 요청 취소", async () => {
@@ -36,6 +52,27 @@ describe("검색 요청과 복귀", () => {
     old.resolve(Response.json({ places: [candidate("old")] })); await first;
     expect(search.getSnapshot()).toMatchObject({ searched: "새검색", results: [candidate("new")], busy: false }); search.pause();
   });
+  it("수동 검색도 A 요청 뒤 B 요청을 보내면 B → A 응답에서 B만 표시", async () => {
+    vi.useFakeTimers();
+    const old = deferred<Response>();
+    const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce(Response.json({ places: [candidate("new")] }));
+    const search = new PlaceSearch(fetcher);
+    search.setQuery("수원 카페", false); await vi.advanceTimersByTimeAsync(500);
+    expect(fetcher).not.toHaveBeenCalled();
+    const first = search.search();
+    search.setQuery("수원 빵집", false); await search.search();
+    old.resolve(Response.json({ places: [candidate("old")] })); await first;
+    expect(search.getSnapshot()).toMatchObject({ query: "수원 빵집", searched: "수원 빵집", results: [candidate("new")], busy: false, error: "" });
+    expect(fetcher.mock.calls.map(([url]) => decodeURIComponent(url))).toEqual(["/api/search?q=수원 카페", "/api/search?q=수원 빵집"]);
+    search.pause();
+  });
+  it("수동 검색어를 바꾸면 이전 응답과 오류를 무시하고 새 검색을 기다림", async () => {
+    const old = deferred<Response>(); const search = new PlaceSearch(vi.fn(() => old.promise));
+    search.setQuery("수원 카페", false); const first = search.search();
+    search.setQuery("수원 빵집", false); old.resolve(new Response("bad", { status: 500 })); await first;
+    expect(search.getSnapshot()).toMatchObject({ query: "수원 빵집", searched: "", results: null, busy: false, error: "" });
+    search.pause();
+  });
   it("화면을 떠난 뒤 응답·오류는 무시하고 복귀하면 미완료 검색 재시도", async () => {
     const old = deferred<Response>(); const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce(Response.json({ places: [] })); const search = new PlaceSearch(fetcher);
     search.setQuery("수원"); const first = search.search(); search.pause(); old.resolve(new Response("bad", { status: 500 })); await first;
@@ -46,6 +83,20 @@ describe("검색 요청과 복귀", () => {
     const fetcher = vi.fn().mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(Response.json({ places: [] })); const search = new PlaceSearch(fetcher);
     search.setQuery("수원"); await search.search(); expect(search.getSnapshot().error).toContain("연결"); expect(search.getSnapshot().results).toBeNull();
     await search.search(); expect(search.getSnapshot()).toMatchObject({ query: "수원", error: "", results: [] }); search.pause();
+  });
+  it.each(["fetch", "body"])("%s 응답이 끝나지 않아도 검색 대기가 풀리고 재시도 가능", async (phase) => {
+    vi.useFakeTimers();
+    const never = new Promise<never>(() => {});
+    const fetcher = vi.fn().mockImplementationOnce(() => phase === "fetch" ? never : Promise.resolve({ status: 200, ok: true, json: () => never }))
+      .mockResolvedValueOnce(Response.json({ places: [candidate("retry")] }));
+    const search = new PlaceSearch(fetcher);
+    search.setQuery("수원 카페", false); const pending = search.search();
+    await vi.advanceTimersByTimeAsync(10000); await pending;
+    expect(search.getSnapshot()).toMatchObject({ query: "수원 카페", busy: false, results: null });
+    expect(search.getSnapshot().error).toBeTruthy();
+    await search.search();
+    expect(search.getSnapshot()).toMatchObject({ searched: "수원 카페", busy: false, error: "", results: [candidate("retry")] });
+    search.pause();
   });
   it("인증 만료 응답은 캐시 제거 경로로 전달", async () => {
     const search = new PlaceSearch(vi.fn(async () => new Response(null, { status: 401 })) as typeof fetch); const expired = vi.fn(); search.onUnauthorized = expired;

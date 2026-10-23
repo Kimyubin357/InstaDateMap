@@ -3,6 +3,7 @@ import { cacheScope, isSnapshot, snapshotEtag, type BoardSnapshot, type SyncAcce
 import type { PlaceView } from "./place-view";
 import { clearRecentSearches } from "./recent-searches";
 import type { SavedPlace } from "./saved-place";
+import { RequestTimeoutError, withRequestDeadline } from "./client-request";
 export interface BoardState { access: SyncAccess | null; snapshot: BoardSnapshot | null; syncing: boolean; error: string; connected: boolean }
 export const EMPTY_BOARD_STATE: BoardState = { access: null, snapshot: null, syncing: false, error: "", connected: false };
 export class BoardStore {
@@ -55,18 +56,22 @@ export class BoardStore {
   };
   private async load(generation: number) {
     this.set({ syncing: true });
+    try {
     while (this.dirty && generation === this.generation && !this.paused) {
       this.dirty = false; const mutation = this.mutation; const access = this.state.access!;
       const headers: Record<string, string> = {};
       if (this.state.snapshot) headers["If-None-Match"] = snapshotEtag(this.state.snapshot);
       const abort = new AbortController(); this.abort = abort;
       try {
-        const res = await this.fetcher("/api/places", { cache: "no-store", credentials: "same-origin", headers, signal: abort.signal });
+        const { res, data } = await withRequestDeadline(async (signal) => {
+          const res = await this.fetcher("/api/places", { cache: "no-store", credentials: "same-origin", headers, signal });
+          const data: unknown = [304, 401, 409].includes(res.status) ? null : await res.json().catch(() => null);
+          return { res, data };
+        }, { signal: abort.signal, timeoutMs: 15000 });
         if (generation !== this.generation || abort.signal.aborted) return;
         if (res.status === 401 || res.status === 409) { this.onUnauthorized(); return; }
         if (mutation !== this.mutation) { this.dirty = true; continue; }
         if (res.status === 304) { this.set({ error: "" }); continue; }
-        const data: unknown = await res.json();
         if (generation !== this.generation || abort.signal.aborted) return;
         if (mutation !== this.mutation) { this.dirty = true; continue; }
         if (!res.ok) throw new Error((data as { message?: string })?.message || "변경 내용을 확인하지 못했어요.");
@@ -76,10 +81,16 @@ export class BoardStore {
         if (BigInt(data.revision) < BigInt(this.confirmedRevision)) throw new Error("저장 결과를 맞추는 중이에요. 저장한 장소는 그대로 보여드려요.");
         this.set({ snapshot: data, error: "" }); this.persist(data, generation);
       } catch (e) {
+        if (e instanceof RequestTimeoutError && generation === this.generation && !this.paused) {
+          const queued = this.dirty;
+          this.dirty = false;
+          // Release this shared request at its deadline. A queued DB event gets a new flight.
+          if (queued) this.schedule();
+        }
         if (generation === this.generation && !abort.signal.aborted) this.set({ error: e instanceof Error && !(e instanceof TypeError) ? e.message : "연결이 끊겼어요. 마지막으로 저장된 내용을 보여드려요." });
-      }
+      } finally { if (this.abort === abort) this.abort = null; }
     }
-    if (generation === this.generation) this.set({ syncing: false });
+    } finally { if (generation === this.generation) this.set({ syncing: false }); }
   }
   private persist(snapshot: BoardSnapshot, generation = this.generation) {
     if (generation === this.generation && !this.paused) void this.cache.write(snapshot).catch(() => {});
