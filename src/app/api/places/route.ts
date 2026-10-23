@@ -8,6 +8,7 @@ import { withSavedPlace } from "@/lib/saved-place-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** 지도에 필요한 것: 장소 + 원본 링크 + 공유자, 그리고 확인이 필요한 링크 */
 export async function GET(req: Request) {

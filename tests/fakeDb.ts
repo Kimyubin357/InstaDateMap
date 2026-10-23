@@ -20,7 +20,7 @@ class Q {
   insert(input: Row | Row[]) { if (this.failed("insert")) return this; this.result = (Array.isArray(input) ? input : [input]).map((r) => { const row = { id: `id${++seq}`, ...r }; tables[this.t].push(row); return row; }); return this; }
   upsert(input: Row | Row[], opts: { ignoreDuplicates?: boolean } = {}) {
     if (this.failed("upsert")) return this;
-    const keys = uniq[this.t] || ["id"];
+    const keys = this.t === "push_subscriptions" ? ["endpoint_hash"] : uniq[this.t] || ["id"];
     this.result = (Array.isArray(input) ? input : [input]).map((r) => {
       const found = tables[this.t].find((x) => keys.every((k) => x[k] === r[k]));
       if (found) { if (!opts.ignoreDuplicates) Object.assign(found, r); return found; }

@@ -1,4 +1,5 @@
 /* Canvas, woven seams and two-colour ink. Layout and gestures live in globals.css. */
+.push-settings h2{display:flex;gap:8px;align-items:center}.push-settings .btn{width:100%}.push-settings .text-btn{display:block;margin-top:10px}
 body,.shell-page,.view-list,.view-list .places-list,.persistent-search.is-covering,
 .search-app.is-search-active,.unified-search-body,.sheet,.sheet-footer,.savebar,.action-dialog{
   background-color:var(--paper);

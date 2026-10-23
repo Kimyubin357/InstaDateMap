@@ -1,0 +1,15 @@
+import fs from "node:fs";
+import webpush from "web-push";
+const envPath = new URL("../.env.local", import.meta.url);
+const current = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
+const values = Object.fromEntries(current.split(/\r?\n/).flatMap((line) => { const m = line.match(/^([A-Z0-9_]+)=(.*)$/); return m ? [[m[1], m[2].trim().replace(/^['"]|['"]$/g, "")]] : []; }));
+const subject = values.VAPID_SUBJECT || process.argv[2] || (values.APP_BASE_URL?.startsWith("https://") ? values.APP_BASE_URL : "");
+if (!/^https:\/\/[^/]+/.test(subject) && !/^mailto:[^@]+@[^@]+$/.test(subject)) throw new Error("운영 HTTPS 주소를 지정해 주세요: npm run push:keys -- https://배포주소");
+const keys = values.VAPID_PUBLIC_KEY && values.VAPID_PRIVATE_KEY ? { publicKey: values.VAPID_PUBLIC_KEY, privateKey: values.VAPID_PRIVATE_KEY } : webpush.generateVAPIDKeys();
+webpush.setVapidDetails(subject, keys.publicKey, keys.privateKey);
+const additions = { VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: subject };
+const lines = Object.entries(additions).map(([k, v]) => `${k}=${v}`);
+const kept = current.split(/\r?\n/).filter((line) => !/^(VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|VAPID_SUBJECT)=/.test(line)).join("\n").trimEnd();
+fs.writeFileSync(envPath, `${kept}\n\n${lines.join("\n")}\n`);
+fs.writeFileSync(new URL("../.env.push.local", import.meta.url), `${lines.join("\n")}\n`, { mode: 0o600 });
+console.log("알림 키를 .env.local과 .env.push.local에 저장했습니다. Vercel에도 같은 세 값을 설정해 주세요. 키는 Git에 포함되지 않습니다.");

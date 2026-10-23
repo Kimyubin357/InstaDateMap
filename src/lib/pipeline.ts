@@ -6,6 +6,7 @@ import type { SourceContext } from "./extract/types";
 import { callLlm, type LlmCall } from "./llm";
 import { isConfident, resolveCandidate } from "./kakao";
 import type { KakaoPlace } from "./types";
+import { schedulePlacePushes } from "./push-server";
 
 export interface ShareInput {
   boardId: string;
@@ -51,6 +52,7 @@ export async function savePlace(args: { boardId: string; sourceId: string | null
   const { data, error } = await db().rpc("dm_save_place", { p_board: args.boardId, p_place: args.place, p_added_by: args.addedBy, p_source: args.sourceId, p_extraction: args.extractionId });
   checkDb(error, "장소 저장 실패");
   if (!data) throw new Error("장소 저장 결과가 없습니다.");
+  schedulePlacePushes(args.boardId);
   return data as string;
 }
 

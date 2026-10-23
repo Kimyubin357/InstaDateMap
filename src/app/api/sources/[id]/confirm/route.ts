@@ -10,6 +10,7 @@ function isPlace(v: unknown): v is KakaoPlace {
 }
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
