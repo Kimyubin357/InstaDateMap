@@ -12,14 +12,14 @@ import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
 import TrashPlaces from "./TrashPlaces";
 import ActionDialog from "./ActionDialog";
-import Feedback, { type ToastNotice } from "./Feedback";
+import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
 
 function AddPanel() {
   const url = useSearchParams().get("url") || "";
   return <AddForm key={url} initialUrl={url} />;
 }
 
-interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<void>; lock: () => Promise<void>; notify: (message: string, tone?: "success" | "error" | "info") => void }
+interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<void>; lock: () => Promise<void>; notify: (message: string, tone?: "success" | "error" | "info", action?: ToastAction) => void }
 const Context = createContext<BoardContext | null>(null);
 export function useBoardSync() { const context = useContext(Context); if (!context) throw new Error("BoardProvider missing"); return context; }
 export function useBoardState() { const { store } = useBoardSync(); return useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE); }
@@ -38,9 +38,9 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [toast, setToast] = useState<ToastNotice | null>(null);
   const dismissToast = useCallback(() => setToast(null), []);
-  const notify = useCallback((message: string, tone: "success" | "error" | "info" = "success") => {
+  const notify = useCallback((message: string, tone: "success" | "error" | "info" = "success", action?: ToastAction) => {
     if (tone === "error") { setToast(null); setNotice({ message, tone }); }
-    else { setNotice(null); setToast({ message, tone }); }
+    else { setNotice(null); setToast({ message, tone, action }); }
   }, []);
   useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };

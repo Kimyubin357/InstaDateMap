@@ -1,7 +1,5 @@
 "use client";
-import { analysisMessage } from "@/lib/analysis-issue";
-import DismissSource from "@/components/DismissSource";
-import Link from "next/link";
+import PendingLinks from "@/components/PendingLinks";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
@@ -17,7 +15,6 @@ import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type Plac
 import { categoryIcon } from "@/lib/place-presentation";
 import { navigateShell } from "@/lib/shell-navigation";
 type Overlay = "filters" | "pending" | "place" | null;
-const PENDING_LABEL: Record<string, string> = { pending_confirm: "지점 고르기", needs_review: "장소 확인하기", needs_caption: "정보 보태기" };
 const NO_PLACES: PlaceView[] = [];
 export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }: { who: string; kakaoKey: string; active: boolean; keyboard: boolean; onViewChange: (href: string) => void }) {
   const router = useRouter();
@@ -33,6 +30,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
   const duplicateArrival = useRef(false);
+  const restoredArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -69,7 +67,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setView(params.get("view") === "list" ? "list" : "map");
     if (id && params.get("from") === "search") setFocusedId(id);
     setSelectedId(id); setOverlay(id ? "place" : params.get("panel") === "filters" ? "filters" : params.get("panel") === "pending" ? "pending" : null);
-    const saved = params.get("saved"); setSavedArrival(saved); duplicateArrival.current = params.get("duplicate") === "1";
+    const saved = params.get("saved") || params.get("restored"); setSavedArrival(saved); duplicateArrival.current = params.get("duplicate") === "1"; restoredArrival.current = !!params.get("restored");
     // Successful saves already supply this place. Only old responses / direct URLs need a fetch.
     if (saved && !store.getSnapshot().snapshot?.places.some((p) => p.id === saved)) void store.refresh();
   }, [active, navigation, store]);
@@ -101,12 +99,13 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!active || !loaded || !savedArrival) return;
     const place = places.find((p) => p.id === savedArrival);
     if (!place && (syncing || error || !["0", "1"].includes(savedArrival))) return;
-    setView("map"); setStatuses([...STATUS_ORDER]); setCategory("");
+    setView("map");
+    if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses([...STATUS_ORDER]); setCategory(""); }
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true } : { sequence: ++requestSequence.current, kind: "saved" });
-    notify(savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
+    notify(restoredArrival.current ? "복구한 장소를 보여드릴게요." : savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
     setSavedArrival(null);
-    const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate");
+    const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate"); url.searchParams.delete("restored"); url.searchParams.delete("view");
     history.replaceState(history.state, "", url.pathname + url.search);
   }, [active, loaded, places, savedArrival, syncing, error]);
   function showPlaceOnMap(place: PlaceView) {
@@ -167,6 +166,6 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); setFocusedId(null); close(); setOverlay(null); setSelectedId(null); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
     {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant="compact" onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}><h3>우리의 상태</h3><div className="filter-options"><button className="chip" aria-pressed={all} onClick={() => setStatuses([...STATUS_ORDER])}>전체</button>{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={!all && statuses.includes(s)} onClick={() => toggleStatus(s)}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}
-    {overlay === "pending" && <Modal title="조금만 더 확인해요" onClose={close}><p className="lead">지점을 고르거나 장소 정보를 보태면 저장할 수 있어요.</p><div className="pending-list">{pending.map((p) => <div key={p.id}><Link href={`/confirm/${p.id}`} className="pending-row"><div><strong>{analysisMessage(p.recovery_reason) ?? (p.recovery_reason === "interrupted" ? "장소를 끝까지 확인하지 못했어요" : PENDING_LABEL[p.status] || "장소 확인하기")}</strong><small>{p.shared_by}님이 발견한 링크</small><span>{p.url.replace("https://www.instagram.com/", "")}</span></div><Icon name="chevron" /></Link>{p.analysis_version && <DismissSource id={p.id} version={p.analysis_version} onDone={() => { void store.refresh(); }} />}</div>)}</div></Modal>}
+    {overlay === "pending" && <Modal title="조금만 더 확인해요" initialStop={2} onClose={close}><p className="lead">링크별로 남은 확인을 이어가세요.</p><PendingLinks sources={pending} onChanged={() => { void store.refresh(); }} /></Modal>}
   </div>;
 }

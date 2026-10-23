@@ -5,7 +5,8 @@ import { detectMediaType, fetchCaption, normalizeInstagramUrl } from "./instagra
 import { extractPlaces } from "./extract/router";
 import type { SourceContext } from "./extract/types";
 import { callLlm, type LlmCall } from "./llm";
-import { isConfident, keywordSearch, resolveCandidate } from "./kakao";
+import { isConfident, keywordSearch, keywordSearchPage, resolveCandidate } from "./kakao";
+import { validSearchPage } from "./search-page";
 import type { KakaoPlace } from "./types";
 import { checkWork, SOURCE_MESSAGES } from "./source-work";
 import { AccessError } from "./auth";
@@ -98,8 +99,8 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
         status: existing.status === "pending_confirm" ? "confirm" : existing.status,
         code: analysisMessage(existing.recovery_reason) ? existing.recovery_reason : undefined,
         message: analysisMessage(existing.recovery_reason) ?? (existing.status === "pending_confirm" ? "확인이 남아 있는 링크예요. 지점을 골라 저장하거나 다른 방법으로 다시 찾을 수 있어요."
-          : existing.status === "needs_caption" ? "아직 게시물 내용을 읽지 못한 링크예요. 캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요."
-          : "장소 확인이 필요한 링크예요. 다시 시도하거나 캡션·스크린샷·직접 검색으로 이어갈 수 있어요."),
+          : existing.status === "needs_caption" ? "아직 게시물 내용을 읽지 못한 링크예요. 인스타 주소로 다시 분석하거나 장소를 직접 검색해 주세요."
+          : "장소 확인이 필요한 링크예요. 인스타 주소로 다시 분석하거나 장소를 직접 검색해 주세요."),
         confirm_url: confirmUrl(existing.id),
         source_id: existing.id, source_version: existing.analysis_version,
       };
@@ -120,7 +121,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     if (!caption) { const r = await fetchCaption(url); caption = r.caption; method = r.method; locationTag = r.locationTag; }
     if (!caption && !locationTag && images.length === 0) {
       await finish("needs_caption", []);
-      return { status: "needs_caption", message: "캡션을 가져오지 못했어요. 캡션·스크린샷을 보태거나 직접 검색해 주세요.", source_id: sourceId, source_version: existing.analysis_version, confirm_url: confirmUrl(sourceId) };
+      return { status: "needs_caption", message: "게시물에서 장소 정보를 읽지 못했어요. 다시 분석하거나 장소를 직접 검색해 주세요.", source_id: sourceId, source_version: existing.analysis_version, confirm_url: confirmUrl(sourceId) };
     }
     const ctx: SourceContext = {
       url,
@@ -199,11 +200,14 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
   }
 }
 
-export interface Selection { extraction_id: string; include: boolean; place_id?: string | null; query?: string }
-export interface DirectSelection { place_id: string; query: string }
+export interface Selection { extraction_id: string; include: boolean; place_id?: string | null; query?: string; page?: number }
+export interface DirectSelection { place_id: string; query: string; page?: number }
 async function searchedPlace(selection: DirectSelection) {
   if (typeof selection.query !== "string" || !selection.query.trim() || selection.query.length > 100 || typeof selection.place_id !== "string") throw new AccessError("검색한 장소를 골라 주세요.");
-  const place = (await keywordSearch(selection.query.trim())).find((p) => p.kakao_place_id === selection.place_id);
+  const page = selection.page ?? 1;
+  if (!validSearchPage(page)) throw new AccessError("검색 결과 페이지가 올바르지 않아요.");
+  const results = page === 1 ? await keywordSearch(selection.query.trim()) : (await keywordSearchPage(selection.query.trim(), page)).places;
+  const place = results.find((p) => p.kakao_place_id === selection.place_id);
   if (!place) throw new AccessError("검색 결과가 바뀌었어요. 다시 검색해서 골라 주세요.", 409);
   return place;
 }
@@ -219,7 +223,7 @@ export async function confirmSelections(boardId: string, sourceId: string, who: 
   const resolved = await Promise.all(selections.map(async (s) => {
     if (!s.include) return { extraction_id: s.extraction_id, include: false, place: null };
     const stored = allowed.get(s.extraction_id)?.find((p) => p.kakao_place_id === s.place_id);
-    const place = stored || (s.query && s.place_id ? await searchedPlace({ query: s.query, place_id: s.place_id }) : null);
+    const place = stored || (s.query && s.place_id ? await searchedPlace({ query: s.query, place_id: s.place_id, page: s.page }) : null);
     if (!place) throw new AccessError("선택한 장소가 후보에 없어요. 다시 골라 주세요.");
     return { extraction_id: s.extraction_id, include: true, place };
   }));

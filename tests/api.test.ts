@@ -116,3 +116,9 @@ describe("직접 저장과 세션 저장자", () => {
     expect(stages).toEqual(["caption", "extract", "search", "save"]); expect(saved.status).toBe("saved"); expect(saved.place_url).toContain("/?place=");
   });
 });
+
+it.each([{ caption: "수동 붙여넣기" }, { images: ["data:image/png;base64,iVBOR"] }, { images: "malformed" }])("retired upload inputs are rejected before creating a source: %j", async (input) => {
+  const response = await POST(request({ url: "https://www.instagram.com/p/RETIRED/", ...input }));
+  expect(response.status).toBe(400); expect((await response.json()).message).toContain("인스타 주소나 장소 직접 검색");
+  expect(tables.sources ?? []).toHaveLength(0); expect(tables.places ?? []).toHaveLength(0);
+});

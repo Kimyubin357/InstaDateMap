@@ -142,7 +142,7 @@ async function getHtml(fetcher: Fetcher, url: string, ua: string): Promise<strin
  * 1) 링크 미리보기 봇 UA로 게시물 페이지 → og:description
  * 2) 임베드 페이지(/embed/captioned/) → 캡션 블록
  * 3) (토큰이 있으면) oEmbed
- * 모두 실패하면 null → 스크린샷이나 캡션 붙여넣기로 넘어갑니다.
+ * 모두 실패하면 null → 링크 재분석이나 장소 직접 검색으로 이어갑니다.
  */
 export async function fetchCaption(url: string, fetcher: Fetcher = fetch): Promise<CaptionResult> {
   let locationTag: string | null = null;

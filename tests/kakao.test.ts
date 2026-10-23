@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { isConfident, keywordSearch, resolveCandidate, scorePlace } from "@/lib/kakao";
+import { isConfident, keywordSearch, keywordSearchPage, resolveCandidate, scorePlace } from "@/lib/kakao";
 import type { PlaceCandidate } from "@/lib/extract/types";
 
 beforeAll(() => {
@@ -93,4 +93,12 @@ describe("카카오 후보 고르기", () => {
     const p = { kakao_place_id: "1", name: "어니언", address: "서울 성동구 성수동", lat: 0, lng: 0, category: "", kakao_url: "" };
     expect(scorePlace(p, cand)).toBeGreaterThan(scorePlace({ ...p, address: "서울 종로구" }, cand));
   });
+});
+
+it("interactive search requests a stable page size and keeps the last-page flag", async () => {
+  let requested: URL | undefined;
+  const fetcher: typeof fetch = async (input) => { requested = new URL(String(input)); return Response.json({ documents: [doc("p2", "두 번째 페이지", "서울")], meta: { is_end: false, total_count: 24 } }); };
+  expect(await keywordSearchPage("식당", 2, fetcher)).toMatchObject({ page: 2, is_end: false, total_count: 24, places: [{ kakao_place_id: "p2" }] });
+  expect(requested?.searchParams.get("page")).toBe("2"); expect(requested?.searchParams.get("size")).toBe("8");
+  expect((await keywordSearchPage("식당", 45, fetcher)).is_end).toBe(true);
 });

@@ -30,11 +30,13 @@ export default function InlineManualSearch({ initial, onPick }: { initial: strin
     </form>
     {state.results?.length === 0 && <p className="pick-evidence">검색 결과가 없어요.</p>}
     {(error || state.error) && <p className="error" role="alert">{error || state.error}</p>}
+    {state.moreError && <p className="error" role="alert">{state.moreError}</p>}
     {state.results?.map((place) => <button key={place.kakao_place_id} className="option" style={{ width: "100%", marginTop: 6, background: "var(--paper)", textAlign: "left" }} disabled={picking || state.busy} onClick={async () => {
       setPicking(true); setError("");
       try { await onPick(place, state.searched); search.pause(); setOpen(false); }
       catch (cause) { setError(cause instanceof Error ? cause.message : "장소를 선택하지 못했어요."); }
       finally { setPicking(false); }
     }}><span>{place.name}<small>{place.address}</small></span></button>)}
+    {state.hasMore && <button className="btn search-more" disabled={picking || state.busy || state.loadingMore} onClick={() => void search.loadMore()}>{state.loadingMore ? "다음 결과를 찾고 있어요…" : "다음 검색 결과 보기"}</button>}
   </div>;
 }

@@ -2,6 +2,7 @@ import { env } from "./env";
 import type { KakaoPlace } from "./types";
 import type { PlaceCandidate } from "./extract/types";
 import { nameKey } from "./extract/normalize";
+import { MAX_SEARCH_PAGE, SEARCH_PAGE_SIZE, validSearchPage } from "./search-page";
 
 interface KakaoDoc {
   id: string;
@@ -49,6 +50,16 @@ export async function keywordSearch(query: string, fetcher: Fetcher = fetch, nea
   }
   const r = await kakaoGet<{ documents: KakaoDoc[] }>("/v2/local/search/keyword.json", params, fetcher);
   return (r?.documents ?? []).map(toKakaoPlace);
+}
+
+/** Interactive search retains Kakao's pagination metadata; extraction keeps its own search. */
+export async function keywordSearchPage(query: string, page = 1, fetcher: Fetcher = fetch) {
+  if (!validSearchPage(page)) throw new Error("검색 결과 페이지가 올바르지 않아요.");
+  const result = await kakaoGet<{ documents: KakaoDoc[]; meta: { is_end: boolean; total_count: number } }>(
+    "/v2/local/search/keyword.json", { query, page: String(page), size: String(SEARCH_PAGE_SIZE) }, fetcher);
+  return { places: (result?.documents ?? []).map(toKakaoPlace), page,
+    is_end: result?.meta?.is_end !== false || page >= MAX_SEARCH_PAGE,
+    total_count: result?.meta?.total_count ?? 0 };
 }
 
 async function geocode(address: string, fetcher: Fetcher) {

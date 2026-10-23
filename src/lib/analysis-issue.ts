@@ -30,3 +30,16 @@ export function geminiFailure(status: number, payload: unknown): AnalysisError {
   }
   return new AnalysisError(status === 401 || status === 403 ? "gemini_auth" : "gemini_unavailable");
 }
+
+/** Daily/auth limits are not fixed by adding more AI input. */
+export function analysisRecovery(reason?: string | null): "search" | "retry" {
+  return reason === "gemini_rate_limit" || reason === "gemini_unavailable" || reason === "interrupted" ? "retry" : "search";
+}
+export function analysisSummary(reason?: string | null): string | undefined {
+  if (!analysisMessage(reason)) return undefined;
+  if (reason === "gemini_free_daily_quota" || reason === "gemini_daily_quota") return "Gemini 하루 분석 한도를 모두 사용했어요.";
+  if (reason === "gemini_rate_limit") return "Gemini 요청이 잠시 제한됐어요.";
+  if (reason === "gemini_auth") return "AI 분석을 사용할 수 없어요.";
+  if (reason === "gemini_unavailable") return "AI 분석이 잠시 응답하지 못했어요.";
+  return "Gemini 분석 사용 한도에 걸렸어요.";
+}

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
 import { tokenHash } from "@/lib/pin";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
-vi.mock("@/lib/kakao", () => ({ keywordSearch: vi.fn(async () => [{ kakao_place_id: "manual", name: "서버가 찾은 식당", address: "실제 주소", lat: 37, lng: 127, category: "식당", kakao_url: "" }]) }));
-import { keywordSearch } from "@/lib/kakao";
+vi.mock("@/lib/kakao", () => ({ keywordSearch: vi.fn(async () => [{ kakao_place_id: "manual", name: "서버가 찾은 식당", address: "실제 주소", lat: 37, lng: 127, category: "식당", kakao_url: "" }]), keywordSearchPage: vi.fn(async (_query: string, page: number) => ({ page, is_end: true, total_count: 9, places: [{ kakao_place_id: "page-two", name: "서버의 두 번째 페이지 식당", address: "진짜 주소", lat: 37, lng: 127, category: "식당", kakao_url: "" }] })) }));
+import { keywordSearch, keywordSearchPage } from "@/lib/kakao";
 import { POST as confirm } from "@/app/api/sources/[id]/confirm/route";
 import { POST as session } from "@/app/api/sources/[id]/session/route";
 import { PATCH } from "@/app/api/places/[id]/route";
-import { GET as list } from "@/app/api/places/route";
+import { GET as list, POST as directSave } from "@/app/api/places/route";
 const work = "10000000-0000-4000-8000-000000000001", version = "20000000-0000-4000-8000-000000000001";
 const owner = `${tokenHash("a".repeat(64))}:${work}`;
 const place = { kakao_place_id: "original", name: "어부의딸", address: "서울", lat: 37, lng: 127, category: "식당", kakao_url: "" };
@@ -73,4 +73,27 @@ describe("대기 링크 복구와 제외", () => {
     expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ code: "MEMO_CONFLICT", memo: "토요일 저녁", memo_version: 1, memo_updated_by: "유빈" });
     expect(tables.places[0].memo).toBe("토요일 저녁");
   });
+});
+
+it("direct saves from a later search page validate the provider response instead of the client object", async () => {
+  const response = await confirm(request({ selections: [], direct: { query: "식당", place_id: "page-two", page: 2, name: "위조", lat: 0 } }), params);
+  expect(response.status).toBe(200); expect(keywordSearchPage).toHaveBeenCalledWith("식당", 2);
+  expect(tables.places[0]).toMatchObject({ name: "서버의 두 번째 페이지 식당", lat: 37 });
+});
+it("replacement candidates from later pages are also verified", async () => {
+  const response = await confirm(request({ selections: [{ extraction_id: "e1", include: true, place_id: "page-two", query: "식당", page: 2 }] }), params);
+  expect(response.status).toBe(200); expect(tables.places[0].kakao_place_id).toBe("page-two");
+});
+it("pending names and dates are returned only for this board's pending sources", async () => {
+  tables.sources[0].shared_at = "2026-10-24T00:00:00Z"; tables.sources[0].shared_by = "유빈";
+  tables.sources.push({ id: "other", board_id: "b2", status: "needs_review" });
+  Object.assign(tables.extractions[0], { raw_name: "어부의딸", branch: "성수점" });
+  tables.extractions.push({ source_id: "other", raw_name: "다른 보드의 장소" });
+  const response = await list(new Request("http://localhost/api/places", { headers: { cookie: `datemap_session=${"a".repeat(64)}` } }));
+  expect((await response.json()).pending).toMatchObject([{ id: "s1", place_names: ["어부의딸 성수점"], shared_at: "2026-10-24T00:00:00Z" }]);
+});
+
+it("standalone direct search can save an item from page two", async () => {
+  const response = await directSave(request({ query: "식당", place_id: "page-two", page: 2, name: "위조" }));
+  expect(response.status).toBe(200); expect(tables.places[0]).toMatchObject({ kakao_place_id: "page-two", name: "서버의 두 번째 페이지 식당" });
 });

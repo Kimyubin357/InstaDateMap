@@ -7,7 +7,7 @@ import DismissSource from "@/components/DismissSource";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { KakaoPlace } from "@/lib/types";
-import { requestJson } from "@/lib/client-request";
+import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite } from "@/lib/verified-write";
 import { verifyConfirmation, verifySharedLink, type ConfirmSaved } from "@/lib/save-recovery";
 import ManualPlaceSearch from "@/components/ManualPlaceSearch";
@@ -65,9 +65,8 @@ export default function ConfirmForm({
   const [saving, setSaving] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [caption, setCaption] = useState("");
   const [reprocessing, setReprocessing] = useState(false);
-  const [shots, setShots] = useState<string[]>([]);
+  const [recoveryReason, setRecoveryReason] = useState(source.recoveryReason);
   const [manual, setManual] = useState(false);
   const [notice, setNotice] = useState("");
   const [confirmationWrite] = useState(() => new VerifiedWrite<ConfirmSaved>());
@@ -94,7 +93,7 @@ export default function ConfirmForm({
       const c = choices[e.id];
       const all = [...e.candidates, ...c.extra];
       const place = all.find((p) => p.kakao_place_id === c.pickedId) ?? null;
-      return { extraction_id: e.id, include: c.include && !!place, place, place_id: place?.kakao_place_id ?? null, query: c.pickedId ? c.queries?.[c.pickedId] : undefined };
+      return { extraction_id: e.id, include: c.include && !!place, place, place_id: place?.kakao_place_id ?? null, page: place?.search_page, query: c.pickedId ? c.queries?.[c.pickedId] : undefined };
     });
     try {
       const body = await confirmationWrite.run(() => requestJson<ConfirmSaved>(`/api/sources/${source.id}/confirm`, {
@@ -108,7 +107,7 @@ export default function ConfirmForm({
     finally { setSaving(false); setNotice(""); }
   }
 
-  async function reprocess(images = shots) {
+  async function reprocess() {
     if ((!session.ready && !reprocessWrite.pending) || saving || reprocessing || leaving || confirmationWrite.pending) return;
     setReprocessing(true);
     setError(null);
@@ -118,16 +117,21 @@ export default function ConfirmForm({
       const body = await reprocessWrite.run(() => { retryAfter = Date.now() + 65000; return requestJson<ShareResult>("/api/share", {
         method: "POST",
         headers,
-        body: JSON.stringify({ url: source.url, caption, images, retry: true, work_id: workId() }),
+        body: JSON.stringify({ url: source.url, retry: true, work_id: workId() }),
       }); }, () => verifySharedLink(source.url, retryAfter), () => setNotice(CHECKING_SAVE));
       if (body.status === "saved" || body.status === "duplicate") {
         store.acceptSavedPlace(body.saved_place);
         returnToMap(shareDestination(body)!);
       } else {
         setNotice(body.message);
+        setRecoveryReason(body.code);
         router.refresh();
       }
-    } catch (e) { setNotice(""); setError(e instanceof Error ? e.message : "다시 찾지 못했어요."); }
+    } catch (e) {
+      setNotice(""); setError(e instanceof Error ? e.message : "다시 찾지 못했어요.");
+      if (e instanceof RequestError && analysisMessage(e.code)) setRecoveryReason(e.code);
+      if (e instanceof RequestError && e.details?.source_id === source.id && typeof e.details?.source_version === "string") router.refresh();
+    }
     finally { setReprocessing(false); }
   }
 
@@ -143,13 +147,13 @@ export default function ConfirmForm({
           : "남길 곳을 골라 주세요"}
       </h2>
       <p className="lead">
-        {noPlaces ? "캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요." : "게시물에서 찾은 장소예요. 남길 곳과 지점을 선택해 주세요."}{" "}
+        {noPlaces ? "인스타 주소로 다시 분석하거나 장소를 직접 검색해 주세요." : "게시물에서 찾은 장소예요. 남길 곳과 지점을 선택해 주세요."}{" "}
         <a className="source-link" href={source.url} target="_blank" rel="noreferrer">
           원본 보기
         </a>
       </p>
 
-      {analysisMessage(source.recoveryReason) && <p className="notice" role="status">{analysisMessage(source.recoveryReason)}</p>}
+      {analysisMessage(recoveryReason) && <p className="notice" role="status">{analysisMessage(recoveryReason)}</p>}
       {source.recoveryReason === "interrupted" && <p className="notice">장소를 끝까지 확인하지 못했어요. 다시 시도하거나 이 링크를 제외할 수 있어요.</p>}
       {!session.ready && <p className="notice" role="status">{session.error || "링크 상태를 확인하고 있어요…"} {session.error && <button className="text-btn" onClick={() => router.refresh()}>최신 후보 불러오기</button>}</p>}
       <fieldset disabled={!session.ready || saving || reprocessing || pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} aria-label="저장할 장소 선택">
@@ -196,7 +200,7 @@ export default function ConfirmForm({
                   initial={[e.areaHint, e.name].filter(Boolean).join(" ")}
                   onPick={(p, query) =>
                     update(e.id, {
-                      extra: c.extra.some((x) => x.kakao_place_id === p.kakao_place_id) ? c.extra : [...c.extra, p],
+                      extra: [...c.extra.filter((x) => x.kakao_place_id !== p.kakao_place_id), p],
                       pickedId: p.kakao_place_id,
                       queries: { ...c.queries, [p.kakao_place_id]: query },
                       include: true,
@@ -217,9 +221,9 @@ export default function ConfirmForm({
           </button>
         </div>
       )}
-      {noPlaces && session.ready && !pending && <LinkRecovery caption={caption} onCaption={setCaption} busy={saving || reprocessing} shotCount={shots.length} onRetry={() => reprocess()} onCaptionSubmit={() => reprocess()} onScreenshots={async (images) => { setShots(images); await reprocess(images); }} onSearch={() => setManual(true)} />}
+      {noPlaces && session.ready && !pending && <LinkRecovery reason={recoveryReason} busy={saving || reprocessing} onRetry={() => reprocess()} onSearch={() => setManual(true)} />}
       {reprocessWrite.pending && <button className="btn" disabled={reprocessing || saving} onClick={() => reprocess()}>처리 결과 확인·재시도</button>}
-      {reprocessing && <p className="hint" role="status">보태주신 정보로 장소를 다시 찾고 있어요…</p>}
+      {reprocessing && <p className="hint" role="status">인스타 주소에서 장소를 다시 찾고 있어요…</p>}
       {notice && <p className="notice" role="status">{notice}</p>}
       {manual && noPlaces && !pending && <section className="manual-recovery"><h3>장소 이름으로 직접 찾기</h3><DirectAdd sourceId={source.id} version={source.version} ready={session.ready} onDone={(href) => returnToMap(savedMapHref(href))} /></section>}
 

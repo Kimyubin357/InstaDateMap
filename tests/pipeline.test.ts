@@ -114,7 +114,7 @@ describe("저장 실패와 재시도", () => {
 });
 
 describe("공유 → 저장 흐름", () => {
-  it("캡션을 못 받으면 붙여넣기 요청", async () => {
+  it("게시물 정보를 못 받으면 링크 재분석·직접 검색 안내", async () => {
     const r = await ingestShare({ ...base, text: "https://www.instagram.com/p/AAA/?igsh=1" }, llmFor([]));
     expect(r.status).toBe("needs_caption");
     expect(r.confirm_url).toContain("/confirm/");

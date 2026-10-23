@@ -156,7 +156,7 @@ describe("기기 조회 캐시와 서버 일치", () => {
     const store = new BoardStore(disk, fetcher as typeof fetch); await store.authorize(access); await store.refresh();
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("If-None-Match")).toBe(snapshotEtag(snapshot()));
     expect(disk.write).not.toHaveBeenCalled(); expect(store.getSnapshot().snapshot).toEqual(snapshot());
-    expect(snapshotEtag(snapshot())).toBe('"dm2:b1:1:1"');
+    expect(snapshotEtag(snapshot())).toBe('"dm3:b1:1:1"');
   });
   it("연속 이벤트를 250ms에 한 번 조회로 묶음", async () => {
     vi.useFakeTimers(); const fetcher = vi.fn(async () => response()), store = new BoardStore(cache(), fetcher as typeof fetch);

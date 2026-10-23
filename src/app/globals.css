@@ -245,3 +245,19 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 .trash-actions { display: flex; gap: 10px; margin-top: 12px; }
 .trash-actions .btn { flex: 1; min-height: 44px; }
 .settings-link { color: inherit; text-decoration: none; }
+
+.toast-action { flex: none; padding: 10px 4px; min-height: 44px; display: inline-flex; align-items: center; color: inherit; font-weight: 750; white-space: nowrap; text-decoration: underline; }
+.trash-restored { padding: 16px; border: 1px solid var(--line); border-radius: 14px; }
+.trash-restored h2 { font-size: 18px; margin-bottom: 8px; }
+.trash-restored > div { display: flex; align-items: center; gap: 12px; }
+.trash-restored > div > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.trash-restored a { flex: none; min-height: 44px; display: inline-flex; align-items: center; font-weight: 700; }
+.search-more { width: 100%; min-height: 44px; margin-top: 12px; }
+.search-group-heading h2 small { font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.pending-summary { margin-bottom: 12px; }
+.pending-row > div { min-width: 0; }
+.pending-row strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pending-row .pending-action { color: var(--accent-ink); font-size: 14px; font-weight: 650; margin-top: 8px; }
+.pending-row .pending-link-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pending-summary { padding: 12px; font-size: 14px; line-height: 1.55; margin-bottom: 8px; }

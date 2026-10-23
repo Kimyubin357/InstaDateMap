@@ -1,7 +1,8 @@
 import { boardFromRequest, unauthorized, requireIdentity, AccessError, accessError } from "@/lib/auth";
 import { recoverSources } from "@/lib/source-work";
 import { db } from "@/lib/db";
-import { keywordSearch } from "@/lib/kakao";
+import { keywordSearch, keywordSearchPage } from "@/lib/kakao";
+import { validSearchPage } from "@/lib/search-page";
 import { savePlace } from "@/lib/pipeline";
 import { boardRevision } from "@/lib/sync-server";
 import { snapshotEtag } from "@/lib/sync-types";
@@ -44,6 +45,15 @@ export async function GET(req: Request) {
     const { data: places } = placeResult;
     const { data: links } = linkResult;
     const { data: pending } = pendingResult;
+    const pendingIds = (pending ?? []).map((source) => source.id);
+    const candidateNames = pendingIds.length ? await db().from("extractions").select("source_id, raw_name, branch").in("source_id", pendingIds) : { data: [], error: null };
+    const namesBySource = new Map<string, Set<string>>();
+    if (!candidateNames.error) for (const row of candidateNames.data ?? []) {
+      const names = namesBySource.get(row.source_id) ?? new Set<string>();
+      const name = [row.raw_name, row.branch].filter(Boolean).join(" ").trim();
+      if (name) names.add(name);
+      namesBySource.set(row.source_id, names);
+    }
 
     type Link = { place_id: string; added_by: string; sources: { id: string; url: string; media_type: string } };
     const byPlace = new Map<string, { sharers: Set<string>; sources: Map<string, { url: string; media_type: string }> }>();
@@ -74,7 +84,7 @@ export async function GET(req: Request) {
           last_saved_at: latest.get(p.id) || p.created_at,
         };
       }),
-      pending: pending ?? [],
+      pending: (pending ?? []).map((source) => ({ ...source, place_names: [...(namesBySource.get(source.id) ?? [])] })),
     }, { headers: { "Cache-Control": "no-store", ETag: etag } });
     }
     return Response.json({ status: "error", message: "변경 내용을 맞추는 중이에요. 잠시 후 다시 확인할게요." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "1" } });
@@ -90,7 +100,9 @@ export async function POST(req: Request) {
     requireIdentity(board);
     const body = await req.json().catch(() => null);
     if (typeof body?.query !== "string" || !body.query.trim() || body.query.length > 100 || typeof body?.place_id !== "string") throw new AccessError("검색한 장소를 골라 주세요.");
-    const places = await keywordSearch(body.query.trim());
+    const page = body.page ?? 1;
+    if (!validSearchPage(page)) throw new AccessError("검색 결과 페이지가 올바르지 않아요.");
+    const places = page === 1 ? await keywordSearch(body.query.trim()) : (await keywordSearchPage(body.query.trim(), page)).places;
     const place = places.find((p) => p.kakao_place_id === body.place_id);
     if (!place) throw new AccessError("검색 결과가 바뀌었어요. 다시 검색해서 골라 주세요.", 409);
     const { data: existing, error } = await db().from("places").select("id").is("deleted_at", null).eq("board_id", board.id).eq("kakao_place_id", place.kakao_place_id).maybeSingle();

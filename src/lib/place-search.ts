@@ -1,8 +1,9 @@
 import { filterPlaces, STATUS_ORDER, type PlaceView } from "./place-view";
 import type { KakaoPlace } from "./types";
 import { withRequestDeadline } from "./client-request";
-export interface SearchState { query: string; searched: string; results: KakaoPlace[] | null; busy: boolean; error: string }
-const EMPTY: SearchState = { query: "", searched: "", results: null, busy: false, error: "" };
+import { MAX_SEARCH_PAGE } from "./search-page";
+export interface SearchState { query: string; searched: string; results: KakaoPlace[] | null; busy: boolean; error: string; page: number; hasMore: boolean; loadingMore: boolean; moreError: string }
+const EMPTY: SearchState = { query: "", searched: "", results: null, busy: false, error: "", page: 0, hasMore: false, loadingMore: false, moreError: "" };
 /**
  * Saved places are searched by name, address, and memo only. Kakao's category or
  * alias matches must not expand that set. All saved IDs are still excluded from
@@ -26,15 +27,15 @@ export class PlaceSearch {
   getSnapshot = () => this.state;
   private set(patch: Partial<SearchState>) { this.state = { ...this.state, ...patch }; for (const listener of this.listeners) listener(); }
   setQuery(query: string, automatic = true) {
-    this.pause(); this.set({ query, results: null, searched: "", error: "" });
+    this.pause(); this.set({ ...EMPTY, query });
     if (automatic && query.trim().length >= 2) this.timer = setTimeout(() => { void this.search(); }, 350);
   }
-  pause() { clearTimeout(this.timer); this.abort?.abort(); ++this.sequence; if (this.state.busy) this.set({ busy: false }); }
+  pause() { clearTimeout(this.timer); this.abort?.abort(); ++this.sequence; if (this.state.busy || this.state.loadingMore) this.set({ busy: false, loadingMore: false }); }
   resume() { if (this.state.query.trim().length >= 2 && this.state.searched !== this.state.query.trim()) void this.search(); }
   async search() {
     this.pause(); const query = this.state.query.trim(); if (!query) return;
     const sequence = this.sequence, abort = new AbortController(); this.abort = abort;
-    this.set({ busy: true, results: null, error: "" });
+    this.set({ busy: true, results: null, error: "", page: 0, hasMore: false, moreError: "" });
     try {
       const { response, body } = await withRequestDeadline(async (signal) => {
         const response = await this.fetcher(`/api/search?q=${encodeURIComponent(query)}`, { cache: "no-store", signal });
@@ -44,9 +45,31 @@ export class PlaceSearch {
       if (sequence !== this.sequence) return;
       if (response.status === 401 || response.status === 409) { this.onUnauthorized(); return; }
       if (!response.ok || !Array.isArray(body.places)) throw new Error(body?.message || "장소를 찾지 못했어요. 다시 시도해 주세요.");
-      this.set({ searched: query, results: body.places });
+      this.set({ searched: query, results: body.places, page: 1, hasMore: body.is_end === false });
     } catch (error) {
       if (sequence === this.sequence && !abort.signal.aborted) this.set({ error: error instanceof Error && !(error instanceof TypeError) ? error.message : "연결하지 못했어요. 저장된 장소는 계속 찾을 수 있어요." });
     } finally { if (sequence === this.sequence) this.set({ busy: false }); }
+  }
+  async loadMore() {
+    const current = this.state;
+    if (!current.hasMore || current.busy || current.loadingMore || current.page >= MAX_SEARCH_PAGE || current.searched !== current.query.trim()) return;
+    this.pause();
+    const sequence = this.sequence, page = current.page + 1, abort = new AbortController(); this.abort = abort;
+    this.set({ loadingMore: true, moreError: "" });
+    try {
+      const { response, body } = await withRequestDeadline(async (signal) => {
+        const response = await this.fetcher(`/api/search?q=${encodeURIComponent(current.searched)}&page=${page}`, { cache: "no-store", signal });
+        const body = response.status === 401 || response.status === 409 ? null : await response.json();
+        return { response, body };
+      }, { signal: abort.signal, timeoutMs: 10000 });
+      if (sequence !== this.sequence) return;
+      if (response.status === 401 || response.status === 409) { this.onUnauthorized(); return; }
+      if (!response.ok || !Array.isArray(body?.places)) throw new Error(body?.message || "다음 검색 결과를 불러오지 못했어요. 다시 시도해 주세요.");
+      const combined = new Map((current.results ?? []).map((place) => [place.kakao_place_id, place]));
+      for (const place of body.places as KakaoPlace[]) if (!combined.has(place.kakao_place_id)) combined.set(place.kakao_place_id, place);
+      this.set({ results: [...combined.values()], page, hasMore: body.is_end === false && page < MAX_SEARCH_PAGE });
+    } catch (error) {
+      if (sequence === this.sequence && !abort.signal.aborted) this.set({ moreError: error instanceof Error && !(error instanceof TypeError) ? error.message : "다음 결과에 연결하지 못했어요. 다시 시도해 주세요." });
+    } finally { if (sequence === this.sequence) this.set({ loadingMore: false }); }
   }
 }

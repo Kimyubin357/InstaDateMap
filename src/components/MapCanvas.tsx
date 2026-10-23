@@ -14,8 +14,8 @@ declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: (
 function clusterButton(total: number, visited: number, region: string | null) {
   const button = document.createElement("button"); button.type = "button"; button.className = "cluster-pin";
   button.dataset.total = String(total); button.dataset.visited = String(visited);
-  button.setAttribute("aria-label", `${region || ""} 저장한 장소 ${total}곳, 가본 곳 ${visited}곳. 지도 확대`);
-  button.title = `${region || ""} · 저장 ${total}곳 · 방문 ${visited}/${total} · 눌러서 확대`;
+  button.setAttribute("aria-label", `${region || ""} 저장한 장소 ${total}곳, 가본 곳 ${visited}곳. ${total === 1 ? "장소 카드 보기" : "지도 확대"}`);
+  button.title = `${region || ""} · 저장 ${total}곳 · 방문 ${visited}/${total} · ${total === 1 ? "눌러서 장소 보기" : "눌러서 확대"}`;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 56 56"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
   const circle = document.createElementNS(svg.namespaceURI, "circle");
@@ -211,6 +211,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
         button.classList.toggle("active", ids.includes(focused.current || ""));
         button.onclick = (event) => {
           k.event.preventMap(); cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined;
+          if (group.places.length === 1) { pick.current(group.places[0].id); return; }
           if (event.detail === 0) pendingMarkerFocus.current = ids;
           map.current.setLevel(Math.max(3, map.current.getLevel() - 2), { anchor: point, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
         };

@@ -2,19 +2,21 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
+import ShellLink from "./ShellLink";
 
-export interface ToastNotice { message: string; tone: "success" | "info" }
+export interface ToastAction { label: string; href: string }
+export interface ToastNotice { message: string; tone: "success" | "info"; action?: ToastAction }
 export default function Feedback({ toast, onDismiss, connection, onRetry, map }: {
   toast: ToastNotice | null; onDismiss: () => void; connection: string; onRetry: () => void; map: boolean;
 }) {
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(onDismiss, 3500);
+    const timer = setTimeout(onDismiss, toast.action ? 8000 : 3500);
     return () => clearTimeout(timer);
   }, [toast, onDismiss]);
   if (typeof document === "undefined" || (!toast && !connection)) return null;
   return createPortal(<div className={`global-feedback${map ? " is-map" : ""}`}>
     {connection && <div className="sync-notice" role="status"><span>{connection} 마지막 조회 내용을 유지하고 있어요.</span><button className="text-btn" onClick={onRetry}>다시 연결</button></div>}
-    {toast && <div className={`toast tone-${toast.tone}`} role="status"><Icon name={toast.tone === "success" ? "check" : "pin"} width="18" /><span>{toast.message}</span><button className="icon-btn" aria-label="알림 닫기" onClick={onDismiss}><Icon name="close" width="16" /></button></div>}
+    {toast && <div className={`toast tone-${toast.tone}`} role="status"><Icon name={toast.tone === "success" ? "check" : "pin"} width="18" /><span>{toast.message}</span>{toast.action && <ShellLink className="toast-action" href={toast.action.href} onClick={onDismiss}>{toast.action.label}</ShellLink>}<button className="icon-btn" aria-label="알림 닫기" onClick={onDismiss}><Icon name="close" width="16" /></button></div>}
   </div>, document.body);
 }

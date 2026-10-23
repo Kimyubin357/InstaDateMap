@@ -6,11 +6,9 @@ import { withSavedPlace } from "@/lib/saved-place-server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type ImgType = "image/jpeg" | "image/png" | "image/webp";
-
 /**
  * 단축어가 부르는 엔드포인트.
- * body: { url: string, who: string, caption?: string, images?: string[] (base64) }
+ * body: { url: string, retry?: boolean, stream?: boolean, work_id?: string }
  */
 export async function POST(req: Request) {
   try {
@@ -28,22 +26,15 @@ export async function POST(req: Request) {
     const text = String(body.url ?? body.text ?? "");
     if (!text) return Response.json({ status: "error", message: "링크가 비어 있습니다." }, { status: 400 });
 
-    const images = (Array.isArray(body.images) ? body.images : [])
-      .filter((x): x is string => typeof x === "string" && x.length > 0)
-      .slice(0, 4)
-      .map((data) => {
-        const clean = data.replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "");
-        const mediaType: ImgType = clean.startsWith("iVBOR") ? "image/png" : clean.startsWith("UklGR") ? "image/webp" : "image/jpeg";
-        return { mediaType, data: clean };
-      });
+    if ((body.caption != null && body.caption !== "") || (body.images != null && (!Array.isArray(body.images) || body.images.length > 0))) {
+      return Response.json({ status: "error", message: "인스타 주소나 장소 직접 검색으로 등록해 주세요. 캡션 붙여넣기와 사진 업로드는 지원하지 않아요." }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
 
     const input = {
       boardId: board.id,
       owner: workOwner(board, body.work_id),
       text,
       who: board.who,
-      caption: typeof body.caption === "string" ? body.caption : null,
-      images,
       retry: body.retry === true,
     };
     if (body.stream === true) {

@@ -24,6 +24,8 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   const [write, setWrite] = useState(() => new VerifiedWrite<ShareResult>());
   const input = useRef<HTMLInputElement>(null), scroll = useRef<HTMLDivElement>(null), scrollTop = useRef(0);
   const returnHref = useRef(backHref); const [hasSearched, setHasSearched] = useState(false);
+  const [savedLimit, setSavedLimit] = useState(3);
+  useEffect(() => { setSavedLimit(3); }, [state.query]);
   search.onUnauthorized = () => { void lock(); };
   const { saved, fresh } = unifiedResults(snapshot?.places || [], state.query, state.results || []);
   useEffect(() => { if (scroll.current) scroll.current.inert = !active; }, [active]);
@@ -80,7 +82,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   async function save() {
     if (!picked || saving) return; setSaving(true); setSaveError("");
     try {
-      const result = await write.run(() => requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: state.searched, place_id: picked.kakao_place_id }) }), () => verifyDirectSave(picked.kakao_place_id), () => setSaveError(CHECKING_SAVE));
+      const result = await write.run(() => requestJson<ShareResult>("/api/places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: state.searched, place_id: picked.kakao_place_id, page: picked.search_page }) }), () => verifyDirectSave(picked.kakao_place_id), () => setSaveError(CHECKING_SAVE));
       const destination = shareDestination(result); if (!destination) throw new Error("저장 결과를 확인하지 못했어요. 다시 시도해 주세요.");
       store.acceptSavedPlace(result.saved_place);
       // Remove the confirmation-only history marker before replacing with the map.
@@ -103,11 +105,14 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
         {!recent.length && <p className="search-hint">가보고 싶은 곳을 찾아보세요.<br />저장한 장소도 함께 찾을 수 있어요.</p>}
         {recent.map((term) => <div className="recent-search-row" key={term}><button className="recent-term" onClick={() => run(term)}><Icon name="clock" /><span>{term}</span></button><button className="icon-btn" aria-label={`${term} 최근 검색 삭제`} onClick={() => setRecent(history.remove(term))}><Icon name="close" width="18" /></button></div>)}
       </section> : <>
-        <section aria-label="저장된 장소 검색 결과"><div className="search-group-heading"><h2>우리 지도에 저장된 곳</h2></div>
-          {!snapshot ? <p className="search-hint" role="status">저장한 장소를 확인하고 있어요…</p> : !saved.length ? <p className="search-hint">저장된 장소 중에는 없어요.</p> : saved.map((place) => <button className="unified-place-row" key={place.id} onClick={() => { record(); input.current?.blur(); navigateShell(`/?place=${encodeURIComponent(place.id)}&from=search`); }}><span className="search-category"><Icon name={categoryIcon(place.category)} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{[place.category, place.address].filter(Boolean).join(" · ")}</small></span><span className="saved-badge">저장됨</span><Icon name="chevron" width="17" /></button>)}
+        <section aria-label="저장된 장소 검색 결과"><div className="search-group-heading"><h2>우리 지도에 저장된 곳 <small>{saved.length}곳</small></h2></div>
+          {!snapshot ? <p className="search-hint" role="status">저장한 장소를 확인하고 있어요…</p> : !saved.length ? <p className="search-hint">저장된 장소 중에는 없어요.</p> : saved.slice(0, savedLimit).map((place) => <button className="unified-place-row" key={place.id} onClick={() => { record(); input.current?.blur(); navigateShell(`/?place=${encodeURIComponent(place.id)}&from=search`); }}><span className="search-category"><Icon name={categoryIcon(place.category)} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{[place.category, place.address].filter(Boolean).join(" · ")}</small></span><span className="saved-badge">저장됨</span><Icon name="chevron" width="17" /></button>)}
+          {saved.length > savedLimit && <button className="text-btn search-more" onClick={() => setSavedLimit((count) => count + 3)}>저장한 장소 더 보기 · {saved.length - savedLimit}곳 남음</button>}
         </section>
-        <section aria-label="새 장소 검색 결과"><div className="search-group-heading"><h2>새로 찾은 장소</h2></div>
-          {state.busy ? <p className="search-hint" role="status">장소를 찾고 있어요…</p> : state.error ? <div className="search-failure" role="alert"><p>{state.error}</p><button className="btn" onClick={() => run()}>다시 검색</button></div> : !state.results ? <p className="search-hint">{query.length < 2 && !hasSearched ? "두 글자 이상 입력하거나 키보드의 검색을 눌러 주세요." : "입력한 이름으로 찾아볼게요…"}</p> : !fresh.length ? <p className="search-hint">{saved.length ? "추가로 찾은 장소는 없어요." : "검색 결과가 없어요. 지역이나 다른 이름으로 찾아보세요."}</p> : fresh.map((place) => <button className="unified-place-row" key={place.kakao_place_id} onClick={() => choose(place)} disabled={!snapshot}><span className="search-category"><Icon name={categoryIcon(place.category)} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{place.address}</small></span><span className="search-add-icon" aria-label="주소 확인 후 저장"><Icon name="plus" width="21" /></span></button>)}
+        <section aria-label="새 장소 검색 결과"><div className="search-group-heading"><h2>새로 찾은 장소 <small>{fresh.length}곳</small></h2></div>
+          {state.busy ? <p className="search-hint" role="status">장소를 찾고 있어요…</p> : state.error ? <div className="search-failure" role="alert"><p>{state.error}</p><button className="btn" onClick={() => run()}>다시 검색</button></div> : !state.results ? <p className="search-hint">{query.length < 2 && !hasSearched ? "두 글자 이상 입력하거나 키보드의 검색을 눌러 주세요." : "입력한 이름으로 찾아볼게요…"}</p> : !fresh.length ? <p className="search-hint">{state.hasMore ? "이 결과에는 새 장소가 없어요. 다음 검색 결과도 확인해 보세요." : saved.length ? "추가로 찾은 장소는 없어요." : "검색 결과가 없어요. 지역이나 다른 이름으로 찾아보세요."}</p> : fresh.map((place) => <button className="unified-place-row" key={place.kakao_place_id} onClick={() => choose(place)} disabled={!snapshot}><span className="search-category"><Icon name={categoryIcon(place.category)} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{place.address}</small></span><span className="search-add-icon" aria-label="주소 확인 후 저장"><Icon name="plus" width="21" /></span></button>)}
+          {state.moreError && <p className="error" role="alert">{state.moreError}</p>}
+          {state.hasMore && <button className="btn search-more" disabled={state.loadingMore || state.busy} onClick={() => void search.loadMore()}>{state.loadingMore ? "다음 결과를 찾고 있어요…" : state.moreError ? "다음 결과 다시 불러오기" : "다음 검색 결과 보기"}</button>}
         </section>
       </>}
     </div>
