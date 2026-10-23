@@ -1,7 +1,7 @@
 import type { PlaceStatus } from "./types";
 export interface PlaceView {
   id: string; name: string; address: string | null; lat: number; lng: number; category: string | null;
-  kakao_place_id: string | null; kakao_url: string | null; status: PlaceStatus; memo: string | null; sharers: string[];
+  kakao_place_id: string | null; kakao_url: string | null; status: PlaceStatus; memo: string | null; memo_version?: number; sharers: string[];
   sources: { url: string; media_type: string }[]; created_at: string; last_saved_at: string;
 }
 export const STATUS_ORDER: PlaceStatus[] = ["wish", "again", "visited", "meh"];

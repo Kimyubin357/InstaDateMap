@@ -24,7 +24,7 @@ import { resolveCandidate } from "@/lib/kakao";
 process.env.APP_BASE_URL = "https://app.test";
 const llmFor = (names: string[]) => async () =>
   JSON.stringify({ places: names.map((n) => ({ name: n, confidence: 0.9 })) });
-const base = { boardId: "b1", token: "tok", who: "민지" };
+const base = { boardId: "b1", token: "tok", owner: "tab-a", who: "민지" };
 
 beforeEach(() => {
   reset();
@@ -36,7 +36,7 @@ describe("저장 실패와 재시도", () => {
   const input = { ...base, text: "https://www.instagram.com/p/AAA/", caption: "어니언" };
 
   it.each(["needs_caption", "needs_review", "pending_confirm"])("예전 %s 링크를 처음 다시 넣어도 상태에 맞는 보완 흐름으로 반환", async (status) => {
-    tables.sources = [{ id: "s1", board_id: "b1", url: input.text, shared_by: "민지", status }];
+    tables.sources = [{ id: "s1", board_id: "b1", url: input.text, shared_by: "민지", status, work_owner: base.owner, work_until: new Date(Date.now()+90000).toISOString() }];
     const llm = vi.fn(llmFor(["어니언"]));
     const result = await ingestShare({ ...base, text: input.text }, llm);
     expect(result.status).toBe(status === "pending_confirm" ? "confirm" : status);
@@ -107,7 +107,7 @@ describe("저장 실패와 재시도", () => {
   it("다른 링크의 추출 후보를 연결하지 못함", async () => {
     const r = await ingestShare(input, llmFor(["자연도소금빵"]));
     tables.extractions.push({ id: "foreign", source_id: "other" });
-    await expect(confirmSelections("b1", r.source_id!, "민지", [{ extraction_id: "foreign", include: true, place: tables.extractions[0].candidates[0] }])).rejects.toThrow("이 링크의 장소 후보");
+    await expect(confirmSelections("b1", r.source_id!, "민지", [{ extraction_id: "foreign", include: true, place_id: tables.extractions[0].candidates[0].kakao_place_id }], null, base.owner, tables.sources[0].analysis_version)).rejects.toThrow("이 링크의 장소 후보");
     expect(tables.places ?? []).toHaveLength(0);
   });
 });
@@ -137,10 +137,10 @@ describe("공유 → 저장 흐름", () => {
 
     const [onion, bread, none] = ["어니언", "자연도소금빵", "없는집"].map((n) => tables.extractions.find((e) => e.raw_name === n)!);
     const saved = await confirmSelections("b1", r.source_id!, "민지", [
-      { extraction_id: onion.id, include: false, place: onion.candidates[0] }, // 추리기에서 뺌
-      { extraction_id: bread.id, include: true, place: bread.candidates[1] }, // 익선점 선택
-      { extraction_id: none.id, include: false, place: null },
-    ]);
+      { extraction_id: onion.id, include: false, place_id: onion.candidates[0].kakao_place_id }, // 추리기에서 뺌
+      { extraction_id: bread.id, include: true, place_id: bread.candidates[1].kakao_place_id }, // 익선점 선택
+      { extraction_id: none.id, include: false, place_id: null },
+    ], null, base.owner, tables.sources[0].analysis_version);
     expect(saved).toBe(1);
     expect(tables.places.map((p) => p.kakao_place_id)).toEqual(["k3"]);
     expect(onion.excluded).toBe(true);

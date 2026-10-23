@@ -96,6 +96,13 @@ describe("Postgres 알림 트랜잭션과 수신 대상", () => {
     await save(); await pg.exec("delete from places"); expect(await count("place_push_events")).toBe(0);
     await save(); expect(await count("place_push_events")).toBe(1); expect(await claim()).toHaveLength(1);
   });
+  it("사용자 활동 없이 다음 예약이 미발송만 회수하고 오래된 이벤트는 보내지 않음", async () => {
+    await save(); const [first] = await claim();
+    await pg.exec("update push_deliveries set state='pending',available_at=now()-interval '1 second'");
+    const [scheduled] = await claim(); expect(scheduled.event_id).toBe(first.event_id); expect(scheduled.lease).not.toBe(first.lease);
+    await pg.exec("update push_deliveries set available_at=now()-interval '1 second'; update place_push_events set created_at=now()-interval '25 hours'");
+    expect(await claim()).toHaveLength(0);
+  });
   it("브라우저용 DB 역할은 구독·발송 기록과 RPC에 접근할 수 없음", async () => {
     await pg.exec("set role anon");
     try {

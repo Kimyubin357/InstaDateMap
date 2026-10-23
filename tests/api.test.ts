@@ -16,7 +16,7 @@ import { readShareResponse } from "@/lib/share-stream";
 import { withSavedPlace } from "@/lib/saved-place-server";
 import { POST as confirm } from "@/app/api/sources/[id]/confirm/route";
 
-const request = (body: unknown, token = "tok") => new Request("http://localhost/api/share", { method: "POST", headers: { "content-type": "application/json", cookie: `datemap_session=${token === "tok" ? "a".repeat(64) : token}`, origin: "http://localhost" }, body: JSON.stringify(body) });
+const request = (body: unknown, token = "tok") => new Request("http://localhost/api/share", { method: "POST", headers: { "content-type": "application/json", cookie: `datemap_session=${token === "tok" ? "a".repeat(64) : token}`, origin: "http://localhost" }, body: JSON.stringify(body === null ? null : { work_id: "10000000-0000-4000-8000-000000000001", ...(body as object) }) });
 beforeEach(() => { reset(); tables.boards = [{ id: "b1", name: "테스트", token: "tok", auth_version: 1, member_names: ["테스트", "연인"] }]; tables.access_sessions = [{ token_hash: tokenHash("a".repeat(64)), board_id: "b1", purpose: "member", member_name: "테스트", auth_version: 1, expires_at: "2030-01-01T00:00:00Z" }]; });
 
 describe("공유 HTTP API", () => {
@@ -74,7 +74,8 @@ describe("직접 저장과 세션 저장자", () => {
   it("확인 후 저장과 스트리밍 링크 저장 모두 지도에 바로 쓸 장소 정보를 제공", async () => {
     const shared = await readShareResponse(await POST(request({ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", stream: true })), () => {});
     expect(shared.saved_place?.place).toMatchObject({ name: "도나스데이 본점", sources: [{ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", media_type: "reel" }] });
-    const res = await confirm(request({ selections: [], direct: { ...tables.places[0], kakao_place_id: "another", name: "다른 곳" } }), { params: Promise.resolve({ id: tables.sources[0].id }) });
+    Object.assign(tables.sources[0], { status: "needs_review", work_owner: `${tokenHash("a".repeat(64))}:10000000-0000-4000-8000-000000000001`, work_until: new Date(Date.now()+90000).toISOString() });
+    const res = await confirm(request({ selections: [], version: tables.sources[0].analysis_version, direct: { place_id: "978669489", query: "도나스데이" } }), { params: Promise.resolve({ id: tables.sources[0].id }) });
     expect((await res.json()).saved_place).toMatchObject({ boardId: "b1", authVersion: 1, place: { sharers: ["테스트"] } });
   });
   it("저장 후 미리보기 조회 장애는 저장 실패로 바꾸지 않으며 다른 보드 장소를 노출하지 않음", async () => {

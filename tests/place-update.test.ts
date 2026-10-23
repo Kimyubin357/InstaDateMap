@@ -9,7 +9,7 @@ const params = (id = "p1") => ({ params: Promise.resolve({ id }) });
 const request = (body: unknown, authenticated = true, origin = "http://localhost") => new Request("http://localhost/api/places/p1", {
   method: "PATCH",
   headers: { origin, "Content-Type": "application/json", ...(authenticated ? { cookie: `datemap_session=${"a".repeat(64)}` } : {}) },
-  body: JSON.stringify(body),
+  body: JSON.stringify({ memo_version: 0, ...(body as object) }),
 });
 const readRequest = (authenticated = true) => new Request("http://localhost/api/places/p1", {
   headers: authenticated ? { cookie: `datemap_session=${"a".repeat(64)}` } : {},
@@ -30,7 +30,7 @@ describe("장소 수정 결과 확인", () => {
     const response = await PATCH(request(patch), params());
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toMatchObject({ ok: true });
     expect(tables.places[0]).toMatchObject(patch);
     expect(tables.places[1]).toMatchObject({ status: "visited", memo: "다른 보드 메모" });
   });
@@ -78,7 +78,7 @@ describe("응답 유실 뒤 장소 최신 내용 확인", () => {
     const response = await GET(readRequest(), params());
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ place: { id: "p1", status: "again", memo: "실제로 저장된 메모" } });
+    expect(await response.json()).toMatchObject({ place: { id: "p1", status: "again", memo: "실제로 저장된 메모" } });
   });
 
   it.each(["missing", "p2"])("없거나 다른 보드인 장소를 읽을 수 없음: %s", async (id) => {

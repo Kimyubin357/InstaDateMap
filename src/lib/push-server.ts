@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import webpush from "web-push";
 import { waitUntil } from "@vercel/functions";
 import { db } from "./db";
@@ -18,7 +19,7 @@ async function sendDelivery(job: Delivery, config: NonNullable<ReturnType<typeof
   for (let attempt = 0; attempt < 2 && !permanent; attempt++) {
     try {
       await webpush.sendNotification({ endpoint: job.endpoint, keys: { p256dh: job.p256dh, auth: job.auth } }, JSON.stringify(placeNotification(job)),
-        { vapidDetails: config, TTL: 86400, urgency: "high", timeout: 4000 });
+        { vapidDetails: config, TTL: 86400, topic: createHash("sha256").update(job.event_id).digest("base64url").slice(0, 32), urgency: "high", timeout: 4000 });
       success = true; break;
     } catch (e) {
       const status = (e as { statusCode?: number }).statusCode;

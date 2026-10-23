@@ -6,22 +6,28 @@ import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, type PlaceView, placeMeta } from "@/lib/place-view";
 import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite, UnconfirmedWriteError } from "@/lib/verified-write";
-import { verifyDeletedPlace, verifyPlacePatch } from "@/lib/save-recovery";
+import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave } from "@/lib/save-recovery";
 import MapCanvas from "./MapCanvas";
 import ActionDialog from "./ActionDialog";
 import { useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
 const ignore = () => {};
-export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string }) => void; onDelete: () => void }) {
+export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
   const { notify, store, lock } = useBoardSync();
   const copy = placeCopyContent(place);
-  const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string }>());
+  const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());
   const [statusWrite] = useState(() => new VerifiedWrite<{ status: PlaceStatus }>());
   const [deletion] = useState(() => new VerifiedWrite<{ ok: boolean; deleted_id: string }>());
   const [memoPending, setMemoPending] = useState(false), [statusPending, setStatusPending] = useState(false);
   const [activity, setActivity] = useState("");
   function mutationError(error: unknown) {
+    if (error instanceof RequestError && error.code === "MEMO_CONFLICT") {
+      const current = error.details!;
+      memoBase.current = Number(current.memo_version);
+      setMemoConflict({ memo: String(current.memo || ""), who: typeof current.memo_updated_by === "string" ? current.memo_updated_by : "상대방" });
+      setActivity(""); return;
+    }
     if (error instanceof RequestError && [401, 409].includes(error.status)) { void lock(); return; }
     if (error instanceof RequestError && error.status === 404 && error.code === "PLACE_NOT_FOUND") {
       onDelete(); void store.refresh(); notify("이미 삭제된 장소예요.", "error"); return;
@@ -40,7 +46,13 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
   const memoDraft = useRef(memo); memoDraft.current = memo;
   const deleteRequest = useRef(false);
   const lastMemo = useRef(place.memo || "");
-  useEffect(() => { const incoming = place.memo || "", previous = lastMemo.current; setMemo((draft) => draft === previous ? incoming : draft); lastMemo.current = incoming; }, [place.memo]);
+  const memoBase = useRef(place.memo_version ?? 0);
+  const [memoConflict, setMemoConflict] = useState<{ memo: string; who: string } | null>(null);
+  useEffect(() => {
+    const incoming = place.memo || "", previous = lastMemo.current;
+    if (memoDraft.current === previous && !memoConflict) { setMemo(incoming); memoBase.current = place.memo_version ?? 0; }
+    lastMemo.current = incoming;
+  }, [place.memo, place.memo_version, memoConflict]);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState<"close" | "map" | null>(null);
   const deleteButton = useRef<HTMLButtonElement>(null);
@@ -62,9 +74,11 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
   async function saveMemo() {
     if (busy) return;
     const value = { memo };
+    const expected = memoBase.current;
     setBusy(true); setError("");
     try {
-      const saved = await memoWrite.run(async () => { await requestJson(`/api/places/${place.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) }); return value; }, () => verifyPlacePatch(place.id, value), checking);
+      const saved = await memoWrite.run(async () => { const result = await requestJson<{ memo_version: number }>(`/api/places/${place.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...value, memo_version: expected }) }); return { ...value, memo_version: result.memo_version }; }, () => verifyMemoSave(place.id, value.memo, expected), checking);
+      memoBase.current = saved.memo_version; setMemoConflict(null); lastMemo.current = saved.memo;
       onPatch(saved); setActivity(""); notify(saved.memo === memoDraft.current ? "메모를 저장했어요." : "이전에 요청한 메모를 저장했어요. 새로 쓴 내용은 아직 저장 전이에요.");
     } catch (e) { mutationError(e); } finally { setMemoPending(memoWrite.pending); setBusy(false); }
   }
@@ -103,7 +117,8 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div>
     {statusPending && <button className="text-btn" disabled={busy} onClick={retryStatus}>상태 저장 확인·재시도</button>}
     {activity && <p className="notice" role="status">{activity}</p>}
-    <label className="section-label" htmlFor="place-memo">둘만의 메모</label><textarea id="place-memo" className="memo" placeholder="다음에 같이 가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && memo === (place.memo || ""))} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
+    {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
+    <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "둘만의 메모"}</label><textarea id="place-memo" className="memo" placeholder="다음에 같이 가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && memo === (place.memo || ""))} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
     <div className="place-source-actions">
       {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
       <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>

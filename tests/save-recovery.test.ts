@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestJson, RequestError } from "@/lib/client-request";
 import { UnconfirmedWriteError } from "@/lib/verified-write";
-import { verifyConfirmation, verifyDeletedPlace, verifyDirectSave, verifyPlacePatch, verifySharedLink } from "@/lib/save-recovery";
+import { verifyConfirmation, verifyDeletedPlace, verifyDirectSave, verifyPlacePatch, verifySharedLink, verifyMemoSave } from "@/lib/save-recovery";
 
 vi.mock("@/lib/client-request", async (original) => ({ ...await original<typeof import("@/lib/client-request")>(), requestJson: vi.fn() }));
 const request = vi.mocked(requestJson);
@@ -11,6 +11,18 @@ const status = () => ({ result: { status: "saved", message: "저장됨", place_u
 beforeEach(() => vi.resetAllMocks());
 
 describe("저장 결과가 실제로 일치하는지 확인", () => {
+  it("메모 응답을 잃어도 저장된 내용과 실제 버전을 함께 복구", async () => {
+    request.mockResolvedValueOnce({ place: { memo: "내 메모", memo_version: 3 } });
+    expect(await verifyMemoSave("p1", "내 메모", 1)).toEqual({ memo: "내 메모", memo_version: 3 });
+  });
+  it("응답 유실 후 다른 메모가 저장돼 있으면 재전송 대신 충돌 내용을 반환", async () => {
+    request.mockResolvedValueOnce({ place: { memo: "상대방 수정", memo_version: 2, memo_updated_by: "유빈" } });
+    await expect(verifyMemoSave("p1", "내 초안", 0)).rejects.toMatchObject({ code: "MEMO_CONFLICT", details: { memo: "상대방 수정", memo_version: 2 } });
+  });
+  it("버전이 그대로인 미저장은 성공으로 확인하지 않음", async () => {
+    request.mockResolvedValueOnce({ place: { memo: "기존 메모", memo_version: 1 } });
+    expect(await verifyMemoSave("p1", "내 초안", 1)).toBeNull();
+  });
   it("메모·상태는 서버 값이 모두 일치할 때만 원래 저장값을 반환함", async () => {
     const patch = { memo: "창가", status: "visited" as const };
     request.mockResolvedValueOnce({ place: patch }).mockResolvedValueOnce({ place: { ...patch, memo: "예전 메모" } });

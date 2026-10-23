@@ -50,6 +50,66 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
   const snapshot = structuredClone(tables);
   const check = (r: { error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); };
   try {
+    if (name === "dm_patch_place") {
+      const row = tables.places?.find((r) => r.id === p.p_id && r.board_id === p.p_board);
+      if (!row) return { data: { code: "PLACE_NOT_FOUND" }, error: null };
+      if ("memo" in p.p_patch && p.p_expected !== (row.memo_version ?? 0)) return { data: { code: "MEMO_CONFLICT", memo: row.memo || "", memo_version: row.memo_version ?? 0, memo_updated_by: row.memo_updated_by }, error: null };
+      const patch = { ...p.p_patch, ...("memo" in p.p_patch ? { memo_version: (row.memo_version ?? 0) + 1, memo_updated_by: p.p_who } : {}) };
+      check(await new Q("places").update(patch).eq("id", row.id));
+      return { data: { ok: true, memo_version: row.memo_version ?? 0 }, error: null };
+    }
+    if (name === "dm_recover_sources") {
+      for (const r of tables.sources ?? []) if (r.board_id === p.p_board && r.status === "processing" && new Date(r.work_until || new Date(r.shared_at).getTime() + 90000).getTime() <= Date.now()) Object.assign(r, { status: "needs_review", recovery_reason: "interrupted", work_owner: null, work_until: null, analysis_version: `v${++seq}` });
+      return { data: null, error: null };
+    }
+    if (name === "dm_begin_source") {
+      let r = tables.sources?.find((r) => r.board_id === p.p_board && r.url === p.p_url);
+      if (!r) { const result = await new Q("sources").upsert({ board_id: p.p_board, url: p.p_url, media_type: p.p_media, shared_by: p.p_who, status: "needs_review" }).single(); check(result); r = result.data; }
+      if (new Date(r.work_until).getTime() > Date.now() && (r.status === "processing" || r.work_owner !== p.p_owner)) return { data: { outcome: "busy" }, error: null };
+      if (r.status === "done" && tables.source_places?.some((l) => l.source_id === r!.id)) return { data: { outcome: "duplicate", source: { ...r } }, error: null };
+      if (new Date(r.work_until).getTime() > Date.now() && r.work_owner === p.p_owner && !p.p_retry) return { data: { outcome: "resume", source: { ...r } }, error: null };
+      Object.assign(r, { status: "processing", work_owner: p.p_owner, work_until: new Date(Date.now()+90000).toISOString(), analysis_version: `v${++seq}`, recovery_reason: null });
+      return { data: { outcome: "started", source: { ...r } }, error: null };
+    }
+    if (name === "dm_finish_analysis") {
+      const r = tables.sources?.find((r) => r.board_id === p.p_board && r.id === p.p_source);
+      if (!r || r.status !== "processing" || r.work_owner !== p.p_owner || r.analysis_version !== p.p_version || new Date(r.work_until).getTime() <= Date.now()) throw Error("SOURCE_STALE");
+      let placeId = null;
+      if (p.p_rows !== null) {
+        check(await new Q("extractions").delete().eq("source_id", r.id));
+        for (const row of p.p_rows) {
+          const inserted = await new Q("extractions").insert({ ...row, source_id: r.id }).single(); check(inserted);
+          if (p.p_auto) { const saved = await rpc("dm_save_place", { p_board: p.p_board, p_source: r.id, p_extraction: inserted.data.id, p_added_by: p.p_who, p_place: row.candidates[0] }); check(saved); placeId = saved.data; }
+        }
+      }
+      check(await new Q("sources").update({ status: p.p_status, caption: p.p_caption, caption_method: p.p_method, location_tag: p.p_location, recovery_reason: p.p_reason, work_until: p.p_status === "done" ? null : new Date(Date.now()+90000).toISOString(), work_owner: p.p_status === "done" ? null : p.p_owner }).eq("id", r.id));
+      return { data: { place_id: placeId }, error: null };
+    }
+    if (name === "dm_source_session") {
+      check(await rpc("dm_recover_sources", p));
+      const r = tables.sources?.find((r) => r.id === p.p_source && r.board_id === p.p_board);
+      if (!r) return { data: { code: "SOURCE_NOT_FOUND" }, error: null };
+      if (p.p_action === "release") { if (r.work_owner === p.p_owner && r.analysis_version === p.p_version && r.status !== "processing") Object.assign(r, { work_owner: null, work_until: null }); return { data: { ok: true }, error: null }; }
+      if (r.status === "dismissed" && p.p_action === "dismiss") return { data: { ok: true }, error: null };
+      if (r.analysis_version !== p.p_version || ["done", "dismissed"].includes(r.status)) return { data: { code: "SOURCE_STALE" }, error: null };
+      if (r.status === "processing" || new Date(r.work_until).getTime() > Date.now() && r.work_owner !== p.p_owner) return { data: { code: "SOURCE_BUSY" }, error: null };
+      if (p.p_action === "dismiss") Object.assign(r, { status: "dismissed", work_owner: null, work_until: null, analysis_version: `v${++seq}` });
+      else Object.assign(r, { work_owner: p.p_owner, work_until: new Date(Date.now()+90000).toISOString() });
+      return { data: { ok: true }, error: null };
+    }
+    if (name === "dm_confirm_source") {
+      const r = tables.sources?.find((r) => r.board_id === p.p_board && r.id === p.p_source);
+      if (!r || r.analysis_version !== p.p_version || ["processing", "done", "dismissed"].includes(r.status)) throw Error("SOURCE_STALE");
+      if (r.work_owner !== p.p_owner || new Date(r.work_until).getTime() <= Date.now()) throw Error("SOURCE_BUSY");
+      let n = 0;
+      for (const s of p.p_selections) {
+        if (!tables.extractions?.some((e) => e.id === s.extraction_id && e.source_id === r.id)) throw Error("SOURCE_STALE");
+        check(await new Q("extractions").update({ excluded: !s.include }).eq("id", s.extraction_id));
+        if (s.include) { check(await rpc("dm_save_place", { p_board: p.p_board, p_source: r.id, p_extraction: s.extraction_id, p_place: s.place, p_added_by: p.p_who })); n++; }
+      }
+      if (p.p_direct) { check(await rpc("dm_save_place", { p_board: p.p_board, p_source: r.id, p_extraction: null, p_place: p.p_direct, p_added_by: p.p_who })); n++; }
+      Object.assign(r, { status: "done", work_owner: null, work_until: null }); return { data: n, error: null };
+    }
     if (name === "dm_board_revision") { const result = await new Q("board_sync").eq("board_id", p.p_board).maybeSingle(); check(result); return { data: String(result.data?.revision ?? 0), error: null }; }
     if (name === "dm_save_place") {
       if (p.p_source && !tables.sources?.some((s) => s.id === p.p_source && s.board_id === p.p_board)) throw Error("이 보드의 링크가 아닙니다.");

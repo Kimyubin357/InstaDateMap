@@ -1,6 +1,6 @@
 import { boardChanged } from "./board-events";
 /** HTTP 오류와 연결 실패를 성공으로 처리하지 않습니다. */
-export class RequestError extends Error { constructor(message: string, public status: number, public code?: string) { super(message); } }
+export class RequestError extends Error { constructor(message: string, public status: number, public code?: string, public details?: Record<string, unknown>) { super(message); } }
 export class RequestTimeoutError extends Error { constructor() { super("응답이 늦어지고 있어요. 연결을 확인하고 다시 시도해 주세요."); } }
 export class ConnectionError extends Error { constructor(message = "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요.") { super(message); } }
 export const uncertainResponse = (e: unknown) => e instanceof RequestTimeoutError || e instanceof ConnectionError;
@@ -27,7 +27,7 @@ export async function requestJson<T>(url: string, init: RequestInit & { timeoutM
   catch (e) { if (signal.aborted) throw signal.reason; throw new ConnectionError(); }
   let body: any;
   try { body = await res.json(); } catch (e) { if (signal.aborted) throw signal.reason; throw new ConnectionError("서버 응답을 읽지 못했어요."); }
-  if (!res.ok || body?.status === "error") throw new RequestError(body?.message || "요청을 처리하지 못했어요. 다시 시도해 주세요.", res.status, body?.code);
+  if (!res.ok || body?.status === "error") throw new RequestError(body?.message || "요청을 처리하지 못했어요. 다시 시도해 주세요.", res.status, body?.code, body);
   if (!body) throw new ConnectionError("서버 응답을 읽지 못했어요.");
   return body as T;
   }, { signal, timeoutMs });

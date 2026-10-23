@@ -1,4 +1,5 @@
 import { boardFromRequest, unauthorized, requireIdentity, AccessError, accessError } from "@/lib/auth";
+import { recoverSources } from "@/lib/source-work";
 import { db } from "@/lib/db";
 import { keywordSearch } from "@/lib/kakao";
 import { savePlace } from "@/lib/pipeline";
@@ -15,6 +16,7 @@ export async function GET(req: Request) {
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
+    await recoverSources(board.id);
     for (let attempt = 0; attempt < 3; attempt++) {
     const revision = await boardRevision(board.id);
     const etag = snapshotEtag({ boardId: board.id, authVersion: board.authVersion, revision });
@@ -22,7 +24,7 @@ export async function GET(req: Request) {
     const [placeResult, linkResult, pendingResult, saveResult] = await Promise.all([
       db()
         .from("places")
-        .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, created_at")
+        .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at")
         .eq("board_id", board.id)
         .order("created_at", { ascending: false }),
       db()
@@ -31,7 +33,7 @@ export async function GET(req: Request) {
         .eq("sources.board_id", board.id),
       db()
         .from("sources")
-        .select("id, url, status, shared_by, shared_at")
+        .select("id, url, status, shared_by, shared_at, analysis_version, recovery_reason")
         .eq("board_id", board.id)
         .in("status", ["pending_confirm", "needs_review", "needs_caption"])
         .order("shared_at", { ascending: false }),

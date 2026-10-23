@@ -4,12 +4,15 @@ import { detectMediaType, fetchCaption, normalizeInstagramUrl } from "./instagra
 import { extractPlaces } from "./extract/router";
 import type { SourceContext } from "./extract/types";
 import { callLlm, type LlmCall } from "./llm";
-import { isConfident, resolveCandidate } from "./kakao";
+import { isConfident, keywordSearch, resolveCandidate } from "./kakao";
 import type { KakaoPlace } from "./types";
+import { checkWork, SOURCE_MESSAGES } from "./source-work";
+import { AccessError } from "./auth";
 import { schedulePlacePushes } from "./push-server";
 
 export interface ShareInput {
   boardId: string;
+  owner: string;
   text: string; // 공유 시트에서 넘어온 텍스트(링크 포함)
   who: string;
   caption?: string | null;
@@ -20,10 +23,11 @@ export interface ShareInput {
 
 /** 단축어가 읽는 응답. message는 알림으로 그대로 보여 줍니다. */
 export interface ShareResponse {
-  status: "saved" | "confirm" | "needs_caption" | "needs_review" | "duplicate" | "error";
+  status: "saved" | "confirm" | "needs_caption" | "needs_review" | "duplicate" | "error" | "busy";
   message: string;
   confirm_url?: string;
   source_id?: string;
+  source_version?: string;
   place_url?: string;
 }
 
@@ -31,11 +35,6 @@ const MAX_PLACES_PER_SOURCE = 8;
 
 function checkDb(error: { message: string } | null, action: string) {
   if (error) throw new Error(`${action}: ${error.message}`);
-}
-
-async function setSourceStatus(sourceId: string, status: string) {
-  const { error } = await db().from("sources").update({ status }).eq("id", sourceId);
-  checkDb(error, "링크 상태 저장 실패");
 }
 
 export function confirmUrl(sourceId: string) {
@@ -64,17 +63,12 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
   const manualCaption = input.caption?.trim() || null;
   const images = input.images ?? [];
 
-  // 이미 처리한 링크인지 확인
-  const { data: existing, error: existingError } = await db()
-    .from("sources")
-    .select("id, status, caption, caption_method, location_tag, shared_by")
-    .eq("board_id", input.boardId)
-    .eq("url", url)
-    .maybeSingle();
-  checkDb(existingError, "기존 링크 조회 실패");
-
-  const retrying = input.retry || !!manualCaption || images.length > 0;
-  if (existing && !retrying) {
+  const claimed = await db().rpc("dm_begin_source", { p_board: input.boardId, p_url: url, p_media: detectMediaType(url), p_who: input.who, p_owner: input.owner, p_retry: !!(input.retry || manualCaption || images.length) });
+  checkDb(claimed.error, "링크 저장 실패");
+  if (claimed.data.outcome === "busy") return { status: "busy", message: SOURCE_MESSAGES.SOURCE_BUSY };
+  const existing = claimed.data.source;
+  const sourceId = existing.id as string;
+  if (claimed.data.outcome === "duplicate" || claimed.data.outcome === "resume") {
     if (existing.status === "done") {
       // 연인이 이미 공유한 링크면 "둘 다 저장함"이 되도록 내 공유 기록도 남깁니다.
       const { data: links, error: linksError } = await db()
@@ -103,65 +97,30 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
           : existing.status === "needs_caption" ? "아직 게시물 내용을 읽지 못한 링크예요. 캡션·스크린샷을 보태거나 장소를 직접 검색해 주세요."
           : "장소 확인이 필요한 링크예요. 다시 시도하거나 캡션·스크린샷·직접 검색으로 이어갈 수 있어요.",
         confirm_url: confirmUrl(existing.id),
-        source_id: existing.id,
+        source_id: existing.id, source_version: existing.analysis_version,
       };
     }
   }
 
-  input.onProgress?.("caption");
-  // 캡션 확보
-  let caption = manualCaption || existing?.caption || null;
-  let method: "og" | "oembed" | "manual" | null = manualCaption ? "manual" : existing?.caption_method ?? null;
-  let locationTag: string | null = existing?.location_tag ?? null;
-  if (!caption) {
-    const r = await fetchCaption(url);
-    caption = r.caption;
-    method = r.method;
-    locationTag = r.locationTag;
-  }
-
-  const sourceRow = {
-    board_id: input.boardId,
-    url,
-    media_type: detectMediaType(url),
-    caption,
-    caption_method: method,
-    location_tag: locationTag,
-    shared_by: existing?.shared_by || input.who,
+  let caption = manualCaption || existing.caption || null;
+  let method = manualCaption ? "manual" : existing.caption_method ?? null;
+  let locationTag = existing.location_tag ?? null;
+  const finish = async (status: string, rows: unknown[] | null, auto = false, reason: string | null = null) => {
+    const { data, error } = await db().rpc("dm_finish_analysis", { p_board: input.boardId, p_source: sourceId, p_owner: input.owner,
+      p_version: existing.analysis_version, p_status: status, p_caption: caption, p_method: method, p_location: locationTag,
+      p_rows: rows, p_auto: auto, p_who: input.who, p_reason: reason });
+    checkWork(error); return data;
   };
-
-  if (!caption && !locationTag && images.length === 0) {
-    const { data, error } = await db()
-      .from("sources")
-      .upsert({ ...sourceRow, status: "needs_caption" }, { onConflict: "board_id,url" })
-      .select("id")
-      .single();
-    checkDb(error, "링크 저장 실패");
-    if (!data) throw new Error("링크 저장 결과가 없습니다.");
-    return {
-      status: "needs_caption",
-      message: "캡션을 가져오지 못했어요. 열리는 화면에 캡션을 붙여넣어 주세요.",
-      confirm_url: data?.id ? confirmUrl(data.id) : undefined,
-      source_id: data?.id,
-    };
-  }
-
-  const { data: src, error: srcErr } = await db()
-    .from("sources")
-    .upsert({ ...sourceRow, status: "processing" }, { onConflict: "board_id,url" })
-    .select("id")
-    .single();
-  if (srcErr || !src) return { status: "error", message: `저장 실패: ${srcErr?.message}` };
-  const sourceId = src.id as string;
-
   try {
-    // 다시 처리하는 경우 이전 추출 결과를 지웁니다.
-    const { error: deleteError } = await db().from("extractions").delete().eq("source_id", sourceId);
-    checkDb(deleteError, "기존 후보 정리 실패");
-
+    input.onProgress?.("caption");
+    if (!caption) { const r = await fetchCaption(url); caption = r.caption; method = r.method; locationTag = r.locationTag; }
+    if (!caption && !locationTag && images.length === 0) {
+      await finish("needs_caption", []);
+      return { status: "needs_caption", message: "캡션을 가져오지 못했어요. 캡션·스크린샷을 보태거나 직접 검색해 주세요.", source_id: sourceId, source_version: existing.analysis_version, confirm_url: confirmUrl(sourceId) };
+    }
     const ctx: SourceContext = {
       url,
-      mediaType: sourceRow.media_type,
+      mediaType: detectMediaType(url),
       caption,
       locationTag,
       images,
@@ -190,22 +149,17 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       evidence: c.evidence,
       candidates: places,
     }));
-    const { data: inserted, error: insertError } = rows.length
-      ? await db().from("extractions").insert(rows).select("id")
-      : { data: [] as { id: string }[], error: null };
-    checkDb(insertError, "장소 후보 저장 실패");
-
     const withPlaces = resolved.filter((r) => r.places.length > 0);
 
     if (withPlaces.length === 0) {
-      await setSourceStatus(sourceId, "needs_review");
+      await finish("needs_review", rows);
       return {
         status: "needs_review",
         message: top.length
           ? "장소 이름은 찾았지만 지도에서 못 찾았어요. 확인 화면에서 직접 검색해 주세요."
           : "장소 정보를 찾지 못했어요. 확인 화면에서 직접 검색해 주세요.",
         confirm_url: confirmUrl(sourceId),
-        source_id: sourceId,
+        source_id: sourceId, source_version: existing.analysis_version,
       };
     }
 
@@ -213,77 +167,56 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     if (resolved.length === 1 && isConfident(resolved[0].c, resolved[0].places)) {
       const place = resolved[0].places[0];
       input.onProgress?.("save");
-      const placeId = await savePlace({
-        boardId: input.boardId,
-        sourceId,
-        extractionId: inserted?.[0]?.id ?? null,
-        place,
-        addedBy: input.who,
-      });
-      await setSourceStatus(sourceId, "done");
-      return { status: "saved", message: `${place.name}을(를) 지도에 저장했어요.`, source_id: sourceId, place_url: `/?place=${placeId}` };
+      const result = await finish("done", rows, true);
+      const placeId = result.place_id;
+      schedulePlacePushes(input.boardId);
+      return { status: "saved", message: `${place.name}을(를) 지도에 저장했어요.`, source_id: sourceId, source_version: existing.analysis_version, place_url: `/?place=${placeId}` };
     }
 
-    await setSourceStatus(sourceId, "pending_confirm");
+    await finish("pending_confirm", rows);
     const n = resolved.length;
     return {
       status: "confirm",
       message: n > 1 ? `장소 ${n}곳을 찾았어요. 남길 곳을 골라 주세요.` : "어느 지점인지 골라 주세요.",
       confirm_url: confirmUrl(sourceId),
-      source_id: sourceId,
+      source_id: sourceId, source_version: existing.analysis_version,
     };
   } catch (e) {
     // 실패한 링크도 지도에서 다시 찾거나 직접 검색할 수 있어야 합니다.
-    await setSourceStatus(sourceId, "needs_review");
+    try { await finish("needs_review", null, false, "interrupted"); }
+    catch { console.warn("중단된 링크 복구 대기", { sourceId }); }
     console.error("링크 처리 실패", { sourceId, message: e instanceof Error ? e.message : String(e) });
-    return { status: "error", message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId,
+    return { status: "error", message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId, source_version: existing.analysis_version,
       confirm_url: confirmUrl(sourceId) };
   }
 }
 
-export interface Selection {
-  extraction_id: string;
-  include: boolean;
-  place?: KakaoPlace | null;
+export interface Selection { extraction_id: string; include: boolean; place_id?: string | null; query?: string }
+export interface DirectSelection { place_id: string; query: string }
+async function searchedPlace(selection: DirectSelection) {
+  if (typeof selection.query !== "string" || !selection.query.trim() || selection.query.length > 100 || typeof selection.place_id !== "string") throw new AccessError("검색한 장소를 골라 주세요.");
+  const place = (await keywordSearch(selection.query.trim())).find((p) => p.kakao_place_id === selection.place_id);
+  if (!place) throw new AccessError("검색 결과가 바뀌었어요. 다시 검색해서 골라 주세요.", 409);
+  return place;
 }
-
-/** 확인 화면에서 고른 결과 반영 (추리기 + 지점 선택) */
-export async function confirmSelections(
-  boardId: string,
-  sourceId: string,
-  who: string,
-  selections: Selection[],
-  direct?: KakaoPlace | null,
-) {
-  const { data: src, error: sourceError } = await db()
-    .from("sources")
-    .select("id")
-    .eq("id", sourceId)
-    .eq("board_id", boardId)
-    .maybeSingle();
-  checkDb(sourceError, "링크 조회 실패");
-  if (!src) throw new Error("링크를 찾을 수 없습니다.");
-
-  const { data: extractions, error: extractionError } = await db().from("extractions").select("id").eq("source_id", sourceId);
-  checkDb(extractionError, "장소 후보 조회 실패");
-  const allowed = new Set((extractions ?? []).map((e) => e.id));
-  if (selections.some((s) => !allowed.has(s.extraction_id))) throw new Error("이 링크의 장소 후보가 아닙니다. 화면을 새로 열어 주세요.");
-
-  let saved = 0;
-  for (const s of selections) {
-    const keep = s.include && !!s.place;
-    const { error } = await db().from("extractions").update({ excluded: !keep }).eq("id", s.extraction_id).eq("source_id", sourceId);
-    checkDb(error, "선택 내용 저장 실패");
-    if (keep) {
-      await savePlace({ boardId, sourceId, extractionId: s.extraction_id, place: s.place!, addedBy: who });
-      saved++;
-    }
-  }
-  // 추출 결과 없이 직접 검색해서 고른 장소
-  if (direct) {
-    await savePlace({ boardId, sourceId, extractionId: null, place: direct, addedBy: who });
-    saved++;
-  }
-  await setSourceStatus(sourceId, "done");
-  return saved;
+export async function confirmSelections(boardId: string, sourceId: string, who: string, selections: Selection[], direct: DirectSelection | null, owner: string, version: string) {
+  const { data: src, error } = await db().from("sources").select("id, analysis_version").eq("id", sourceId).eq("board_id", boardId).maybeSingle();
+  checkDb(error, "링크 조회 실패");
+  if (!src) throw new AccessError(SOURCE_MESSAGES.SOURCE_NOT_FOUND, 404);
+  if (src.analysis_version !== version) throw new AccessError(SOURCE_MESSAGES.SOURCE_STALE, 409);
+  const result = await db().from("extractions").select("id, candidates").eq("source_id", sourceId);
+  checkDb(result.error, "장소 후보 조회 실패");
+  const allowed = new Map((result.data ?? []).map((e) => [e.id, e.candidates as KakaoPlace[]]));
+  if (new Set(selections.map((s) => s.extraction_id)).size !== selections.length || selections.some((s) => !allowed.has(s.extraction_id))) throw new AccessError("이 링크의 장소 후보가 아닙니다. 화면을 새로 열어 주세요.", 409);
+  const resolved = await Promise.all(selections.map(async (s) => {
+    if (!s.include) return { extraction_id: s.extraction_id, include: false, place: null };
+    const stored = allowed.get(s.extraction_id)?.find((p) => p.kakao_place_id === s.place_id);
+    const place = stored || (s.query && s.place_id ? await searchedPlace({ query: s.query, place_id: s.place_id }) : null);
+    if (!place) throw new AccessError("선택한 장소가 후보에 없어요. 다시 골라 주세요.");
+    return { extraction_id: s.extraction_id, include: true, place };
+  }));
+  const directPlace = direct ? await searchedPlace(direct) : null;
+  const saved = await db().rpc("dm_confirm_source", { p_board: boardId, p_source: sourceId, p_owner: owner, p_version: version,
+    p_who: who, p_selections: resolved, p_direct: directPlace });
+  checkWork(saved.error); schedulePlacePushes(boardId); return saved.data as number;
 }

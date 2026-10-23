@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     const candidate = rawUrl?.match(/https?:\/\/[^\s"'<>]+/)?.[0];
     const url = candidate ? normalizeInstagramUrl(candidate) : null;
     if (rawUrl !== null && (rawUrl.length > 4000 || !url)) throw new AccessError("인스타그램 게시물이나 릴스 링크를 입력해 주세요.");
-    const query = db().from("sources").select("id, status").eq("board_id", board.id);
+    const query = db().from("sources").select("id, status, analysis_version").eq("board_id", board.id);
     const source = await (sourceId !== null ? query.eq("id", sourceId) : query.eq("url", url!)).maybeSingle();
     check(source.error);
     if (!source.data) return reply(empty);
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       result = await withSavedPlace(board, { status: "saved", message: "저장한 장소를 확인했어요.", source_id: currentSource.id, place_url: `/?place=${encodeURIComponent(first.place_id)}` });
     } else if (["pending_confirm", "needs_review", "needs_caption"].includes(currentSource.status)) {
       result = { status: currentSource.status === "pending_confirm" ? "confirm" : currentSource.status,
-        message: "링크 처리 결과를 확인했어요. 남은 확인을 이어서 해 주세요.", source_id: currentSource.id, confirm_url: `/confirm/${currentSource.id}` };
+        message: "링크 처리 결과를 확인했어요. 남은 확인을 이어서 해 주세요.", source_id: currentSource.id, source_version: source.data.analysis_version, confirm_url: `/confirm/${currentSource.id}` };
     }
     return reply({ result, source: currentSource, selections, linked });
   } catch (error) { return accessError(error); }

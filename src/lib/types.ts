@@ -1,6 +1,6 @@
 export type MediaType = "post" | "carousel" | "reel" | "unknown";
 export type PlaceStatus = "wish" | "visited" | "again" | "meh";
-export type SourceStatus = "processing" | "pending_confirm" | "done" | "needs_review" | "needs_caption";
+export type SourceStatus = "processing" | "pending_confirm" | "done" | "dismissed" | "needs_review" | "needs_caption";
 
 /** 카카오 로컬 검색 결과를 우리 형식으로 바꾼 것 */
 export interface KakaoPlace {

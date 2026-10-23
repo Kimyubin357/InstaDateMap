@@ -4,3 +4,8 @@ node_modules
 .env.local
 .env.push.local
 *.tsbuildinfo
+.vercel/
+supabase/.temp/
+.env*
+!.env.example
+.playwright-mcp/

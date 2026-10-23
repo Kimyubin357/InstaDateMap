@@ -7,6 +7,12 @@ export async function verifyPlacePatch<T extends { memo?: string; status?: Place
   const { place } = await requestJson<{ place: { memo: string | null; status: PlaceStatus } }>(`/api/places/${id}`, { cache: "no-store" });
   return Object.entries(patch).every(([key, value]) => (key === "memo" ? place.memo || "" : place.status) === value) ? patch : null;
 }
+export async function verifyMemoSave(id: string, memo: string, expected: number): Promise<{ memo: string; memo_version: number } | null> {
+  const { place } = await requestJson<{ place: { memo: string | null; memo_version: number; memo_updated_by: string | null } }>(`/api/places/${id}`, { cache: "no-store" });
+  if ((place.memo || "") === memo && place.memo_version > expected) return { memo, memo_version: place.memo_version };
+  if (place.memo_version !== expected) throw new RequestError("메모가 먼저 바뀌었어요.", 409, "MEMO_CONFLICT", { ...place });
+  return null;
+}
 export async function verifyDeletedPlace(id: string): Promise<{ ok: boolean; deleted_id: string } | null> {
   try { await requestJson(`/api/places/${id}`, { cache: "no-store" }); return null; }
   catch (error) { if (error instanceof RequestError && error.status === 404 && error.code === "PLACE_NOT_FOUND") return { ok: true, deleted_id: id }; throw error; }

@@ -6,7 +6,7 @@ import type { KakaoPlace } from "@/lib/types";
 import { useBoardSync } from "./BoardProvider";
 
 /** Search for an alternative candidate without allowing an older response to replace it. */
-export default function InlineManualSearch({ initial, onPick }: { initial: string; onPick: (place: KakaoPlace) => void | Promise<void> }) {
+export default function InlineManualSearch({ initial, onPick }: { initial: string; onPick: (place: KakaoPlace, query: string) => void | Promise<void> }) {
   const { lock } = useBoardSync();
   const [search] = useState(() => { const model = new PlaceSearch(); model.setQuery(initial, false); return model; });
   const state = useSyncExternalStore(search.subscribe, search.getSnapshot, search.getSnapshot);
@@ -32,7 +32,7 @@ export default function InlineManualSearch({ initial, onPick }: { initial: strin
     {(error || state.error) && <p className="error" role="alert">{error || state.error}</p>}
     {state.results?.map((place) => <button key={place.kakao_place_id} className="option" style={{ width: "100%", marginTop: 6, background: "var(--paper)", textAlign: "left" }} disabled={picking || state.busy} onClick={async () => {
       setPicking(true); setError("");
-      try { await onPick(place); search.pause(); setOpen(false); }
+      try { await onPick(place, state.searched); search.pause(); setOpen(false); }
       catch (cause) { setError(cause instanceof Error ? cause.message : "장소를 선택하지 못했어요."); }
       finally { setPicking(false); }
     }}><span>{place.name}<small>{place.address}</small></span></button>)}

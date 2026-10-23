@@ -1,4 +1,5 @@
 import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
+import { workOwner } from "@/lib/source-work";
 import { ingestShare } from "@/lib/pipeline";
 import { withSavedPlace } from "@/lib/saved-place-server";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     if (!board) return unauthorized();
     requireIdentity(board);
 
-    let body: { url?: string; text?: string; caption?: string; images?: unknown; retry?: boolean; stream?: boolean };
+    let body: { url?: string; text?: string; caption?: string; images?: unknown; retry?: boolean; stream?: boolean; work_id?: string };
     try {
       body = await req.json();
     } catch {
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
 
     const input = {
       boardId: board.id,
+      owner: workOwner(board, body.work_id),
       text,
       who: board.who,
       caption: typeof body.caption === "string" ? body.caption : null,
