@@ -55,3 +55,10 @@
 - DB 스키마 변경은 없다. Vercel 배포 `dpl_9M8VMMs3z4iVS5zhkH7c6mGzSTPw`의 상태는 `READY`, 대상은 `production`이며 기존 운영 주소에 연결했다.
 - 관련 자동 테스트 52개와 타입 검사·운영 빌드를 통과했다. Browser 플러그인이 제공되지 않아 기존 Playwright/Chrome와 합성 Postgres DB 도구로 `http://localhost:43100`을 검증했다. 모바일 390×844·데스크톱 1440×900에서 브라우저 점검 31개 통과: 삭제 0개 설정 진입, 독립 페이지와 빈 목록, 삭제 목록·메모 표시, 설정/지도 복귀, 전체 목록 요청을 보류한 상태에서 복구 장소 즉시 표시, 직접 URL·새로고침·인증 복귀 주소, 의미 있는 화면·가로 넘침·브라우저 오류 없음.
 - QA 임시 스크립트와 화면 캡처는 저장소 밖 `trash-page-qa.cjs`, `trash-page-results.json`, `mobile-trash-empty-page.png`, `mobile-trash-separate-page.png`, `mobile-restored-before-refresh.png` 등에 보관했다. 실제 운영 장소는 QA를 위해 수정하지 않았다. iPhone PWA 실기기 확인은 별도로 남는다.
+
+
+## 추가 운영 반영: 축소 지도 단일 장소 집계핀
+
+- 메인 지도에서 집계 표시 기준을 장소 수가 아니라 현재 확대 단계로 통일했다. 카카오 레벨 4 이상에서는 그룹에 1개만 있어도 숫자 핀을 사용하며, 권역 정보가 없거나 조회 중인 장소도 상호명 이름표를 표시하지 않는다. 레벨 3 이하에서는 기존 상호명 핀으로 전환하고 상세 위치 미리보기는 유지한다.
+- 관련 집계·권역 테스트 36개, 운영 빌드 통과. Browser 플러그인이 제공되지 않아 기존 Playwright/Chrome와 합성 DB·지도 SDK로 `http://localhost:43100`을 검증했다. 모바일 390×844·데스크톱 1440×900에서 총수 4개를 2·1·1로 표시, 상호명 핀 잔류 없음, 레벨 4 경계, 단일 숫자 핀 클릭 시 확대·상호명 전환, 다시 축소 시 숫자 복귀, 상세 미리보기, 가로 넘침과 브라우저/DB 오류 없음을 포함해 22개 점검을 통과했다. 실제 지도 타일·실기기는 이번 모의 브라우저 검증 범위에 포함하지 않는다.
+- 배포 `dpl_DpmSMGHhn3Pc3yoxLM3QY9VZy5Kq`는 `READY`, `production`이며 `https://insta-date-map.vercel.app`에 연결했다. 운영 PIN 입장 화면 HTTP 200과 제목을 확인했다. DB 변경은 없다.

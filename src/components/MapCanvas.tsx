@@ -198,11 +198,13 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     el.current!.parentElement!.append(measure);
     const sizes = new Map([...buttons].map(([id, button]) => [id, { width: button.offsetWidth, height: button.offsetHeight }]));
     measure.remove();
+    const displayLevel = interactive ? map.current.getLevel() : 0;
     const groups = clusterPlaces(places, (p) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng)), {
-      level: interactive ? map.current.getLevel() : 0, region: (p) => regions.get(p), size: (p) => sizes.get(p.id)!,
+      level: displayLevel, region: (p) => regions.get(p), size: (p) => sizes.get(p.id)!,
     });
     markers.current = groups.map((group) => {
-      if (group.places.length > 1) {
+      // Keep zoomed-out markers compact even for a single or not-yet-resolved place.
+      if (displayLevel >= CLUSTER_MIN_LEVEL) {
         const button = clusterButton(group.places.length, group.visited, group.region);
         const point = projection.coordsFromContainerPoint(new k.Point(group.x, group.y));
         const ids = group.places.map((place) => place.id);
