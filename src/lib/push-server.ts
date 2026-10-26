@@ -9,9 +9,10 @@ export function pushConfiguration() {
   if (!publicKey || !privateKey || !subject) return null;
   try { webpush.setVapidDetails(subject, publicKey, privateKey); return { publicKey, privateKey, subject }; } catch { return null; }
 }
-interface Delivery { event_id: string; subscription_id: string; lease: string; endpoint: string; p256dh: string; auth: string; added_by: string; place_id: string; place_name: string }
-export function placeNotification(job: Pick<Delivery, "event_id" | "added_by" | "place_id" | "place_name">) {
-  return { title: `${job.added_by}님이 새 장소를 담았어요`, body: job.place_name.slice(0, 160), tag: `place-${job.event_id}`,
+interface Delivery { event_id: string; subscription_id: string; lease: string; endpoint: string; p256dh: string; auth: string; added_by: string; place_id: string; place_name: string; event_kind?: "place_added" | "memo_added" | "memo_updated" }
+export function placeNotification(job: Pick<Delivery, "event_id" | "added_by" | "place_id" | "place_name" | "event_kind">) {
+  const action = job.event_kind === "memo_added" ? "메모를 남겼어요" : job.event_kind === "memo_updated" ? "메모를 바꿨어요" : "새 장소를 담았어요";
+  return { title: `${job.added_by}님이 ${action}`, body: job.place_name.slice(0, 160), tag: `place-${job.event_id}`,
     url: `/?place=${encodeURIComponent(job.place_id)}`, icon: "/icons/canvas-heart-192.png" };
 }
 async function sendDelivery(job: Delivery, config: NonNullable<ReturnType<typeof pushConfiguration>>) {

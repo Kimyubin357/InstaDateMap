@@ -1,4 +1,5 @@
 import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
+import { schedulePlacePushes } from "@/lib/push-server";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export async function PATCH(req: Request, { params: route }: { params: Promise<{
     if (error) return Response.json({ message: error.message }, { status: 400 });
     if (!data || data.code === "PLACE_NOT_FOUND") return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (data.code === "MEMO_CONFLICT") return Response.json({ ...data, message: "메모가 먼저 바뀌었어요. 두 내용을 확인하고 저장해 주세요." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    if (data.memo_changed) schedulePlacePushes(board.id);
     return Response.json({ ok: true, ...(body.memo !== undefined ? { memo_version: data.memo_version } : {}) }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);

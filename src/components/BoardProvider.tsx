@@ -1,6 +1,6 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BoardStore, EMPTY_BOARD_STATE } from "@/lib/board-store";
 import { connectBoardSync } from "@/lib/sync-connection";
 import { accessSender, announceAccess, type AccessMessage } from "@/lib/board-events";
@@ -8,6 +8,7 @@ import { cacheScope, type SyncAccess } from "@/lib/sync-types";
 import MapApp from "@/app/MapApp";
 import SearchApp from "./SearchApp";
 import useKeyboardViewport from "./useKeyboardViewport";
+import EnterForm from "@/app/enter/EnterForm";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
 import TrashPlaces from "./TrashPlaces";
@@ -26,7 +27,12 @@ export function useBoardState() { const { store } = useBoardSync(); return useSy
 export default function BoardProvider({ children }: { children: ReactNode }) {
   const [store] = useState(() => new BoardStore()); const [suspended, setSuspended] = useState(false);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE);
-  const pathname = usePathname();
+  const pathname = usePathname(); const router = useRouter();
+  const [lockScreen, setLockScreen] = useState<string | null>(null);
+  const locking = useRef(false);
+  useEffect(() => {
+    if (pathname === "/enter") { setLockScreen(null); locking.current = false; setSuspended(false); }
+  }, [pathname]);
   const viewport = useKeyboardViewport();
   const onMap = pathname === "/" || pathname === "/search";
   useEffect(() => {
@@ -45,7 +51,18 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };
   const resume = () => { setSuspended(false); store.resume(); };
-  const lock = async () => { setNotice(null); setToast(null); suspend(); await store.forget(); try { sessionStorage.removeItem("datemap-view"); } catch {} announceAccess("locked"); window.location.replace(`/enter?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
+  const lock = async (broadcast = true) => {
+    if (locking.current) return;
+    locking.current = true;
+    const next = window.location.pathname === "/enter" ? "/" : window.location.pathname + window.location.search;
+    // Cover the old route before clearing access, so its MapEntry cannot flash during navigation.
+    setLockScreen(next); setNotice(null); setToast(null); suspend();
+    const forgotten = store.forget();
+    try { sessionStorage.removeItem("datemap-view"); } catch {}
+    if (broadcast) announceAccess("locked");
+    router.replace(`/enter?next=${encodeURIComponent(next)}`);
+    await forgotten;
+  };
   const resetAccess = async (broadcast = true) => {
     setNotice(null); setToast(null);
     suspend(); await store.forget({ keepShell: true }); if (broadcast) announceAccess("changed");
@@ -75,7 +92,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     const receive = (event: { type?: AccessMessage; nonce?: number; sender?: string }) => {
       if (event?.sender === accessSender || typeof event?.nonce !== "number" || seen.has(event.nonce)) return;
       seen.add(event.nonce); if (seen.size > 20) seen.delete(seen.values().next().value!);
-      if (event.type === "locked") { store.suspend(); void store.forget().then(() => { if (window.location.pathname !== "/enter") window.location.replace("/enter"); }); } else if (event.type === "changed") void resetAccess(false);
+      if (event.type === "locked") { if (window.location.pathname !== "/enter") void lock(false); } else if (event.type === "changed") void resetAccess(false);
     };
     let channel: BroadcastChannel | undefined;
     try { channel = new BroadcastChannel("datemap-access"); channel.onmessage = (e) => receive(e.data); } catch {}
@@ -84,6 +101,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
   return <Context.Provider value={{ store, homeHref, suspended, suspend, resume, resetAccess, lock, notify }}>
+    {lockScreen !== null ? <EnterForm configured next={lockScreen} disabled /> : <>
     {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
       <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
@@ -92,7 +110,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       <Feedback toast={toast} onDismiss={dismissToast} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
     </>}
-    {children}
+    {children}</> }
   </Context.Provider>;
 }
 export function MapEntry({ access }: { access: SyncAccess }) {

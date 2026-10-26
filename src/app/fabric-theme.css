@@ -261,3 +261,18 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
   .entry-page .entry-art{margin-top:16px;height:160px;margin-bottom:14px}
   .choose-page .entry-art{height:150px}
 }
+
+/* New registrations keep their badge for 24 hours, across map/card/list. */
+.new-place-badge{display:inline-flex;align-items:center;vertical-align:middle;background:var(--forest);color:var(--cream,#fff9e9);border:1px dashed #fff9e980;border-radius:7px;padding:1px 6px;font-size:12px;line-height:1.5;letter-spacing:.04em;white-space:nowrap}
+.pin .new-place-badge{font-size:10px;margin-left:4px}
+.card-badges{display:flex;align-items:center;gap:7px;margin-bottom:2px}
+.card-badges .status-tag{font-size:11px;line-height:19px;border-radius:20px;padding:1px 9px}
+/* Focus changes layout immediately, before the keyboard finishes animating. */
+@media(max-width:759px){
+  .entry-page.is-pin-editing{position:fixed;inset-inline:0;top:var(--entry-top,0px);height:var(--entry-height,100dvh);min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-top:calc(var(--safe-t) + 12px);padding-bottom:20px}
+  .entry-page.is-pin-editing .wordmark{font-size:28px}
+  .entry-page.is-pin-editing .entry-art{height:64px;margin:10px 0}
+  .entry-page.is-pin-editing .pin-field>label{margin-bottom:8px}
+  .entry-page.is-pin-editing .remember{margin:6px 0 14px}
+  .entry-page.is-pin-editing .btn.large{height:52px;min-height:52px}
+}

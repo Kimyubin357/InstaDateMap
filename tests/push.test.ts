@@ -64,6 +64,9 @@ describe("장소 알림 발송", () => {
     expect(placeNotification(job)).toMatchObject({ title: "수민님이 새 장소를 담았어요", body: "새 카페", url: "/?place=place1", tag: "place-event1" });
     expect(JSON.stringify(placeNotification(job))).not.toContain("session");
   });
+  it.each([['memo_added', '메모를 남겼어요'], ['memo_updated', '메모를 바꿨어요']] as const)("메모 알림 %s은 본문 없이 장소명과 상세 링크만 포함", (event_kind, action) => {
+    expect(placeNotification({ ...job, event_kind })).toMatchObject({ title: `수민님이 ${action}`, body: "새 카페", url: "/?place=place1" });
+  });
   it("실제 Web Push 라이브러리가 VAPID 서명과 암호화된 payload를 생성함", () => {
     const details = webpush.generateRequestDetails({ endpoint, keys: sub.keys }, JSON.stringify(placeNotification(job)), {
       vapidDetails: { publicKey: keys.publicKey, privateKey: keys.privateKey, subject: "mailto:test@example.com" }, TTL: 86400,

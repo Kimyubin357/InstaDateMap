@@ -8,7 +8,7 @@ import { animateMapCenter } from "@/lib/map-motion";
 import { CLUSTER_MIN_LEVEL, clusterPlaces } from "@/lib/map-clusters";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
 export interface MapPosition { lat: number; lng: number; level: number }
-export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean };
+export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number };
 declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: () => void } } } }
 
 function clusterButton(total: number, visited: number, region: string | null) {
@@ -28,12 +28,17 @@ function clusterButton(total: number, visited: number, region: string | null) {
   return button;
 }
 
-function placeButton(p: PlaceView, interactive: boolean) {
+function placeButton(p: PlaceView, interactive: boolean, isNew = false) {
   const button = document.createElement("button"); button.type = "button"; button.className = `pin ${p.status}`;
   button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}`);
   button.id = `${interactive ? "map" : "preview"}-place-${p.id}`;
   const dot = document.createElement("i"); dot.className = "mark";
   const label = document.createElement("span"); label.textContent = p.name; button.append(dot, label);
+  if (isNew) {
+    const badge = document.createElement("span"); badge.className = "new-place-badge"; badge.textContent = "NEW";
+    badge.setAttribute("aria-hidden", "true"); button.append(badge);
+    button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}, 새로 등록한 장소`);
+  }
   if (!interactive) { button.tabIndex = -1; button.setAttribute("aria-hidden", "true"); }
   return button;
 }
@@ -49,13 +54,13 @@ function lookupRegion(services: any, point: RegionPoint) {
   });
 }
 
-export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList }: {
+export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
   viewRequest: MapViewRequest | null;
   onBlank?: () => void; interactive?: boolean;
   focusPadding?: () => { top: number; bottom: number } | null;
-  onShowList?: () => void;
+  onShowList?: () => void; newPlaceIds?: ReadonlySet<string>;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
   const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
@@ -190,7 +195,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     const previousFocus = pendingMarkerFocus.current || markers.current.find((marker) => marker.button === document.activeElement)?.ids;
     markers.current.forEach((m) => m.overlay.setMap(null));
     const projection = map.current.getProjection();
-    const buttons = new Map(places.map((p) => [p.id, placeButton(p, interactive)]));
+    const buttons = new Map(places.map((p) => [p.id, placeButton(p, interactive, newPlaceIds?.has(p.id))]));
     // Batch layout reads: use the actual font/nameplate dimensions, not an 80px radius.
     const measure = document.createElement("div");
     measure.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;visibility:hidden;pointer-events:none";
@@ -227,7 +232,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     });
     if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
     pendingMarkerFocus.current = undefined;
-  }, [places, ready, level, interactive, regions, regionVersion]);
+  }, [places, ready, level, interactive, regions, regionVersion, newPlaceIds]);
   useEffect(() => {
     for (const marker of markers.current) {
       const selected = marker.ids.includes(selectedId || "");
@@ -274,16 +279,17 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     else {
       const k = window.kakao.maps;
       framedPlace.current = viewRequest;
+      const targetLevel = viewRequest.level ?? 4;
       if (viewRequest.smooth) {
         const center = map.current.getCenter();
-        if (map.current.getLevel() > 4) map.current.setLevel(4);
+        if (map.current.getLevel() > targetLevel) map.current.setLevel(targetLevel);
         const destination = placeCenter(viewRequest), target = { lat: destination.getLat(), lng: destination.getLng() };
         moving.current = true;
         cancelMotion.current = animateMapCenter({ lat: center.getLat(), lng: center.getLng() }, target, (point) => {
           map.current.setCenter(new k.LatLng(point.lat, point.lng));
           if (point === target) { moving.current = false; rememberPosition(); }
         }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 440);
-      } else { map.current.setLevel(4); map.current.setCenter(placeCenter(viewRequest)); rememberPosition(); }
+      } else { map.current.setLevel(targetLevel); map.current.setCenter(placeCenter(viewRequest)); rememberPosition(); }
     }
   }, [ready, active, viewRequest, places]);
   return <><div ref={el} className="map-canvas" aria-label={interactive ? "저장한 장소 지도" : "장소 위치 미리보기"} />{error && <div className={`map-recovery${interactive ? "" : " map-recovery-preview"}`} aria-busy={loading}>

@@ -56,7 +56,7 @@ export default function PushSettings() {
       }
       if (!subscription) { subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: serverKey(config.publicKey) }); created = subscription; }
       await requestJson("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(subscription.toJSON()), signal: AbortSignal.timeout(12000) });
-      setSubscribed(true); setHint(""); notify("상대방이 담은 새 장소를 알려드릴게요.");
+      setSubscribed(true); setHint(""); notify("상대방의 새 장소와 메모 소식을 알려드릴게요.");
     } catch (e) { await created?.unsubscribe().catch(() => {}); notify(e instanceof Error ? e.message : "알림을 켜지 못했어요. 다시 시도해 주세요.", "error"); }
     finally { setBusy(false); }
   }
@@ -74,7 +74,7 @@ export default function PushSettings() {
     finally { setBusy(false); }
   }
   return <section className="settings-section push-settings" aria-busy={busy || checking}>
-    <h2><Icon name="bell" /> 새 장소 알림</h2><p className="lead">상대방이 우리 지도에 장소를 담으면 알려드려요.</p>
+    <h2><Icon name="bell" /> 우리 지도 알림</h2><p className="lead">상대방이 장소를 담거나 메모를 추가·수정하면 알려드려요.</p>
     {checking ? <p className="hint" role="status">알림 설정을 확인하고 있어요…</p> : <>
       <p className="hint" role="status">{hint || (subscribed ? "이 기기에서 알림을 받고 있어요." : "이 기기의 알림이 꺼져 있어요.")}</p>
       {registration && config?.configured && <button className={`btn${subscribed ? "" : " primary"}`} disabled={busy} onClick={subscribed ? disable : enable}>

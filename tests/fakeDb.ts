@@ -71,9 +71,10 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       const row = tables.places?.find((r) => r.id === p.p_id && r.board_id === p.p_board);
       if (!row || row.deleted_at) return { data: { code: "PLACE_NOT_FOUND" }, error: null };
       if ("memo" in p.p_patch && p.p_expected !== (row.memo_version ?? 0)) return { data: { code: "MEMO_CONFLICT", memo: row.memo || "", memo_version: row.memo_version ?? 0, memo_updated_by: row.memo_updated_by }, error: null };
+      const memo_changed = "memo" in p.p_patch && (row.memo || "") !== (p.p_patch.memo || "");
       const patch = { ...p.p_patch, ...("memo" in p.p_patch ? { memo_version: (row.memo_version ?? 0) + 1, memo_updated_by: p.p_who } : {}) };
       check(await new Q("places").update(patch).eq("id", row.id));
-      return { data: { ok: true, memo_version: row.memo_version ?? 0 }, error: null };
+      return { data: { ok: true, memo_version: row.memo_version ?? 0, memo_changed }, error: null };
     }
     if (name === "dm_recover_sources") {
       for (const r of tables.sources ?? []) if (r.board_id === p.p_board && r.status === "processing" && new Date(r.work_until || new Date(r.shared_at).getTime() + 90000).getTime() <= Date.now()) Object.assign(r, { status: "needs_review", recovery_reason: "interrupted", work_owner: null, work_until: null, analysis_version: `v${++seq}` });

@@ -3,6 +3,8 @@ import { fakeDb, failNext, reset, tables } from "./fakeDb";
 import { tokenHash } from "@/lib/pin";
 
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
+vi.mock("@/lib/push-server", () => ({ schedulePlacePushes: vi.fn() }));
+import { schedulePlacePushes } from "@/lib/push-server";
 import { DELETE, GET, PATCH } from "@/app/api/places/[id]/route";
 
 const params = (id = "p1") => ({ params: Promise.resolve({ id }) });
@@ -16,7 +18,7 @@ const readRequest = (authenticated = true) => new Request("http://localhost/api/
 });
 
 beforeEach(() => {
-  reset();
+  reset(); vi.clearAllMocks();
   tables.boards = [{ id: "b1", name: "지도", member_names: ["유빈", "수민"], auth_version: 1 }];
   tables.access_sessions = [{ token_hash: tokenHash("a".repeat(64)), board_id: "b1", purpose: "member", member_name: "유빈", auth_version: 1, expires_at: "2030-01-01" }];
   tables.places = [
@@ -105,3 +107,16 @@ describe("응답 유실 뒤 장소 최신 내용 확인", () => {
     expect(tables.places).toHaveLength(2);
   });
 });
+
+ it("성공한 메모 변경 직후에만 발송을 예약", async () => {
+   await PATCH(request({ memo: "새 메모" }), params());
+   expect(schedulePlacePushes).toHaveBeenCalledTimes(1);
+   expect(schedulePlacePushes).toHaveBeenCalledWith("b1");
+   vi.mocked(schedulePlacePushes).mockClear();
+   await PATCH(request({ memo: "새 메모", memo_version: 1 }), params());
+   await PATCH(request({ memo: "충돌", memo_version: 0 }), params());
+   await PATCH(request({ status: "visited" }), params());
+   failNext("places", "update");
+   await PATCH(request({ memo: "실패", memo_version: 2 }), params());
+   expect(schedulePlacePushes).not.toHaveBeenCalled();
+ });

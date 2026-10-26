@@ -4,8 +4,8 @@ import Icon from "./Icon";
 import { STATUS_LABEL } from "@/lib/types";
 import { placeMeta, type PlaceView } from "@/lib/place-view";
 
-export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, onDismiss }: {
-  places: PlaceView[]; selectedId: string; onSelect: (id: string) => void; onOpen: (id: string) => void; onDismiss: () => void;
+export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, onDismiss, newPlaceIds }: {
+  newPlaceIds?: ReadonlySet<string>; places: PlaceView[]; selectedId: string; onSelect: (id: string) => void; onOpen: (id: string) => void; onDismiss: () => void;
 }) {
   const rail = useRef<HTMLDivElement>(null);
   const settledId = useRef<string | undefined>(undefined); const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -57,7 +57,7 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
       onClickCapture={(event) => { if (gesture.current?.moved && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); } }}>
       {places.map((place, i) => <article key={place.id} data-place-id={place.id} className={`place-card${place.id === selectedId ? " is-selected" : ""}`} aria-roledescription="슬라이드" aria-label={`${i + 1} / ${places.length}`}>
         <button className="place-card-main" tabIndex={place.id === selectedId ? 0 : -1} aria-label={`${place.name} 상세 보기`} aria-current={place.id === selectedId ? "true" : undefined} onClick={() => onOpen(place.id)}>
-        <span className={`status-tag ${place.status}`}>{STATUS_LABEL[place.status]}</span>
+        <span className="card-badges"><span className={`status-tag ${place.status}`}>{STATUS_LABEL[place.status]}</span>{newPlaceIds?.has(place.id) && <span className="new-place-badge" aria-label="새로 등록한 장소">NEW</span>}</span>
         <strong>{place.name}</strong><span className="card-meta">{placeMeta(place) || place.address || "저장한 장소"}</span>
         {place.memo && <span className="card-memo">{place.memo}</span>}
         <span className="card-bottom"><span className="card-sharer"><Icon name="user" width="13" />{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "우리의 장소"}</span><span className="card-count">{i + 1} / {places.length}</span></span>
