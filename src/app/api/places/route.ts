@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       db().from("place_saves").select("place_id, added_by, added_at").eq("board_id", board.id),
     ]);
     const error = [placeResult, linkResult, pendingResult, saveResult].find((r) => r.error)?.error;
-    if (error) throw new Error("장소를 불러오지 못했어요. 데이터베이스 연결을 확인해 주세요.");
+    if (error) { console.error("GET /api/places failed", error.code, error.message); throw new Error("장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."); }
     const { data: places } = placeResult;
     const { data: links } = linkResult;
     const { data: pending } = pendingResult;

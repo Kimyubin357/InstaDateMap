@@ -263,3 +263,13 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 .pending-row .pending-link-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pending-summary { padding: 12px; font-size: 14px; line-height: 1.55; margin-bottom: 8px; }
+
+/* Wide landscape: settings and filters sit in the top-right corner, mirroring the bottom-right map buttons;
+   the list tab uses the same corner for +. First step of the landscape redesign tracked in AGENTS.md. */
+@media(min-width:760px) and (orientation:landscape){
+  :root{--corner-right:calc(28px + env(safe-area-inset-right,0px))}
+  .unified-search-header{left:calc(var(--search-edge) + env(safe-area-inset-left,0px));width:calc(var(--search-width) - 58px)}
+  .is-search-idle .floating-settings.icon-btn{position:fixed;top:var(--search-top);right:calc(var(--corner-right) + 4px)}
+  .floating-filters{left:auto;right:calc(var(--corner-right) + 4px)}
+  .map-controls,.view-list .map-controls{right:var(--corner-right);bottom:28px}
+}

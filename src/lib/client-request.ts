@@ -4,6 +4,13 @@ export class RequestError extends Error { constructor(message: string, public st
 export class RequestTimeoutError extends Error { constructor() { super("응답이 늦어지고 있어요. 연결을 확인하고 다시 시도해 주세요."); } }
 export class ConnectionError extends Error { constructor(message = "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요.") { super(message); } }
 export const uncertainResponse = (e: unknown) => e instanceof RequestTimeoutError || e instanceof ConnectionError;
+/** Show our own Korean messages; browser/API errors (English DOMException, TypeError…) become a friendly fallback. */
+export function friendlyMessage(e: unknown, fallback: string) {
+  if (e instanceof DOMException && e.name === "TimeoutError") return new RequestTimeoutError().message;
+  if (e instanceof Error && !(e instanceof DOMException) && /[가-힣]/.test(e.message)) return e.message;
+  if (typeof console !== "undefined") console.warn(fallback, e);
+  return fallback;
+}
 
 /** The deadline covers headers AND body consumption; even a stalled fetch implementation settles. */
 export async function withRequestDeadline<T>(task: (signal: AbortSignal) => Promise<T>, options: { signal?: AbortSignal | null; timeoutMs?: number } = {}): Promise<T> {

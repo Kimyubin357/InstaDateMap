@@ -10,8 +10,11 @@ export async function defaultBoard() {
   let query = db().from("boards").select("id, name, pin_hash, member_names, auth_version");
   if (process.env.APP_BOARD_ID) query = query.eq("id", process.env.APP_BOARD_ID);
   const { data, error } = await query.order("created_at").limit(2);
-  if (error) throw new Error("보드 설정을 읽지 못했어요. 데이터베이스 업데이트와 연결을 확인해 주세요.");
-  if (!data?.length || data.length > 1) throw new Error("사용할 보드를 APP_BOARD_ID로 지정해 주세요.");
+  if (error) { console.error("defaultBoard: board query failed", error.code, error.message); throw new Error("지도 정보를 읽지 못했어요. 잠시 후 다시 시도해 주세요."); }
+  if (!data?.length || data.length > 1) {
+    console.error(`defaultBoard: expected exactly one board, found ${data?.length ?? 0}. Set APP_BOARD_ID.`);
+    throw new Error("지금은 지도를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+  }
   return data[0];
 }
 export async function setupSession(req: Request) {

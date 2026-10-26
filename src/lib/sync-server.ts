@@ -6,6 +6,9 @@ export function syncAccess(board: Board): SyncAccess {
 }
 export async function boardRevision(boardId: string): Promise<string> {
   const { data, error } = await db().rpc("dm_board_revision", { p_board: boardId });
-  if (error || typeof data !== "string" || !/^\d+$/.test(data)) throw new Error("변경 내용을 확인하지 못했어요. 데이터베이스 업데이트와 연결을 확인해 주세요.");
+  if (error || typeof data !== "string" || !/^\d+$/.test(data)) {
+    console.error("boardRevision failed", error?.code, error?.message ?? typeof data);
+    throw new Error("변경 내용을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
+  }
   return data;
 }

@@ -5,7 +5,7 @@ export const ANALYSIS_MESSAGES = {
   gemini_free_quota: "Gemini 무료 분석 사용 한도에 걸렸어요. 잠시 후 다시 시도하거나 장소를 직접 검색해 주세요.",
   gemini_rate_limit: "Gemini 분석 요청이 잠시 몰려 제한됐어요. 잠시 후 다시 시도하거나 장소를 직접 검색해 주세요.",
   gemini_quota: "Gemini 분석 사용 한도에 걸렸어요. 정확한 제한 종류는 확인되지 않았어요. 나중에 다시 시도하거나 장소를 직접 검색해 주세요.",
-  gemini_auth: "Gemini 분석 서비스의 API 키나 접근 설정을 확인해야 해요. 지금은 장소를 직접 검색해 저장할 수 있어요.",
+  gemini_auth: "지금은 AI 장소 분석을 사용할 수 없어요. 장소를 직접 검색해 저장할 수 있어요.",
   gemini_unavailable: "Gemini 분석 서비스가 일시적으로 응답하지 못했어요. 잠시 후 다시 시도하거나 장소를 직접 검색해 주세요.",
 } as const;
 export type AnalysisIssue = keyof typeof ANALYSIS_MESSAGES;

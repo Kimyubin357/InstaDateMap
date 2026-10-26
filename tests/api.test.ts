@@ -40,7 +40,9 @@ describe("공유 HTTP API", () => {
     failNext("boards", "select");
     const res = await POST(request({ url: "https://www.instagram.com/p/ABC/" }));
     expect(res.status).toBe(500);
-    expect((await res.json()).message).toContain("데이터베이스");
+    const { message } = await res.json();
+    expect(message).toContain("잠시 후 다시 시도");
+    expect(message).not.toContain("데이터베이스");
   });
   it("연결 기록 저장 실패는 재시도 주소와 실패 상태를 반환", async () => {
     failNext("source_places", "upsert");

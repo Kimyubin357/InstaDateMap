@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
-import { requestJson } from "@/lib/client-request";
+import { friendlyMessage, requestJson } from "@/lib/client-request";
 import { useBoardSync, useBoardState } from "./BoardProvider";
 type Config = { configured: boolean; publicKey?: string; subscribed: boolean };
 function serverKey(value: string) {
@@ -36,7 +36,7 @@ export default function PushSettings() {
         if (!alive) return;
         setRegistration(ready); setSubscribed(!!subscription && value.subscribed && Notification.permission === "granted");
         if (Notification.permission === "denied") setHint("기기 설정에서 데이트맵 알림을 허용한 뒤 다시 확인해 주세요.");
-      } catch (e) { if (alive) setHint(e instanceof Error ? e.message : "알림 설정을 확인하지 못했어요."); }
+      } catch (e) { if (alive) setHint(friendlyMessage(e, "알림 설정을 확인하지 못했어요. 다시 확인해 주세요.")); }
       finally { clearTimeout(timer); if (alive) setChecking(false); }
     }
     void prepare();
@@ -57,7 +57,7 @@ export default function PushSettings() {
       if (!subscription) { subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: serverKey(config.publicKey) }); created = subscription; }
       await requestJson("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(subscription.toJSON()), signal: AbortSignal.timeout(12000) });
       setSubscribed(true); setHint(""); notify("상대방의 새 장소와 메모 소식을 알려드릴게요.");
-    } catch (e) { await created?.unsubscribe().catch(() => {}); notify(e instanceof Error ? e.message : "알림을 켜지 못했어요. 다시 시도해 주세요.", "error"); }
+    } catch (e) { await created?.unsubscribe().catch(() => {}); notify(e instanceof DOMException && e.name === "NotAllowedError" ? "기기 설정에서 데이트맵 알림을 허용해 주세요." : friendlyMessage(e, "알림을 켜지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { setBusy(false); }
   }
   async function disable() {
@@ -70,7 +70,7 @@ export default function PushSettings() {
         await subscription.unsubscribe().catch(() => {});
       }
       setSubscribed(false); notify("이 기기의 장소 알림을 껐어요.");
-    } catch (e) { notify(e instanceof Error ? e.message : "알림을 끄지 못했어요.", "error"); }
+    } catch (e) { notify(friendlyMessage(e, "알림을 끄지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { setBusy(false); }
   }
   return <section className="settings-section push-settings" aria-busy={busy || checking}>
