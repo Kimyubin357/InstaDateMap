@@ -108,7 +108,10 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state.access, store]);
   useEffect(() => {
-    if (["/enter", "/setup"].includes(pathname)) void store.forget();
+    if (["/enter", "/setup"].includes(pathname)) {
+      accessRequest.current?.abort(); accessRequest.current = null; accessFlight.current = null;
+      setAccessError(""); setCheckingAccess(false); void store.forget();
+    }
   }, [pathname, store]);
   useEffect(() => {
     const change = () => store.invalidate();
