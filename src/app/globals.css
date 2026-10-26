@@ -278,3 +278,7 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
   .map-controls,.view-list .map-controls,.has-place-card .map-controls{right:var(--corner-right);bottom:var(--edge-bottom)}
   .bottom-nav{left:75%}
 }
+
+/* Place sheet: close button in the top-right corner; sheets opened from the map have no mini map, so the title makes room for it. */
+.sheet-place .sheet-heading-actions .sheet-close-btn{width:32px;height:32px;color:var(--ink)} /* Naver Map's sheet close: 32px circle, 11px glyph */
+.sheet-place.no-map-preview .detail-title{margin-top:6px;padding-right:52px}

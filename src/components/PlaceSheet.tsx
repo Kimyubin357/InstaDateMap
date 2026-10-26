@@ -13,7 +13,8 @@ import { useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
 const ignore = () => {};
-export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
+/** `mapPreview`: only sheets opened from the list show the mini map and "지도에서 보기"; on the map the place is already visible. */
+export default function PlaceSheet({ place, kakaoKey, mapPreview = true, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; mapPreview?: boolean; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
   const { notify, store, lock } = useBoardSync();
   const copy = placeCopyContent(place);
   const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());
@@ -106,11 +107,13 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     catch (e) { if (e instanceof RequestError && [401, 409].includes(e.status)) { void lock(); return; } setError(e instanceof Error ? e.message : "삭제하지 못했어요. 다시 시도해 주세요."); }
     finally { deleteRequest.current = false; setBusy(false); }
   }
-  return <><Modal title={place.name} className="sheet-place" initialStop={1} dragFromContent onClose={busy || deleting || leaving ? () => {} : () => requestLeave("close")}
+  const closeSheet = busy || deleting || leaving ? () => {} : () => requestLeave("close");
+  return <><Modal title={place.name} className={`sheet-place${mapPreview ? "" : " no-map-preview"}`} initialStop={1} dragFromContent onClose={closeSheet}
+    headerActions={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="22" /></button>}
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}>
-    <div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>
+    {mapPreview && <div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
     <div className="detail-title"><h2>{place.name}</h2><span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span></div><p className="addr">{place.address}</p>
     <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>함께 가볼 곳</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] || "우리"}</strong><span>발견한 사람</span></div></div>
     <div className="detail-section-heading"><span className="section-label">우리에게 어떤 곳인가요?</span></div>
