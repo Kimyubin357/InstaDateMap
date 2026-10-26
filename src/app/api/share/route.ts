@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
+import { boardFromRequest, unauthorized, requireIdentity, accessError, publicMessage } from "@/lib/auth";
 import { workOwner } from "@/lib/source-work";
 import { ingestShare } from "@/lib/pipeline";
 import { withSavedPlace } from "@/lib/saved-place-server";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       const stream = new ReadableStream({ async start(controller) {
         const send = (data: unknown) => { try { controller.enqueue(encoder.encode(JSON.stringify(data) + "\n")); } catch { /* client left; finish the idempotent save */ } };
         try { send({ type: "result", result: await withSavedPlace(board, await ingestShare({ ...input, onProgress: (stage) => send({ type: "progress", stage }) })) }); }
-        catch (e) { send({ type: "result", result: { status: "error", message: e instanceof Error ? e.message : "저장하지 못했어요." } }); }
+        catch (e) { send({ type: "result", result: { status: "error", message: publicMessage(e, "저장하지 못했어요. 잠시 후 다시 시도해 주세요.") } }); }
         finally { try { controller.close(); } catch {} }
       } });
       return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });

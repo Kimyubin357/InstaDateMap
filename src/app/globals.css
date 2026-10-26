@@ -234,6 +234,8 @@ body:has(.modal-root) .global-feedback>.sync-notice{display:none}
 .settings-row[aria-expanded] svg:last-child{transition:rotate .18s ease}.settings-row[aria-expanded=true] svg:last-child{rotate:90deg}
 .category-icon.category-cup{background:#ffe7de;color:#794a3a}.category-icon.category-tree{background:#e5f1e8;color:#3c6b47}.category-icon.category-culture{background:#ece8f7;color:#625081}.category-icon.category-bed{background:#e5edf8;color:#405d86}.category-icon.category-bag{background:#fce5ef;color:#874865}.category-icon.category-activity{background:#ddf1ef;color:#326c66}.category-icon.category-pin{background:#edeae7;color:#665c55}
 @media(min-width:760px){.global-feedback,.global-feedback.is-map,body:has(.modal-root) .global-feedback{left:50%;right:auto;transform:translateX(-50%);width:480px}body:has(.persistent-map:not(.is-away) .has-place-card) .global-feedback.is-map{bottom:calc(var(--map-bottom) + 188px)}}
+/* Short phones lay the map buttons out in a row above the card (+176px, up to 48px tall); keep feedback above them. */
+@media(max-height:699px) and (max-width:759px){body:has(.persistent-map:not(.is-away) .has-place-card) .global-feedback.is-map{bottom:calc(var(--map-bottom) + 232px)}}
 body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global-feedback.is-map{bottom:calc(var(--safe-b) + 88px)}
 
 .memo-conflict { margin: 16px 0 12px; padding: 14px; border: 1px solid var(--line, #cbbfad); border-radius: 12px; background: var(--paper, #fffaf1); }

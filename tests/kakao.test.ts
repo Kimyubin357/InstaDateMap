@@ -60,7 +60,7 @@ describe("카카오 후보 고르기", () => {
   });
 
   it("카카오 인증 실패를 검색 결과 없음으로 숨기지 않음", async () => {
-    await expect(keywordSearch("카페", (async () => new Response("{}", { status: 401 })) as typeof fetch)).rejects.toThrow("401");
+    await expect(keywordSearch("카페", (async () => new Response("{}", { status: 401 })) as typeof fetch)).rejects.toThrow("카카오 장소 검색에 연결하지 못했어요");
   });
   it("지점까지 맞는 곳이 1등, 이름이 전혀 다른 결과는 버림", async () => {
     const places = await resolveCandidate(

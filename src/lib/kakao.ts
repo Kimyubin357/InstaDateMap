@@ -24,7 +24,10 @@ async function kakaoGet<T>(path: string, params: Record<string, string>, fetcher
     headers: { Authorization: `KakaoAK ${env.kakaoRestKey()}` },
     signal: AbortSignal.timeout(4000),
   });
-  if (!res.ok) throw new Error(`카카오 장소 검색 실패 (${res.status}). REST API 키와 카카오맵 사용 설정을 확인해 주세요.`);
+  if (!res.ok) {
+    console.error("Kakao local API failed", res.status, path);
+    throw new Error("카카오 장소 검색에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+  }
   return (await res.json()) as T;
 }
 

@@ -12,7 +12,7 @@ export default function SetupForm({ names, next }: { names: string[]; next: stri
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
     try { const res = await requestJson<{ next: string }>("/api/access/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, confirmPin, names: [first, second], remember, next }) }); router.replace(res.next); router.refresh(); }
-    catch (e) { setError(e instanceof Error ? e.message : "설정하지 못했어요."); } finally { setBusy(false); }
+    catch (e) { setError(e instanceof Error ? e.message : "설정하지 못했어요."); setBusy(false); }
   }
   return <main className="form-page"><ClientReady><div className="wordmark small">데이트맵<span>♥</span></div><h1>우리 지도에 이름을 붙여요</h1><p className="lead">사귄 날의 여섯 자리로 둘만의 지도를 열어요.</p>
     <form onSubmit={submit} className="stack"><label className="form-label">우리가 사귀기 시작한 날<input className="field" type="date" value={date} onChange={(e) => { setDate(e.target.value); setConfirmPin(""); }} required /></label>

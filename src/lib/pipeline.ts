@@ -9,7 +9,7 @@ import { isConfident, keywordSearch, keywordSearchPage, resolveCandidate } from 
 import { validSearchPage } from "./search-page";
 import type { KakaoPlace } from "./types";
 import { checkWork, SOURCE_MESSAGES } from "./source-work";
-import { AccessError } from "./auth";
+import { AccessError, dbUserError, publicMessage } from "./auth";
 import { schedulePlacePushes } from "./push-server";
 
 export interface ShareInput {
@@ -36,8 +36,12 @@ export interface ShareResponse {
 
 const MAX_PLACES_PER_SOURCE = 8;
 
-function checkDb(error: { message: string } | null, action: string) {
-  if (error) throw new Error(`${action}: ${error.message}`);
+function checkDb(error: { message: string; code?: string } | null, action: string) {
+  if (!error) return;
+  const userError = dbUserError(error);
+  if (userError) throw userError;
+  console.error(action, error.code, error.message);
+  throw new Error(`${action}. 잠시 후 다시 시도해 주세요.`);
 }
 
 export function confirmUrl(sourceId: string) {
@@ -195,7 +199,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
     try { await finish("needs_review", null, false, e instanceof AnalysisError ? e.code : "interrupted"); }
     catch { console.warn("중단된 링크 복구 대기", { sourceId }); }
     console.error("링크 처리 실패", { sourceId, message: e instanceof Error ? e.message : String(e) });
-    return { status: "error", code: e instanceof AnalysisError ? e.code : undefined, message: e instanceof Error ? e.message : "장소 저장에 실패했어요.", source_id: sourceId, source_version: existing.analysis_version,
+    return { status: "error", code: e instanceof AnalysisError ? e.code : undefined, message: publicMessage(e, "장소 저장에 실패했어요. 잠시 후 다시 시도해 주세요."), source_id: sourceId, source_version: existing.analysis_version,
       confirm_url: confirmUrl(sourceId) };
   }
 }

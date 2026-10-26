@@ -21,8 +21,8 @@ export default function EnterForm({ configured, next, disabled = false }: { conf
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
     try { const data = await requestJson<{ next: string }>("/api/access/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, remember, next }) }); router.replace(data.next); router.refresh(); }
-    catch (e) { setError(e instanceof Error ? e.message : "다시 시도해 주세요."); setPin(""); }
-    finally { setBusy(false); }
+    // On success keep the button disabled until navigation replaces this screen.
+    catch (e) { setError(e instanceof Error ? e.message : "다시 시도해 주세요."); setPin(""); setBusy(false); }
   }
   return <main className={`entry-page${compact ? " is-pin-editing" : ""}`} style={viewport.keyboard ? { "--entry-height": `${viewport.height}px`, "--entry-top": `${viewport.top}px` } as CSSProperties : undefined}><ClientReady><div className="wordmark" role="heading" aria-level={1}>데이트맵<span aria-hidden="true">♥</span></div>
     <div className="mascot entry-art"><Image src={pinCouple} alt="서로를 안고 있는 두 캐릭터" sizes="(max-height: 740px) 160px, 240px" priority /></div>

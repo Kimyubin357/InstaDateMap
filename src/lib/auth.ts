@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { tokenHash } from "./pin";
+import { AnalysisError } from "./analysis-issue";
 
 export const SESSION_COOKIE = "datemap_session";
 export const SETUP_COOKIE = "datemap_setup";
@@ -13,8 +14,20 @@ export class AccessError extends Error {
 export function checkOrigin(req: Request) {
   if (!["GET", "HEAD"].includes(req.method) && req.headers.get("origin") !== new URL(req.url).origin) throw new AccessError("다른 사이트에서는 요청할 수 없어요.", 403);
 }
+const GENERIC_MESSAGE = "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
+/** Only messages written for users reach the client; library, DB and network errors are logged instead. */
+export function publicMessage(e: unknown, fallback = GENERIC_MESSAGE) {
+  if (e instanceof AccessError || e instanceof AnalysisError) return e.message;
+  if (e instanceof Error && e.constructor === Error && /[가-힣]/.test(e.message)) return e.message;
+  console.error("Unhandled server error", e);
+  return fallback;
+}
+/** A DB function's own `raise exception` (P0001) with a Korean message is meant for users. */
+export function dbUserError(error: { message: string; code?: string } | null) {
+  return error?.code === "P0001" && /[가-힣]/.test(error.message) ? new AccessError(error.message, 409) : null;
+}
 export function accessError(e: unknown) {
-  return Response.json({ status: "error", message: e instanceof Error ? e.message : "요청을 처리하지 못했어요." },
+  return Response.json({ status: "error", message: publicMessage(e) },
     { status: e instanceof AccessError ? e.status : 500, headers: { "Cache-Control": "no-store", ...(e instanceof AccessError && e.retryAfter ? { "Retry-After": String(e.retryAfter) } : {}) } });
 }
 export async function boardFromRequest(req: Request): Promise<Board | null> {

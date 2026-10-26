@@ -36,3 +36,20 @@ it("PIN 재인증을 위해 중단한 이전 연결의 늦은 401은 기기를 �
   store.isSuspended = () => true; resolve(new Response(null, { status: 401 }));
   await vi.advanceTimersByTimeAsync(0); expect(store.onUnauthorized).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0); stop();
 });
+it("연결 직후 바로 끊기는 스트림은 재연결 간격을 늘리고, 오래 유지된 뒤 끊기면 바로 재연결", async () => {
+  const encoder = new TextEncoder();
+  const flapping = vi.fn(async () => new Response('event: ready\ndata: {"revision":"3"}\n\nevent: unavailable\ndata: {}\n\n'));
+  const { stop } = setup(flapping as unknown as typeof fetch);
+  await vi.advanceTimersByTimeAsync(10000);
+  expect(flapping.mock.calls.length).toBeLessThanOrEqual(4); // 0s, +1s, +2s, +5s instead of every 300ms
+  stop();
+  const stable = vi.fn(async (_url: unknown, init?: RequestInit) => new Response(new ReadableStream({ start(c) {
+    c.enqueue(encoder.encode('event: ready\ndata: {"revision":"3"}\n\n'));
+    const t = setTimeout(() => c.close(), 25000);
+    init?.signal?.addEventListener("abort", () => { clearTimeout(t); c.close(); }, { once: true });
+  } })));
+  const second = setup(stable as unknown as typeof fetch);
+  await vi.advanceTimersByTimeAsync(25000); expect(stable).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(400); expect(stable).toHaveBeenCalledTimes(2);
+  second.stop();
+});

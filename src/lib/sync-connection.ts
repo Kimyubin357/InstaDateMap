@@ -15,6 +15,7 @@ export async function readSyncEvents(body: ReadableStream<Uint8Array>, receive: 
     }
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
+const STABLE_STREAM_MS = 20000;
 export function connectBoardSync(store: BoardStore) {
   let disposed = false, controller: AbortController | null = null, retry: ReturnType<typeof setTimeout> | undefined;
   let fallback: ReturnType<typeof setInterval> | undefined, failures = 0, run = 0;
@@ -23,7 +24,7 @@ export function connectBoardSync(store: BoardStore) {
   const stopFallback = () => { clearInterval(fallback); fallback = undefined; };
   const open = async () => {
     if (disposed || !visible() || controller || store.isSuspended()) return;
-    const sequence = ++run, abort = new AbortController(); controller = abort; let healthy = false;
+    const sequence = ++run, abort = new AbortController(); controller = abort; let healthy = false, readyAt = 0;
     startFallback();
     try {
       const res = await fetch("/api/sync/events", { cache: "no-store", credentials: "same-origin", signal: abort.signal });
@@ -34,7 +35,7 @@ export function connectBoardSync(store: BoardStore) {
         if (disposed || sequence !== run || abort.signal.aborted || store.isSuspended()) return;
         if (event === "expired") { abort.abort(); store.onUnauthorized(); }
         if (event === "unavailable") abort.abort();
-        if (event === "ready") { healthy = true; failures = 0; store.connected(true); stopFallback(); }
+        if (event === "ready") { healthy = true; readyAt = Date.now(); store.connected(true); stopFallback(); }
         if ((event === "ready" || event === "change") && typeof data.revision === "string" && /^\d+$/.test(data.revision)) {
           const current = store.getSnapshot().snapshot;
           if (!current || BigInt(data.revision) > BigInt(current.revision)) store.schedule();
@@ -45,7 +46,10 @@ export function connectBoardSync(store: BoardStore) {
       if (sequence === run) { controller = null; store.connected(false); }
       if (store.isSuspended()) stopFallback();
       if (!disposed && sequence === run && visible() && !store.isSuspended()) {
-        startFallback(); const delay = healthy ? 300 : [1000, 2000, 5000, 10000, 30000][Math.min(failures++, 4)];
+        // Reset the backoff only after the stream stayed up; a stream that drops right after "ready" keeps backing off.
+        const stable = healthy && Date.now() - readyAt >= STABLE_STREAM_MS;
+        if (stable) failures = 0;
+        startFallback(); const delay = stable ? 300 : [1000, 2000, 5000, 10000, 30000][Math.min(failures++, 4)];
         retry = setTimeout(() => { void open(); }, delay);
       }
     }
