@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import webpush from "web-push";
+import { after } from "next/server";
 import { fakeDb, reset, tables } from "./fakeDb";
 import { tokenHash } from "@/lib/pin";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
-vi.mock("@vercel/functions", () => ({ waitUntil: vi.fn() }));
+vi.mock("next/server", async (original) => ({ ...await original<typeof import("next/server")>(), after: vi.fn() }));
 import { GET, POST, DELETE } from "@/app/api/push/route";
 import { parsePushSubscription, validPushEndpoint } from "@/lib/push-subscription";
 import { placeNotification, pushConfiguration, schedulePlacePushes, deliverPlacePushes } from "@/lib/push-server";
@@ -81,6 +82,15 @@ describe("장소 알림 발송", () => {
     await deliverPlacePushes("b1");
     expect(send).toHaveBeenCalledTimes(1); expect(tables.push_deliveries[0].state).toBe("sent");
     expect(send.mock.calls[0][2]).toMatchObject({ TTL: 86400, urgency: "high", timeout: 4000 });
+  });
+  it("응답 후에도 Next 작업이 푸시 발송 완료까지 유지됨", async () => {
+    jobs(); const send = vi.spyOn(webpush, "sendNotification").mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+    vi.mocked(after).mockClear();
+    schedulePlacePushes("b1");
+    expect(after).toHaveBeenCalledOnce();
+    const callback = vi.mocked(after).mock.calls[0][0] as () => Promise<void>;
+    await callback();
+    expect(send).toHaveBeenCalledOnce(); expect(tables.push_deliveries[0].state).toBe("sent");
   });
   it("만료된 기기 구독은 제거함", async () => {
     jobs(); tables.push_subscriptions = [{ id: "sub1" }];

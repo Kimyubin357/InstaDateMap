@@ -155,7 +155,7 @@ export default function ConfirmForm({
 
       {analysisMessage(recoveryReason) && <p className="notice" role="status">{analysisMessage(recoveryReason)}</p>}
       {source.recoveryReason === "interrupted" && <p className="notice">장소를 끝까지 확인하지 못했어요. 다시 시도하거나 이 링크를 제외할 수 있어요.</p>}
-      {!session.ready && <p className="notice" role="status">{session.error || "링크 상태를 확인하고 있어요…"} {session.error && <button className="text-btn" onClick={() => router.refresh()}>최신 후보 불러오기</button>}</p>}
+      {!session.ready && <p className="notice" role="status">{session.error || "링크 상태를 확인하고 있어요…"} {session.error && <button className="text-btn" disabled={session.checking} onClick={() => { void session.retry(); router.refresh(); }}>최신 후보 불러오기</button>}</p>}
       <fieldset disabled={!session.ready || saving || reprocessing || pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} aria-label="저장할 장소 선택">
       {extractions.map((e) => {
         const c = choices[e.id];

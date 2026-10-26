@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import webpush from "web-push";
-import { waitUntil } from "@vercel/functions";
+import { after } from "next/server";
 import { db } from "./db";
 import { validPushEndpoint } from "./push-subscription";
 
@@ -45,5 +45,5 @@ export async function deliverPlacePushes(boardId: string) {
 export function schedulePlacePushes(boardId: string) {
   if (!pushConfiguration()) return;
   const task = Promise.resolve().then(() => deliverPlacePushes(boardId)).catch(() => console.warn("장소 알림 발송을 다시 확인해야 해요."));
-  try { waitUntil(task); } catch { /* The handled task still runs on local runtimes. */ }
+  try { after(() => task); } catch { /* The handled task still runs outside a Next request (tests/scripts). */ }
 }

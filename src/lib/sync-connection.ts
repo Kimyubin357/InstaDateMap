@@ -1,9 +1,23 @@
 import type { BoardStore } from "./board-store";
-export async function readSyncEvents(body: ReadableStream<Uint8Array>, receive: (event: string, data: { revision?: string }) => void) {
+async function withAbort<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+  try { return await Promise.race([pending, aborted]); }
+  finally { signal.removeEventListener("abort", onAbort); }
+}
+export async function readSyncEvents(body: ReadableStream<Uint8Array>, receive: (event: string, data: { revision?: string }) => void, options: { signal?: AbortSignal; onActivity?: () => void } = {}) {
   const reader = body.getReader(), decoder = new TextDecoder(); let buffer = "";
   try {
     while (true) {
-      const { done, value } = await reader.read(); buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      const { done, value } = await withAbort(reader.read(), options.signal);
+      if (options.signal?.aborted) break;
+      if (value?.byteLength) options.onActivity?.();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
       buffer = buffer.replace(/\r\n/g, "\n"); let end: number;
       while ((end = buffer.indexOf("\n\n")) >= 0) {
         const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2);
@@ -13,9 +27,15 @@ export async function readSyncEvents(body: ReadableStream<Uint8Array>, receive: 
       }
       if (done) break;
     }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  } finally {
+    // A broken transport may never finish cancellation. It must not hold up the next connection.
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
 const STABLE_STREAM_MS = 20000;
+// The server sends a heartbeat every 15s. Allow two missed beats plus some network delay.
+const STREAM_IDLE_MS = 45000;
 export function connectBoardSync(store: BoardStore) {
   let disposed = false, controller: AbortController | null = null, retry: ReturnType<typeof setTimeout> | undefined;
   let fallback: ReturnType<typeof setInterval> | undefined, failures = 0, run = 0;
@@ -24,10 +44,22 @@ export function connectBoardSync(store: BoardStore) {
   const stopFallback = () => { clearInterval(fallback); fallback = undefined; };
   const open = async () => {
     if (disposed || !visible() || controller || store.isSuspended()) return;
-    const sequence = ++run, abort = new AbortController(); controller = abort; let healthy = false, readyAt = 0;
+    const sequence = ++run, abort = new AbortController(); controller = abort; let healthy = false, readyAt = 0, stalled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const clearWatchdog = () => { clearTimeout(watchdog); watchdog = undefined; };
+    const activity = () => {
+      clearWatchdog();
+      if (!abort.signal.aborted) watchdog = setTimeout(() => { stalled = true; abort.abort(); }, STREAM_IDLE_MS);
+    };
+    abort.signal.addEventListener("abort", clearWatchdog, { once: true });
+    activity();
     startFallback();
     try {
-      const res = await fetch("/api/sync/events", { cache: "no-store", credentials: "same-origin", signal: abort.signal });
+      const request = fetch("/api/sync/events", { cache: "no-store", credentials: "same-origin", signal: abort.signal }).then((res) => {
+        if (abort.signal.aborted) void res.body?.cancel().catch(() => {});
+        return res;
+      });
+      const res = await withAbort(request, abort.signal);
       if (disposed || sequence !== run || abort.signal.aborted || store.isSuspended()) return;
       if (res.status === 401 || res.status === 409) { store.onUnauthorized(); return; }
       if (!res.ok || !res.body) throw new Error("sync unavailable");
@@ -40,17 +72,19 @@ export function connectBoardSync(store: BoardStore) {
           const current = store.getSnapshot().snapshot;
           if (!current || BigInt(data.revision) > BigInt(current.revision)) store.schedule();
         }
-      });
+      }, { signal: abort.signal, onActivity: activity });
     } catch { /* Preserve the snapshot and use conditional requests until reconnected. */ }
     finally {
+      clearWatchdog(); abort.signal.removeEventListener("abort", clearWatchdog);
       if (sequence === run) { controller = null; store.connected(false); }
       if (store.isSuspended()) stopFallback();
       if (!disposed && sequence === run && visible() && !store.isSuspended()) {
         // Reset the backoff only after the stream stayed up; a stream that drops right after "ready" keeps backing off.
-        const stable = healthy && Date.now() - readyAt >= STABLE_STREAM_MS;
+        const stable = !stalled && healthy && Date.now() - readyAt >= STABLE_STREAM_MS;
         if (stable) failures = 0;
+        if (stalled) void store.refresh();
         startFallback(); const delay = stable ? 300 : [1000, 2000, 5000, 10000, 30000][Math.min(failures++, 4)];
-        retry = setTimeout(() => { void open(); }, delay);
+        retry = setTimeout(() => { retry = undefined; void open(); }, delay);
       }
     }
   };
