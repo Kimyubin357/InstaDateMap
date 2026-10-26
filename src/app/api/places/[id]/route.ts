@@ -41,7 +41,10 @@ export async function PATCH(req: Request, { params: route }: { params: Promise<{
     if (body.memo !== undefined) patch.memo = String(body.memo).slice(0, 500);
     if (Object.keys(patch).length === 0) return Response.json({ message: "수정할 내용이 없습니다." }, { status: 400 });
     const { data, error } = await db().rpc("dm_patch_place", { p_board: board.id, p_id: params.id, p_who: board.who, p_patch: patch, p_expected: Number.isInteger(body.memo_version) ? body.memo_version : null });
-    if (error) return Response.json({ message: error.message }, { status: 400 });
+    if (error) {
+      console.error("dm_patch_place failed", error.code, error.message);
+      return Response.json({ message: "장소를 수정하지 못했어요. 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    }
     if (!data || data.code === "PLACE_NOT_FOUND") return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (data.code === "MEMO_CONFLICT") return Response.json({ ...data, message: "메모가 먼저 바뀌었어요. 두 내용을 확인하고 저장해 주세요." }, { status: 409, headers: { "Cache-Control": "no-store" } });
     if (data.memo_changed) schedulePlacePushes(board.id);

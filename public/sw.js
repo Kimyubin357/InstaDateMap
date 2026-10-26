@@ -13,7 +13,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(self.registration.showNotification(typeof payload.title === "string" ? payload.title.slice(0, 100) : "우리 지도에 새 장소가 생겼어요", {
     body: typeof payload.body === "string" ? payload.body.slice(0, 160) : "같이 가볼 곳을 확인해 보세요.",
     icon: "/icons/canvas-heart-192.png", badge: "/icons/canvas-heart-192.png",
-    tag: typeof payload.tag === "string" ? payload.tag : "datemap-place", data: { url: placeUrl(payload.url) },
+    tag: typeof payload.tag === "string" ? payload.tag : "datemap-place", renotify: true, data: { url: placeUrl(payload.url) },
   }));
 });
 self.addEventListener("notificationclick", (event) => {

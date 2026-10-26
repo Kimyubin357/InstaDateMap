@@ -61,7 +61,7 @@ describe("장소 알림 발송", () => {
   const job = { event_id: "event1", subscription_id: "sub1", lease: "lease1", endpoint, p256dh: keys.publicKey, auth: sub.keys.auth, added_by: "수민", place_id: "place1", place_name: "새 카페" };
   function jobs() { const rpc = vi.spyOn(fakeDb, "rpc"); rpc.mockResolvedValue({ data: [job], error: null }); tables.push_deliveries = [{ event_id: "event1", subscription_id: "sub1", lease: "lease1", state: "sending" }]; return rpc; }
   it("알림에는 저장자·장소명과 해당 장소 주소만 담음", () => {
-    expect(placeNotification(job)).toMatchObject({ title: "수민님이 새 장소를 담았어요", body: "새 카페", url: "/?place=place1", tag: "place-event1" });
+    expect(placeNotification(job)).toMatchObject({ title: "수민님이 새 장소를 담았어요", body: "새 카페", url: "/?place=place1", tag: "place-place1" });
     expect(JSON.stringify(placeNotification(job))).not.toContain("session");
   });
   it.each([['memo_added', '메모를 남겼어요'], ['memo_updated', '메모를 바꿨어요']] as const)("메모 알림 %s은 본문 없이 장소명과 상세 링크만 포함", (event_kind, action) => {

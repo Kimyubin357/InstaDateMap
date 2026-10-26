@@ -5,6 +5,7 @@ let pg: PGlite;
 const board = "10000000-0000-4000-8000-000000000001";
 const place = "20000000-0000-4000-8000-000000000001";
 const migration = readFileSync("supabase/migrations/007_memo_push.sql", "utf8");
+const fixes = readFileSync("supabase/migrations/008_memo_push_fixes.sql", "utf8");
 async function patch(memo: string, version = 0, who = "유빈") {
   return (await pg.query<any>("select dm_patch_place($1,$2,$3,$4,$5) r", [board, place, who, JSON.stringify({ memo }), version])).rows[0].r;
 }
@@ -15,7 +16,7 @@ beforeAll(async () => {
   await pg.exec("create role anon; create role authenticated; create role service_role; create function gen_random_bytes(n integer) returns bytea language sql as $$ select decode(repeat('ab',n),'hex') $$;");
   await pg.exec(readFileSync("supabase/schema.sql", "utf8").replace("create extension if not exists pgcrypto;", "").split("-- 보드 하나 만들기")[0]);
   for (const name of ["002_couple_access", "004_place_push", "005_reliable_workflows", "006_place_trash"]) await pg.exec(readFileSync(`supabase/migrations/${name}.sql`, "utf8"));
-  await pg.exec(migration); await pg.exec(migration);
+  await pg.exec(migration); await pg.exec(fixes); await pg.exec(fixes);
 }, 30000);
 afterAll(async () => { await pg?.close(); });
 beforeEach(async () => {
@@ -44,10 +45,20 @@ it("동일 메모·상태만 수정·충돌·삭제된 장소·재전송은 새 
   expect(await patch("삭제 후", 3)).toMatchObject({ code: "PLACE_NOT_FOUND" });
   expect(await events()).toHaveLength(0);
 });
-it("내용 삭제도 수정 알림이며 빈 내용을 다시 저장하면 알리지 않음", async () => {
-  await patch("있던 메모"); await patch("", 1);
-  expect((await events()).map((e) => e.event_kind).sort()).toEqual(["memo_added", "memo_updated"]);
-  await patch("", 2); expect(await events()).toHaveLength(2);
+it("메모를 지우면 저장만 하고 알리지 않으며, 다시 쓰면 새 메모 알림", async () => {
+  await patch("있던 메모");
+  expect(await patch("", 1)).toMatchObject({ ok: true, memo_changed: false, memo_version: 2 });
+  expect((await events()).map((e) => e.event_kind)).toEqual(["memo_added"]);
+  await patch("", 2); expect(await events()).toHaveLength(1);
+  await patch("다시 쓴 메모", 3);
+  expect((await events()).map((e) => e.event_kind).sort()).toEqual(["memo_added", "memo_added"]);
+});
+it("휴지통으로 옮긴 장소는 남은 알림 이벤트가 있어도 발송하지 않음", async () => {
+  await patch("메모");
+  await pg.exec("update places set deleted_at=now()");
+  expect(await claim()).toHaveLength(0);
+  await pg.exec("update places set deleted_at=null");
+  expect((await claim()).map((j) => j.event_kind)).toEqual(["memo_added"]);
 });
 it("알림 기록에 실패하면 메모까지 함께 롤백", async () => {
   await pg.exec("create function test_push_fail() returns trigger language plpgsql as $$ begin raise exception 'push record failure'; end $$; create trigger test_fail before insert on place_push_events for each row execute function test_push_fail();");

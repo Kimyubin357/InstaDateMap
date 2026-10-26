@@ -60,8 +60,9 @@ describe("장소 수정 결과 확인", () => {
   it("DB 오류를 삭제된 장소나 성공으로 오인하지 않음", async () => {
     failNext("places", "update");
     const response = await PATCH(request({ memo: "저장 시도" }), params());
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ message: "테스트 DB 오류" });
+    expect(response.status).toBe(500);
+    // Internal DB messages stay in server logs, not in the response.
+    expect(await response.json()).toEqual({ message: "장소를 수정하지 못했어요. 다시 시도해 주세요." });
     expect(tables.places[0].memo).toBe("기존 메모");
   });
 
