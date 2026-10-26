@@ -278,17 +278,3 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
   .entry-page.is-pin-editing .remember{margin:6px 0 14px}
   .entry-page.is-pin-editing .btn.large{height:52px;min-height:52px}
 }
-
-/* Shared shortcut instructions stay in the settings flow, including short landscape screens. */
-.shortcut-install{min-width:0;padding-left:max(0px,calc(env(safe-area-inset-left,0px) - 20px));padding-right:max(0px,calc(env(safe-area-inset-right,0px) - 20px))}
-.shortcut-install h2{display:flex;align-items:center;gap:8px}
-.shortcut-install h2>svg{color:var(--forest)}
-.shortcut-install .lead{margin-bottom:16px}
-.shortcut-install .shortcut-install-button{width:100%;min-height:48px;scroll-margin-block:12px}
-.shortcut-install .shortcut-install-button:focus-visible{outline:3px solid var(--forest);outline-offset:3px}
-.shortcut-install .shortcut-install-hint{margin:10px 0 20px}
-.shortcut-install h3{margin:0 0 10px;font-size:19px;color:var(--ink)}
-.shortcut-install .shortcut-install-steps{margin:0;padding-left:26px;font-size:18px;line-height:1.6}
-.shortcut-install .shortcut-install-steps li{padding-left:4px}
-.shortcut-install .shortcut-install-steps li+li{margin-top:8px}
-.shortcut-install .shortcut-install-steps li::marker,.shortcut-install .shortcut-install-steps strong{color:var(--forest)}
