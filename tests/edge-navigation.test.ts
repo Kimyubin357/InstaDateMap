@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { installEdgeBackGuard, isStandaloneIOS } from "@/lib/edge-navigation";
+import { allowsEdgeBack, installEdgeBackGuard, isStandaloneIOS } from "@/lib/edge-navigation";
 
 const iphone = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_6 like Mac OS X)", platform: "iPhone", maxTouchPoints: 5, standalone: true, displayModeStandalone: false };
 
@@ -20,6 +20,24 @@ function touch(x: number, { count = 1, changed = 1, cancelable = true } = {}) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("설치한 iOS 앱의 왼쪽 끝 뒤로가기 제스처", () => {
+  it("설정·장소 저장·삭제한 장소만 허용하고 확인창과 다른 경로는 차단", () => {
+    for (const path of ["/settings", "/add", "/settings/trash"]) {
+      expect(allowsEdgeBack(path)).toBe(true);
+      expect(allowsEdgeBack(path, true)).toBe(false);
+    }
+    for (const path of ["/", "/search", "/enter", "/choose", "/setup", "/confirm/123", "/settings/other", "/addition"]) expect(allowsEdgeBack(path)).toBe(false);
+  });
+
+  it("재마운트 없이 이동해도 매 터치 시점의 경로·확인창 상태를 반영", () => {
+    vi.stubGlobal("Element", TestElement);
+    const root = new TestElement(); let path = "/", overlay = false;
+    installEdgeBackGuard(root, iphone, () => allowsEdgeBack(path, overlay));
+    for (const [next, open, blocked] of [["/", false, true], ["/settings", false, false], ["/add", false, false], ["/settings/trash", false, false], ["/settings/trash", true, true], ["/search", false, true]] as const) {
+      path = next; overlay = open; const event = touch(0); root.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(blocked);
+    }
+  });
+
   it("홈 화면 iPhone/iPad에만 적용하고 Safari 탭·Android·Mac은 유지", () => {
     expect(isStandaloneIOS(iphone)).toBe(true);
     expect(isStandaloneIOS({ ...iphone, standalone: false, displayModeStandalone: true })).toBe(true);

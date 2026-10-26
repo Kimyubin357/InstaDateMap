@@ -313,3 +313,15 @@ html{-webkit-text-size-adjust:100%}
   .place-carousel{left:50%;right:auto;transform:translateX(-50%);width:460px;--card-width:400px;bottom:var(--map-bottom)}
   .place-card-rail{padding-inline:30px;scroll-padding-inline:30px}.place-card{height:164px}.carousel-step{display:flex}
 }
+
+/* Map filter controls use the existing sheet gesture engine without changing place sheets. */
+.sheet-map-filters{padding-top:0}
+.sheet-map-filters .sheet-handle{display:flex;height:36px}
+.sheet-map-filters .sheet-heading{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));gap:8px}
+.sheet-map-filters .sheet-heading h2{flex:1;min-width:0}
+.sheet-map-filters .sheet-body,.sheet-map-filters .sheet-footer{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+.sheet-map-filters .filter-close-btn{position:relative;flex:none;width:44px;height:44px;min-height:44px;border:0;background:none;box-shadow:none;border-radius:50%}
+.sheet-map-filters .filter-close-btn::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+.sheet-map-filters .filter-close-btn>svg{position:relative;width:18px;height:18px}
+.sheet-map-filters .filter-close-btn:enabled:active::before{background-color:var(--mist)}
+@media(orientation:landscape) and (max-height:600px){.sheet-map-filters .sheet-handle{height:26px}.sheet-map-filters .sheet-heading h2{font-size:24px}.sheet-map-filters .sheet-heading{padding-bottom:0}.sheet-map-filters .sheet-footer{padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}.sheet-map-filters .sheet-footer .btn{min-height:44px;padding:8px 12px}.sheet-map-filters .sheet-body h3{margin:12px 0 8px}}
