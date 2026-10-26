@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
 import { layoutViewportHeight, visibleViewport } from "@/lib/viewport";
-export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, summary, fullScreenAtMax = !!summary, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; summary?: ReactNode; fullScreenAtMax?: boolean; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, summary, fullScreenAtMax = !!summary, resizeMedia = "(max-width:759px), (max-height:600px) and (orientation:landscape)", className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; summary?: ReactNode; fullScreenAtMax?: boolean; resizeMedia?: string; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
@@ -16,7 +16,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   const drag = useRef<{ id: number; source: "handle" | "content"; stop: SheetStop; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean } | undefined>(undefined);
   useEffect(() => {
     const resize = () => {
-      mobile.current = window.matchMedia("(max-width:759px), (max-height:600px) and (orientation:landscape)").matches;
+      mobile.current = window.matchMedia(resizeMedia).matches;
       const layoutHeight = layoutViewportHeight();
       const editable = !!document.activeElement?.matches("input,textarea,[contenteditable=true]");
       const { top, height } = visibleViewport(layoutHeight, window.visualViewport?.height || window.innerHeight, window.visualViewport?.offsetTop || 0, editable);
@@ -35,7 +35,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     for (const element of [summaryRef.current, footerRef.current, body.current?.querySelector("[data-sheet-preview]")]) if (element) observer.observe(element, { box: "border-box" });
     resize(); window.addEventListener("resize", resize); window.addEventListener("pageshow", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
     return () => { observer.disconnect(); window.removeEventListener("resize", resize); window.removeEventListener("pageshow", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
-  }, [variant, !!summary, fullScreenAtMax]);
+  }, [variant, !!summary, fullScreenAtMax, resizeMedia]);
   function revealInput() {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !ref.current?.contains(active) || !active.matches("input, textarea, select")) return;
