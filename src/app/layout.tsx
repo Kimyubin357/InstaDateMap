@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { dahyun } from "@/lib/app-font";
 import "./globals.css";
 import "./fabric-theme.css";
 import "./splash.css";
@@ -7,16 +7,6 @@ import AppSplash from "@/components/AppSplash";
 import { appleStartupImages } from "@/lib/splash";
 import BoardProvider from "@/components/BoardProvider";
 import EdgeNavigationGuard from "@/components/EdgeNavigationGuard";
-
-const dahyun = localFont({
-  src: "../../public/fonts/ownglyph-park-dahyun.woff2",
-  variable: "--font-dahyun",
-  weight: "400",
-  display: "swap",
-  adjustFontFallback: false,
-  declarations: [{ prop: "size-adjust", value: "125%" }],
-  fallback: ["Apple SD Gothic Neo", "sans-serif"],
-});
 
 export const metadata: Metadata = {
   title: "데이트맵",

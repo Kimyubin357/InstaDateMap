@@ -188,7 +188,7 @@ button:enabled:active:is(.place-row,.unified-place-row,.recent-term){background:
 .sheet-place .sheet-heading{position:relative;height:0;padding:0;z-index:2}
 .sheet-place .sheet-heading>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .sheet-place .sheet-heading-actions{position:absolute;right:30px;top:12px;display:flex;align-items:center;gap:8px}
-.sheet-place .sheet-heading-actions .icon-btn{width:40px;height:40px;border-radius:50%;background:#fffffff2;box-shadow:0 2px 10px #45291f1a}
+.sheet-place .sheet-heading-actions .sheet-close-btn{width:44px;height:44px;min-height:44px;padding:0;border-radius:20px}
 .sheet-delete-confirm{border-radius:30px 30px 0 0;padding-top:28px}
 .sheet-delete-confirm .sheet-heading{justify-content:center}.sheet-delete-confirm .sheet-heading h2{font-size:21px;letter-spacing:-.035em}
 .sheet-delete-confirm .sheet-body{padding-bottom:22px}
@@ -279,6 +279,9 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
   .bottom-nav{left:75%}
 }
 
-/* Place sheet: close button in the top-right corner; sheets opened from the map have no mini map, so the title makes room for it. */
-.sheet-place .sheet-heading-actions .sheet-close-btn{width:32px;height:32px;color:var(--ink)} /* Naver Map's sheet close: 32px circle, 11px glyph */
-.sheet-place.no-map-preview .detail-title{margin-top:6px;padding-right:52px}
+/* The close target and sheet content share safe insets, including short landscape phones. */
+.sheet-place{--sheet-left:max(20px,env(safe-area-inset-left,0px));--sheet-right:max(20px,env(safe-area-inset-right,0px))}
+.sheet-place .sheet-heading-actions{right:calc(var(--sheet-right) + 10px)}
+.sheet-place .sheet-body,.sheet-place .sheet-footer{padding-left:var(--sheet-left);padding-right:var(--sheet-right)}
+.sheet-place.no-map-preview .detail-title{margin-top:6px;padding-right:64px}
+@media(min-width:760px){.sheet-place{--sheet-left:24px;--sheet-right:24px}}

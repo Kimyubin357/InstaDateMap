@@ -128,6 +128,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus({ preventScroll: true });
     const keyboard = (e: KeyboardEvent) => {
+      if (document.querySelector(".app-recovery")) return;
       if (document.querySelector("dialog[data-app-dialog][open]")) return;
       if (e.key === "Escape") { e.preventDefault(); close.current(); }
       if (e.key !== "Tab") return;

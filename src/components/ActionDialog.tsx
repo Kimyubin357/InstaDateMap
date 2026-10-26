@@ -11,7 +11,7 @@ export default function ActionDialog({ title, message, children, onClose, onConf
   const ref = useRef<HTMLDialogElement>(null); const id = useId();
   useEffect(() => {
     const dialog = ref.current;
-    if (!dialog) return;
+    if (!dialog || document.querySelector(".app-recovery")) return;
     dialog.showModal();
     return () => { if (dialog.open) dialog.close(); };
   }, []);

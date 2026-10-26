@@ -5,7 +5,7 @@ import type { KakaoPlace } from "@/lib/types";
 const candidate = (id: string): KakaoPlace => ({ kakao_place_id: id, name: "행궁동 식당", address: "경기 수원시", category: "음식점", lat: 37, lng: 127, kakao_url: "" });
 const place = (id: string, patch: Partial<PlaceView> = {}): PlaceView => ({ ...candidate(id), id, status: "meh", memo: "창가", sharers: [], sources: [], created_at: "", last_saved_at: "", ...patch });
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((r) => { resolve = r; }); return { resolve, promise }; }
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 describe("통합 검색 결과", () => {
   it("네 가지 상태 전체에서 이름·주소·메모 검색하고 보관함 전체 ID로 중복 제거", () => {
     const result = unifiedResults([place("1"), place("2", { name: "다른 이름", memo: "조용한 곳" })], "창가", [candidate("1"), candidate("2"), candidate("3"), candidate("3")]);
@@ -84,6 +84,21 @@ describe("검색 요청과 복귀", () => {
     search.setQuery("수원"); await search.search(); expect(search.getSnapshot().error).toContain("연결"); expect(search.getSnapshot().results).toBeNull();
     await search.search(); expect(search.getSnapshot()).toMatchObject({ query: "수원", error: "", results: [] }); search.pause();
   });
+  it.each([
+    ["HTML 502", () => new Response("<html>서버 오류: Bad Gateway</html>", { status: 502 }), "검색 결과를 읽지 못했어요. 다시 시도해 주세요."],
+    ["깨진 JSON", () => new Response('{"places":', { status: 200 }), "검색 결과를 읽지 못했어요. 다시 시도해 주세요."],
+    ["영어 서버 오류", () => Response.json({ message: "Upstream service unavailable" }, { status: 503 }), "연결하지 못했어요. 저장된 장소는 계속 찾을 수 있어요."],
+    ["한국어 서버 안내", () => Response.json({ message: "검색어는 100자 이내로 입력해 주세요." }, { status: 400 }), "검색어는 100자 이내로 입력해 주세요."],
+  ] as const)("%s는 한국어 안내로 표시하고 재검색할 수 있음", async (_, response, message) => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetcher = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(Response.json({ places: [candidate("retry")] }));
+    const search = new PlaceSearch(fetcher);
+    search.setQuery("수원", false); await search.search();
+    expect(search.getSnapshot()).toMatchObject({ error: message, busy: false, results: null });
+    await search.search();
+    expect(search.getSnapshot()).toMatchObject({ error: "", busy: false, searched: "수원", results: [candidate("retry")] });
+    search.pause();
+  });
   it.each(["fetch", "body"])("%s 응답이 끝나지 않아도 검색 대기가 풀리고 재시도 가능", async (phase) => {
     vi.useFakeTimers();
     const never = new Promise<never>(() => {});
@@ -93,13 +108,14 @@ describe("검색 요청과 복귀", () => {
     search.setQuery("수원 카페", false); const pending = search.search();
     await vi.advanceTimersByTimeAsync(10000); await pending;
     expect(search.getSnapshot()).toMatchObject({ query: "수원 카페", busy: false, results: null });
-    expect(search.getSnapshot().error).toBeTruthy();
+    expect(search.getSnapshot().error).toBe("응답이 늦어지고 있어요. 연결을 확인하고 다시 시도해 주세요.");
     await search.search();
     expect(search.getSnapshot()).toMatchObject({ searched: "수원 카페", busy: false, error: "", results: [candidate("retry")] });
     search.pause();
   });
-  it("인증 만료 응답은 캐시 제거 경로로 전달", async () => {
-    const search = new PlaceSearch(vi.fn(async () => new Response(null, { status: 401 })) as typeof fetch); const expired = vi.fn(); search.onUnauthorized = expired;
-    search.setQuery("수원"); await search.search(); expect(expired).toHaveBeenCalledOnce(); search.pause();
+  it.each([401, 409])("%s 인증 응답은 본문을 파싱하지 않고 캐시 제거 경로로 전달", async (status) => {
+    const search = new PlaceSearch(vi.fn(async () => new Response("<html>Sign in</html>", { status })) as typeof fetch); const expired = vi.fn(); search.onUnauthorized = expired;
+    search.setQuery("수원"); await search.search(); expect(expired).toHaveBeenCalledOnce();
+    expect(search.getSnapshot()).toMatchObject({ error: "", busy: false, results: null }); search.pause();
   });
 });

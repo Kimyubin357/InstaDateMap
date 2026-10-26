@@ -68,6 +68,16 @@ describe("저장 실패와 재시도", () => {
     expect(tables.extractions).toHaveLength(1);
   });
 
+  it("다른 지점 하나만 찾으면 자동 저장 대신 확인 후보와 원문을 보존", async () => {
+    vi.mocked(resolveCandidate).mockResolvedValueOnce([{ kakao_place_id: "wrong", name: "어니언 안국", address: "서울 종로구 계동길 5", lat: 37.577, lng: 126.986, category: "카페", kakao_url: "" }]);
+    const result = await ingestShare(input, async () => JSON.stringify({ places: [{ name: "어니언", branch: "성수점", address: "서울 성동구 아차산로9길 8", area_hint: "성수", confidence: 0.9 }] }));
+    expect(result.status).toBe("confirm");
+    expect(result.confirm_url).toContain("/confirm/");
+    expect(tables.places ?? []).toHaveLength(0);
+    expect(tables.sources[0]).toMatchObject({ status: "pending_confirm", caption: "어니언" });
+    expect(tables.extractions[0]).toMatchObject({ raw_name: "어니언", branch: "성수점", candidates: [{ kakao_place_id: "wrong" }] });
+  });
+
   it("캡션 후보가 있어도 업로드한 스크린샷으로 다시 찾음", async () => {
     const llm = vi.fn(async (_system, content) => JSON.stringify({ places: [{ name: content.some((c: { type: string }) => c.type === "image") ? "어니언" : "없는집", confidence: 0.9 }] }));
     const r = await ingestShare({ ...input, images: [{ mediaType: "image/png", data: "test" }] }, llm);

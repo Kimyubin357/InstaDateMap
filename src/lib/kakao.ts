@@ -82,11 +82,50 @@ function roadAddress(address: string): string | null {
 
 function addressKey(address: string): string | null {
   const road = roadAddress(address);
-  return road?.replace(/경기도/g, "경기").replace(/서울특별시/g, "서울").replace(/인천광역시/g, "인천").replace(/\s/g, "") ?? null;
+  return road ? normalizeRegions(road).replace(/\s/g, "") : null;
 }
 
 function matchesName(place: KakaoPlace, cand: PlaceCandidate) {
   return nameKey(place.name).includes(nameKey(cand.name));
+}
+
+function normalizeRegions(value: string): string {
+  return value
+    .replace(/특별자치시|특별자치도|특별시|광역시/g, "")
+    .replace(/경기도/g, "경기").replace(/강원도/g, "강원")
+    .replace(/충청북도/g, "충북").replace(/충청남도/g, "충남")
+    .replace(/전라북도/g, "전북").replace(/전라남도/g, "전남")
+    .replace(/경상북도/g, "경북").replace(/경상남도/g, "경남").replace(/제주도/g, "제주");
+}
+
+function locationKey(value: string): string {
+  return nameKey(normalizeRegions(value));
+}
+
+/** 지역명은 주소나 지점 표기로 확인하며, 상호 자체에 든 지역명은 근거로 삼지 않습니다. */
+function matchesArea(place: KakaoPlace, cand: PlaceCandidate): boolean {
+  if (!cand.areaHint?.trim()) return true;
+  const address = locationKey(place.address);
+  const branch = locationKey(place.name).replace(locationKey(cand.name), "");
+  return cand.areaHint.trim().split(/[\s,/·]+/).every((part) => {
+    const area = locationKey(part);
+    if (address.includes(area) || branch.includes(area)) return true;
+    // 도로명 주소에 동 이름이 없어도 "성수동"과 지점명 "성수"는 같은 근거입니다.
+    const neighborhood = area.replace(/동(?:\d+가)?$/, "");
+    return neighborhood !== area && neighborhood.length >= 2 && branch.includes(neighborhood);
+  });
+}
+
+/** 지번/도로명 간 직접 비교가 어려워도 명시된 시·군·구가 다르면 확인을 받습니다. */
+function matchesAddressArea(place: KakaoPlace, address: string | null): boolean {
+  const actual = place.address.trim().split(/\s+/).map(locationKey);
+  for (const part of address?.trim().split(/\s+/) ?? []) {
+    const area = locationKey(part);
+    const province = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)$/.test(area);
+    if (!province && !/(시|군|구)$/.test(area)) break;
+    if (province ? actual[0] !== area : !actual.includes(area)) return false;
+  }
+  return true;
 }
 
 function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -147,11 +186,19 @@ export async function resolveCandidate(cand: PlaceCandidate, fetcher: Fetcher = 
     .map(({ p }) => p);
 }
 
-/** 사람이 확인하지 않아도 되는 경우: 후보가 하나뿐이거나, 1등이 이름까지 정확히 같고 2등과 차이가 클 때 */
+/** 추출한 위치와 모순이 없고, 단일 후보이거나 다른 후보보다 충분히 확실할 때만 자동 저장합니다. */
 export function isConfident(cand: PlaceCandidate, places: KakaoPlace[]): boolean {
   if (places.length === 0) return false;
+  const first = places[0];
   const address = cand.address ? addressKey(cand.address) : null;
-  if (cand.confidence >= 0.6 && address && matchesName(places[0], cand) && addressKey(places[0].address) === address &&
+  const selectedAddress = addressKey(first.address);
+  const sameAddress = !!address && selectedAddress === address;
+  if (!matchesName(first, cand) || !matchesArea(first, cand) || !matchesAddressArea(first, cand.address)) return false;
+  if (address && selectedAddress && !sameAddress) return false;
+  const branch = nameKey(cand.branch ?? "").replace(/점$/, "");
+  // 정확한 주소는 "수원본점" / "본점" 같은 지점 표기 차이를 보완합니다.
+  if (branch && !sameAddress && !nameKey(first.name).includes(branch)) return false;
+  if (cand.confidence >= 0.6 && sameAddress &&
       !places.slice(1).some((p) => addressKey(p.address) === address)) return true;
   if (places.length === 1) return cand.confidence >= 0.5;
   const [a, b] = places.map((p) => scorePlace(p, cand));

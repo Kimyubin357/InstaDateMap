@@ -109,7 +109,7 @@ export default function PlaceSheet({ place, kakaoKey, mapPreview = true, onClose
   }
   const closeSheet = busy || deleting || leaving ? () => {} : () => requestLeave("close");
   return <><Modal title={place.name} className={`sheet-place${mapPreview ? "" : " no-map-preview"}`} initialStop={1} dragFromContent onClose={closeSheet}
-    headerActions={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="22" /></button>}
+    headerActions={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}>
