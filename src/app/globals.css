@@ -268,10 +268,13 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 /* Wide landscape: settings and filters sit in the top-right corner, mirroring the bottom-right map buttons;
    the list tab uses the same corner for +. First step of the landscape redesign tracked in AGENTS.md. */
 @media(min-width:760px) and (orientation:landscape){
-  :root{--corner-right:calc(28px + env(safe-area-inset-right,0px))}
-  .unified-search-header{left:calc(var(--search-edge) + env(safe-area-inset-left,0px));width:calc(var(--search-width) - 58px)}
+  /* Hug the safe area like Naver Map: 16px beside the left/right insets, 8px above the home indicator, 10px from the top. */
+  :root{--edge-left:calc(env(safe-area-inset-left,0px) + 16px);--corner-right:calc(env(safe-area-inset-right,0px) + 16px);
+    --edge-bottom:max(16px,calc(env(safe-area-inset-bottom,0px) + 8px));--search-top:max(10px,env(safe-area-inset-top,0px));--dock-bottom:calc(var(--edge-bottom) - 2px)}
+  .unified-search-header{left:var(--edge-left);width:calc(var(--search-width) - 58px)}
+  .pending-map-badge{left:var(--edge-left)}
   .is-search-idle .floating-settings.icon-btn{position:fixed;top:var(--search-top);right:calc(var(--corner-right) + 4px)}
   .floating-filters{left:auto;right:calc(var(--corner-right) + 7px)}
-  .map-controls,.view-list .map-controls{right:var(--corner-right);bottom:28px}
+  .map-controls,.view-list .map-controls,.has-place-card .map-controls{right:var(--corner-right);bottom:var(--edge-bottom)}
   .bottom-nav{left:75%}
 }
