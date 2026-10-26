@@ -10,7 +10,7 @@ describe("변경 번호와 조건부 지도 조회", () => {
   it("카카오 장소 ID를 포함하고 이전 형식 ETag는 최신 목록으로 교체", async () => {
     tables.places = [{ id: "p1", board_id: "b1", kakao_place_id: "123", name: "식당", created_at: "2026-01-01" }];
     const response = await GET(req('"dm2:b1:1:3"')); expect(response.status).toBe(200);
-    expect((await response.json()).places[0].kakao_place_id).toBe("123"); expect(response.headers.get("etag")).toBe('"dm3:b1:1:3"');
+    expect((await response.json()).places[0].kakao_place_id).toBe("123"); expect(response.headers.get("etag")).toBe('"dm4:b1:1:3"');
   });
   it("같은 변경 번호면 304이며 장소 테이블을 조회하지 않음", async () => {
     const first = await GET(req()), etag = first.headers.get("etag")!;

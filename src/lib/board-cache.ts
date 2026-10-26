@@ -35,8 +35,8 @@ export class DeviceBoardCache implements SnapshotCache {
   }
   async write(snapshot: BoardSnapshot) {
     // Only the public map snapshot is persisted, never access credentials or API keys.
-    const { boardId, authVersion, revision, board, places, pending } = snapshot;
-    await this.run((store) => store.put({ schema: SNAPSHOT_SCHEMA, snapshot: { boardId, authVersion, revision, board, places, pending } }, cacheScope(snapshot)));
+    const { boardId, authVersion, revision, board, places, pending, collections } = snapshot;
+    await this.run((store) => store.put({ schema: SNAPSHOT_SCHEMA, snapshot: { boardId, authVersion, revision, board, places, pending, collections } }, cacheScope(snapshot)));
   }
   async clear() { await this.run((store) => store.clear()); }
 }

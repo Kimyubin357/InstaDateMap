@@ -156,7 +156,7 @@ describe("기기 조회 캐시와 서버 일치", () => {
     const store = new BoardStore(disk, fetcher as typeof fetch); await store.authorize(access); await store.refresh();
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("If-None-Match")).toBe(snapshotEtag(snapshot()));
     expect(disk.write).not.toHaveBeenCalled(); expect(store.getSnapshot().snapshot).toEqual(snapshot());
-    expect(snapshotEtag(snapshot())).toBe('"dm3:b1:1:1"');
+    expect(snapshotEtag(snapshot())).toBe('"dm4:b1:1:1"');
   });
   it("연속 이벤트를 250ms에 한 번 조회로 묶음", async () => {
     vi.useFakeTimers(); const fetcher = vi.fn(async () => response()), store = new BoardStore(cache(), fetcher as typeof fetch);
@@ -208,4 +208,16 @@ describe("기기 조회 캐시와 서버 일치", () => {
     await store.authorize({ ...access, authVersion: 2 }); await store.refresh(); await store.authorize(access);
     expect(store.getSnapshot().access?.authVersion).toBe(2); expect(store.getSnapshot().snapshot?.authVersion).toBe(2);
   });
+});
+
+it("locally removing a confirmed trashed place also clears its visible collection membership", async () => {
+ const data = snapshot(); data.collections = [{ id:"c1",name:"주말",description:"",color:"red",icon:"map",version:1,created_at:"2026-01-01",place_ids:["p1"] }];
+ const disk = cache(data); const store = new BoardStore(disk,vi.fn(async()=>response(data)));
+ await store.authorize(access); await store.refresh(); store.removePlace("p1");
+ expect(store.getSnapshot().snapshot?.places).toEqual([]);
+ expect(store.getSnapshot().snapshot?.collections?.[0].place_ids).toEqual([]);
+ store.suspend();
+});
+it("invalid collection cache data is rejected before rendering icons or membership",()=>{
+ expect(isSnapshot({...snapshot(),collections:[{id:"c",name:"모음",description:"",color:"red",icon:"script",version:1,created_at:"2026-01-01",place_ids:[]}]})).toBe(false);
 });

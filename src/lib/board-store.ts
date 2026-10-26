@@ -114,7 +114,7 @@ export class BoardStore {
   }
   removePlace(id: string) {
     this.mutation++;
-    if (this.state.snapshot) { const snapshot = { ...this.state.snapshot, places: this.state.snapshot.places.filter((p) => p.id !== id) }; this.set({ snapshot }); this.persist(snapshot); }
+    if (this.state.snapshot) { const snapshot = { ...this.state.snapshot, places: this.state.snapshot.places.filter((p) => p.id !== id), collections: this.state.snapshot.collections?.map((c) => ({ ...c, place_ids: c.place_ids.filter((placeId) => placeId !== id) })) }; this.set({ snapshot }); this.persist(snapshot); }
     this.schedule();
   }
   isSuspended() { return this.paused; }

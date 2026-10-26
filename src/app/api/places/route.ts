@@ -1,3 +1,4 @@
+import { collectionMemberships } from "@/lib/collections-server";
 import { boardFromRequest, unauthorized, requireIdentity, AccessError, accessError } from "@/lib/auth";
 import { recoverSources } from "@/lib/source-work";
 import { db } from "@/lib/db";
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     const revision = await boardRevision(board.id);
     const etag = snapshotEtag({ boardId: board.id, authVersion: board.authVersion, revision });
     if (req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "no-store" } });
-    const [placeResult, linkResult, pendingResult, saveResult] = await Promise.all([
+    const [placeResult, linkResult, pendingResult, saveResult, collectionResult, membershipResult] = await Promise.all([
       db()
         .from("places")
         .select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at").is("deleted_at", null)
@@ -39,8 +40,10 @@ export async function GET(req: Request) {
         .in("status", ["pending_confirm", "needs_review", "needs_caption"])
         .order("shared_at", { ascending: false }),
       db().from("place_saves").select("place_id, added_by, added_at").eq("board_id", board.id),
+      db().from("collections").select("id,name,description,color,icon,version,created_at").eq("board_id", board.id).order("created_at", { ascending: false }),
+      collectionMemberships(board.id),
     ]);
-    const error = [placeResult, linkResult, pendingResult, saveResult].find((r) => r.error)?.error;
+    const error = [placeResult, linkResult, pendingResult, saveResult, collectionResult, membershipResult].find((r) => r.error)?.error;
     if (error) { console.error("GET /api/places failed", error.code, error.message); throw new Error("장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."); }
     const { data: places } = placeResult;
     const { data: links } = linkResult;
@@ -70,10 +73,16 @@ export async function GET(req: Request) {
       if (!latest.has(s.place_id) || s.added_at > latest.get(s.place_id)!) latest.set(s.place_id, s.added_at);
     }
 
+    const activeIds = new Set((places ?? []).map((p) => p.id));
+    const members = new Map<string, string[]>();
+    for (const row of membershipResult.data ?? []) if (activeIds.has(row.place_id)) {
+      const ids = members.get(row.collection_id) ?? []; ids.push(row.place_id); members.set(row.collection_id, ids);
+    }
     if (await boardRevision(board.id) !== revision) continue;
     return Response.json({
       boardId: board.id, authVersion: board.authVersion, revision,
       board: board.name,
+      collections: (collectionResult.data ?? []).map((c) => ({ ...c, place_ids: members.get(c.id) ?? [] })),
       places: (places ?? []).map((p) => {
         const e = byPlace.get(p.id);
         return {

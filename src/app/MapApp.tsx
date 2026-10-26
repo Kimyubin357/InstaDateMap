@@ -1,4 +1,5 @@
 "use client";
+import CollectionsList from "@/components/CollectionsList";
 import useNewPlaceIds from "@/components/useNewPlaceIds";
 import PendingLinks from "@/components/PendingLinks";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,8 +13,7 @@ import ShellLink from "@/components/ShellLink";
 import PlaceCarousel from "@/components/PlaceCarousel";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
-import { STATUS_ORDER, filterPlaces, sortPlaces, placeMeta, distanceM, type PlaceView } from "@/lib/place-view";
-import { categoryIcon } from "@/lib/place-presentation";
+import { STATUS_ORDER, filterPlaces, sortPlaces, type PlaceView } from "@/lib/place-view";
 import { navigateShell } from "@/lib/shell-navigation";
 type Overlay = "filters" | "pending" | "place" | null;
 const NO_PLACES: PlaceView[] = [];
@@ -23,8 +23,28 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const places = data?.places || NO_PLACES, pending = data?.pending || []; const board = data?.board || "우리 데이트맵", loaded = !!data;
   const newPlaceIds = useNewPlaceIds(places);
   const navigation = useSearchParams().toString();
+  const params = new URLSearchParams(navigation);
+  const collectionId = params.get("collection");
+  const listMode = params.get("section") === "collections" || collectionId ? "collections" : "all";
+  const collection = data?.collections?.find((c) => c.id === collectionId);
+  function viewHref(target: "map" | "list") {
+    const q = new URLSearchParams(); if (target === "list") q.set("view", "list");
+    if (collectionId) q.set("collection", collectionId);
+    if (listMode === "collections") q.set("section", "collections");
+    return "/" + (q.size ? `?${q}` : "");
+  }
+  function navigateCollections(mode: "all" | "collections", id?: string) {
+    const q = new URLSearchParams({ view: "list" }); if (mode === "collections") q.set("section", "collections"); if (id) q.set("collection", id);
+    navigateShell(`/?${q}`);
+  }
+  useEffect(() => {
+    if (loaded && !error && collectionId && data?.collections && !collection) {
+      const q = new URLSearchParams(window.location.search); q.delete("collection");
+      navigateShell(`/?${q}`, true); notify("이 모음이 삭제되었어요. 다른 모음을 골라 주세요.", "info");
+    }
+  }, [collectionId, collection, loaded, error, data?.collections, notify]);
   const [view, setView] = useState<"map" | "list">("map");
-  useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(view === "list" ? "/?view=list" : "/"); }, [active, view, navigation, onViewChange]);
+  useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(viewHref(view)); }, [active, view, navigation, onViewChange]);
   const [statuses, setStatuses] = useState<PlaceStatus[]>([...STATUS_ORDER]); const [category, setCategory] = useState("");
   const [overlay, setOverlay] = useState<Overlay>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [focusedId, setFocusedId] = useState<string | null>(null);
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
@@ -35,6 +55,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const restoredArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
   const list = useRef<HTMLDivElement>(null);
+  const listPositions = useRef(new Map<string, number>());
+  const listKey = `${listMode}:${collectionId ?? ""}`;
   const root = useRef<HTMLDivElement>(null);
   const mapPosition = useRef<MapPosition | undefined>(undefined); const listScroll = useRef(0); const snapshot = useRef({ statuses, category });
   snapshot.current = { statuses, category };
@@ -73,7 +95,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     // Successful saves already supply this place. Only old responses / direct URLs need a fetch.
     if (saved && !store.getSnapshot().snapshot?.places.some((p) => p.id === saved)) void store.refresh();
   }, [active, navigation, store]);
-  useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listScroll.current; }, [view, loaded]);
+  useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listPositions.current.get(listKey) ?? (listKey === "all:" ? listScroll.current : 0); }, [view, loaded, listKey]);
   function open(kind: Exclude<Overlay, null>, id?: string) {
     const url = new URL(window.location.href); url.searchParams.delete("place"); url.searchParams.delete("panel");
     if (kind === "place" && id) url.searchParams.set("place", id); else url.searchParams.set("panel", kind);
@@ -87,7 +109,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     else { const url = new URL(window.location.href); url.searchParams.delete("place"); url.searchParams.delete("panel"); history.replaceState(history.state, "", url.pathname + url.search); setOverlay(null); setSelectedId(null); }
   }
   const categories = useMemo(() => [...new Set(places.map((p) => p.category).filter((s): s is string => !!s))].sort(), [places]);
-  const visible = useMemo(() => sortPlaces(filterPlaces(places, "", statuses, category), sort === "near" ? origin : null), [places, statuses, category, sort, origin]);
+  const scopedPlaces = useMemo(() => { if (!collection) return places; const ids = new Set(collection.place_ids); return places.filter((p) => ids.has(p.id)); }, [places, collection]);
+  const visible = useMemo(() => sortPlaces(filterPlaces(scopedPlaces, "", statuses, category), sort === "near" ? origin : null), [scopedPlaces, statuses, category, sort, origin]);
   const selected = places.find((p) => p.id === selectedId);
   const searchDetail = new URLSearchParams(navigation).get("from") === "search";
   const mapPlaces = useMemo(() => searchDetail && selected && !visible.some((p) => p.id === selected.id) ? [...visible, selected] : visible, [searchDetail, selected, visible]);
@@ -105,9 +128,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses([...STATUS_ORDER]); setCategory(""); }
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true, level: 3 } : { sequence: ++requestSequence.current, kind: "saved" });
-    notify(restoredArrival.current ? "복구한 장소를 보여드릴게요." : savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.");
+    notify(restoredArrival.current ? "복구한 장소를 보여드릴게요." : savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.", "success", place ? { label: "모음에 담기", href: `/?view=list&organize=${place.id}` } : undefined);
     setSavedArrival(null);
-    const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate"); url.searchParams.delete("restored"); url.searchParams.delete("view");
+    const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate"); url.searchParams.delete("restored"); url.searchParams.delete("view"); url.searchParams.delete("collection"); url.searchParams.delete("section");
     history.replaceState(history.state, "", url.pathname + url.search);
   }, [active, loaded, places, savedArrival, syncing, error]);
   function showPlaceOnMap(place: PlaceView) {
@@ -153,19 +176,22 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const showPlaceCard = view === "map" && !!focused && !(overlay === "place" && selected);
   const all = statuses.length === STATUS_ORDER.length;
   return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell("/?view=list")} />}</div>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} />}</div>
     <h1 className="sr-only">{board}</h1>
     {view === "map" && <div className="floating-filters"><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>}
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
-    {view === "list" && <div ref={list} className="places-list" onScroll={(e) => { listScroll.current = e.currentTarget.scrollTop; }}><div className="list-heading"><h2>저장한 장소</h2><div className="list-tools"><button className={`list-filter${category || !all ? " is-active" : ""}`} aria-label="상세 필터" aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>필터</span><Icon className="list-filter-chevron" name="chevron" width="14" />{(category || !all) && <i className="filter-dot" />}</button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div></div>
-      {visible.map((p) => <button key={p.id} className="place-row" onClick={() => open("place", p.id)}><span className={`category-icon category-${categoryIcon(p.category)}`}><Icon name={categoryIcon(p.category)} width="28" height="28" /></span><span className="row-copy"><strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge" aria-label="새로 등록한 장소">NEW</span>}</strong><span className="row-meta">{placeMeta(p)}{sort === "near" && origin ? ` · ${(distanceM(origin, p) / 1000).toFixed(1)}km` : ""}</span><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span><small className="row-sharer"><Icon name="user" width="12" height="12" />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small></span><Icon name="chevron" width="18" /></button>)}
+    {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><Icon name={collection.icon} width={18} /><span>{collection.name} · {visible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
+    {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
+      <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode} loaded={loaded} distanceOrigin={sort === "near" ? origin : null} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
+        onMap={(id) => { setFocusedId(null); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}
+        tools={<div className="list-tools"><button className={`list-filter${category || !all ? " is-active" : ""}`} aria-label="상세 필터" aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>필터</span><Icon className="list-filter-chevron" name="chevron" width="14" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>} />
     </div>}
-    {loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>필터 초기화</button>}</div>}
+    {view === "map" && loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>필터 초기화</button>}</div>}
     {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
     {error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
     {view === "map" && focused && <PlaceCarousel hidden={!showPlaceCard} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
-    <BottomNav hidden={keyboard} current={view} />
+    <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} view={view} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); setFocusedId(null); close(); setOverlay(null); setSelectedId(null); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
     {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant="compact" onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}><h3>우리의 상태</h3><div className="filter-options"><button className="chip" aria-pressed={all} onClick={() => setStatuses([...STATUS_ORDER])}>전체</button>{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={!all && statuses.includes(s)} onClick={() => toggleStatus(s)}>{STATUS_LABEL[s]}</button>)}</div><h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}

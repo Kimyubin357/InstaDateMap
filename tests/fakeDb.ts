@@ -7,7 +7,7 @@ export function failNext(table: string, op: string, message = "테스트 DB 오�
 const uniq: Record<string, string[]> = { sources: ["board_id", "url"], places: ["board_id", "kakao_place_id"], source_places: ["source_id", "place_id", "added_by"], place_saves: ["place_id", "added_by"], access_sessions: ["token_hash"] };
 class Q {
   private filters: ((r: Row) => boolean)[] = []; private op = "select"; private patch: Row = {}; private result: Row[] | null = null;
-  private failure: { message: string } | null = null; private selection = ""; private max = Infinity; private sortKey = ""; private ascending = true;
+  private failure: { message: string } | null = null; private selection = ""; private max = Infinity; private offset = 0; private sortKey = ""; private ascending = true;
   constructor(private t: string) { tables[t] ??= []; }
   private failed(op: string) { const i = failures.findIndex((f) => f.table === this.t && f.op === op); if (i >= 0) this.failure = { message: failures.splice(i, 1)[0].message }; return !!this.failure; }
   select(value = "") { this.selection = value; return this; }
@@ -16,6 +16,7 @@ class Q {
   not(k: string, op: string, v: any) { this.filters.push((r) => r[k] != v); return this; }
   in(k: string, vs: any[]) { this.filters.push((r) => vs.includes(r[k])); return this; }
   order(k = "", opts?: { ascending?: boolean }) { this.sortKey = k; this.ascending = opts?.ascending !== false; return this; }
+  range(from: number, to: number) { this.offset = from; this.max = to - from + 1; return this; }
   limit(n: number) { this.max = n; return this; }
   update(p: Row) { this.op = "update"; this.failed("update"); this.patch = p; return this; }
   delete() { this.op = "delete"; this.failed("delete"); return this; }
@@ -37,7 +38,7 @@ class Q {
     if (this.selection.includes("places!inner")) all = all.map((r) => ({ ...r, places: tables.places?.find((p) => p.id === r.place_id) })).filter((r) => r.places);
     let rows = all.filter((r) => this.filters.every((f) => f(r)));
     if (this.sortKey) rows = [...rows].sort((a, b) => String(a[this.sortKey] ?? "").localeCompare(String(b[this.sortKey] ?? "")) * (this.ascending ? 1 : -1));
-    rows = rows.slice(0, this.max);
+    rows = rows.slice(this.offset, this.offset + this.max);
     if (this.op === "update") rows.forEach((r) => Object.assign(r, this.patch));
     if (this.op === "delete") {
       tables[this.t] = tables[this.t].filter((r) => !rows.includes(r));

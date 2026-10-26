@@ -279,3 +279,37 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 .sheet-place{--sheet-left:max(20px,env(safe-area-inset-left,0px));--sheet-right:max(20px,env(safe-area-inset-right,0px))}
 .sheet-place .sheet-body,.sheet-place .sheet-footer{padding-left:var(--sheet-left);padding-right:var(--sheet-right)}
 @media(min-width:760px){.sheet-place{--sheet-left:24px;--sheet-right:24px}}
+
+/* Collection screens keep the existing two-tab shell and reserve space for all actions. */
+html{-webkit-text-size-adjust:100%}
+.view-list .places-list.collections-list{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));bottom:calc(var(--nav-height) + 12px);padding-bottom:24px}
+.collections-list .list-tools select{font:inherit;font-size:17px;min-height:44px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--ink);background:var(--cream) var(--weave)}
+.view-list .map-controls{bottom:var(--dock-bottom)}
+.collection-map-scope{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);left:max(16px,env(safe-area-inset-left));max-width:calc(100% - 90px);display:flex;border:1px dashed var(--forest);border-radius:12px;background:var(--cream) var(--weave);color:var(--forest);box-shadow:var(--print-shadow)}
+.collection-map-scope button{background:none;border:0;color:inherit;min-height:44px;display:flex;gap:8px;align-items:center;padding:6px 10px;font-size:18px;min-width:44px}.collection-map-scope button:first-child{min-width:0}.collection-map-scope span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.has-pending-links .collection-map-scope{top:calc(var(--search-top) + 102px)}
+@media(orientation:landscape) and (max-height:600px){
+  :root{--search-top:max(8px,env(safe-area-inset-top));--dock-height:50px;--dock-bottom:max(8px,env(safe-area-inset-bottom))}
+  .unified-search-header{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right))}
+  .bottom-nav{height:50px;width:128px;left:75%}.bottom-nav a{width:44px;height:44px}
+  .view-list .places-list.collections-list{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));width:auto;transform:none;padding:0 0 16px;top:calc(var(--search-top) + var(--list-top))}
+  .view-list .map-controls{bottom:var(--dock-bottom);right:max(16px,env(safe-area-inset-right))}.view-list .save-fab{height:48px;min-height:48px;width:48px}
+  .map-controls,.has-place-card .map-controls{right:max(16px,env(safe-area-inset-right));bottom:calc(var(--dock-bottom) + 60px);flex-direction:row;gap:8px}.map-controls .save-fab{height:44px;width:44px;min-height:44px}
+  .floating-filters{right:max(16px,env(safe-area-inset-right));top:calc(var(--search-top) + 60px)}
+  .place-carousel{left:max(8px,env(safe-area-inset-left));right:auto;width:46%;transform:none;bottom:var(--dock-bottom);--card-width:calc(100% - 16px)}.place-card-rail{padding-inline:8px;scroll-padding-inline:8px}.place-card{height:154px}.place-card-main{padding:12px 14px}.place-card-main>strong{font-size:21px}.carousel-step{display:none}
+  .global-feedback.is-map,body:has(.persistent-map:not(.is-away) .has-place-card) .global-feedback.is-map{top:calc(var(--search-top) + 60px);bottom:auto;left:max(16px,env(safe-area-inset-left));right:90px;width:auto;max-width:420px;transform:none}
+  body:has(.modal-root) .global-feedback.is-map{top:auto;bottom:calc(var(--safe-b) + 72px)}
+  .collection-map-scope{max-width:46%}.has-pending-links .collection-map-scope{top:calc(var(--search-top) + 100px)}
+  .entry-page{max-width:650px;padding:20px max(24px,env(safe-area-inset-right)) 24px max(24px,env(safe-area-inset-left));overflow:visible}.entry-page .mascot{height:90px;margin:12px 0}.entry-page .mascot img{width:220px}.entry-subtitle{margin-bottom:12px}.entry-page .entry-form{max-width:360px;margin:auto}
+}
+@media(orientation:landscape) and (max-height:600px){
+  body:has(.persistent-map:not(.is-away) .view-list) .global-feedback.is-map{top:auto;bottom:calc(var(--nav-height) + 12px);left:max(16px,env(safe-area-inset-left));right:88px;max-width:420px;transform:none}
+}
+/* Keep the already-agreed wide-landscape corner placement; compact rows are for narrow phones. */
+@media(min-width:760px) and (orientation:landscape) and (max-height:600px){
+  .view-map .map-controls,.view-map.has-place-card .map-controls{bottom:var(--edge-bottom);flex-direction:column;gap:12px}
+  .view-map .map-controls .save-fab{width:56px;height:56px;min-height:56px}
+  .view-list .map-controls{bottom:var(--edge-bottom)}
+  .place-carousel{left:50%;right:auto;transform:translateX(-50%);width:460px;--card-width:400px;bottom:var(--map-bottom)}
+  .place-card-rail{padding-inline:30px;scroll-padding-inline:30px}.place-card{height:164px}.carousel-step{display:flex}
+}
