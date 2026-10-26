@@ -33,5 +33,3 @@
   .layout:global(.sheet-map):global(.is-fullscreen) :global(.sheet-heading-actions){grid-column:3}
 }
 @media(prefers-reduced-motion:reduce){.layout:global(.sheet-map){transition:none}}
-
-.layout:global(.sheet-map) :global([data-sheet-drag]){touch-action:none;user-select:none}

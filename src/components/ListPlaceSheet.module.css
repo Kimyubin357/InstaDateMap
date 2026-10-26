@@ -1,13 +1,20 @@
 /* Restore the list detail layout from 64d71b4, independently of the map sheet.
-   Map preview precedes the title; narrow screens use 48% / 63.5% / 92% stops. */
+   Map preview precedes the title; narrow screens use 48% / 63.5%; only the maximum becomes a full page. */
 .layout:global(.sheet-list){max-height:calc(var(--app-height) * .92)}
 .layout:global(.sheet-list) :global(.sheet-heading){position:relative;height:0;padding:0;z-index:2;flex:none}
 .layout:global(.sheet-list) :global(.sheet-heading)>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .layout:global(.sheet-list) :global(.sheet-heading-actions){position:absolute;right:calc(var(--sheet-right) + 10px);top:12px;display:flex;align-items:center;gap:8px}
-.layout:global(.sheet-list) :global(.sheet-heading-actions) :global(.sheet-close-btn){width:44px;height:44px;min-height:44px;padding:0;border-radius:20px;background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
-.layout:global(.sheet-list) :global(.sheet-close-btn)::before{display:none}
-.layout:global(.sheet-list) :global(.sheet-close-btn):enabled:active{background-color:var(--mist)}
 .layout:global(.sheet-list) :global(.detail-map){margin:0}
 .layout:global(.sheet-list) :global(.detail-title){margin:22px 0 0;align-items:flex-start}
-.layout:global(.sheet-list) :global([data-sheet-drag]){touch-action:none;user-select:none}
 @media(prefers-reduced-motion:reduce){.layout{transition:none}}
+
+.layout:global(.sheet-list) :global(.sheet-back-btn){display:none;width:44px;height:44px}
+.layout:global(.sheet-list):global(.is-fullscreen){left:0;right:0;width:100%;max-width:none;max-height:100%;padding-top:0;transform:none;border-radius:0;border-top:0}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-handle){height:0;visibility:hidden}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-heading){height:auto;display:flex;justify-content:space-between;padding:calc(var(--safe-t) + 6px) var(--sheet-right) 8px var(--sheet-left)}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-heading-actions){position:static}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-back-btn){display:inline-flex}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-body){flex:1}
+@media(orientation:landscape) and (max-height:600px){
+  .layout:global(.sheet-list):global(.is-fullscreen){--sheet-left:max(20px,env(safe-area-inset-left,0px));--sheet-right:max(20px,env(safe-area-inset-right,0px))}
+}

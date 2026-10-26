@@ -279,9 +279,11 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 }
 
 /* A small printed close mark, with a separate 44px touch target. */
-.sheet-place .sheet-heading-actions .sheet-close-btn{position:relative;border:0;background:none;box-shadow:none;border-radius:50%;width:44px;height:44px;min-height:44px}
-.sheet-place .sheet-heading-actions .sheet-close-btn::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
-.sheet-place .sheet-close-btn>svg{position:relative;width:18px;height:18px}
+.sheet-place .sheet-heading-actions .sheet-close-btn,.carousel-dismiss.icon-btn{position:relative;border:0;background:none;box-shadow:none;border-radius:50%;width:44px;height:44px;min-height:44px}
+.sheet-place .sheet-heading-actions .sheet-close-btn::before,.carousel-dismiss::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+.sheet-place .sheet-close-btn>svg,.carousel-dismiss>svg{position:relative;width:18px;height:18px}
 .sheet-place.is-fullscreen .sheet-close-btn::before{display:none}
 .sheet-place.is-fullscreen .sheet-close-btn>svg{width:22px;height:22px}
-.sheet-place .sheet-close-btn:enabled:active::before{background-color:var(--mist)}
+.sheet-place .sheet-close-btn:enabled:active::before,.carousel-dismiss:enabled:active::before{background-color:var(--mist)}
+
+.carousel-dismiss.icon-btn{position:absolute}
