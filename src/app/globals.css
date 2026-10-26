@@ -272,4 +272,5 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
   .is-search-idle .floating-settings.icon-btn{position:fixed;top:var(--search-top);right:calc(var(--corner-right) + 4px)}
   .floating-filters{left:auto;right:calc(var(--corner-right) + 4px)}
   .map-controls,.view-list .map-controls{right:var(--corner-right);bottom:28px}
+  .bottom-nav{left:75%}
 }
