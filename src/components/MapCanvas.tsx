@@ -279,7 +279,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     else {
       const k = window.kakao.maps;
       framedPlace.current = viewRequest;
-      const targetLevel = viewRequest.level ?? 4;
+      // Selecting one place must leave the count-marker range, including when already at level 4.
+      const targetLevel = viewRequest.level ?? (CLUSTER_MIN_LEVEL - 1);
       if (viewRequest.smooth) {
         const center = map.current.getCenter();
         if (map.current.getLevel() > targetLevel) map.current.setLevel(targetLevel);
