@@ -1,29 +1,40 @@
 "use client";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import Icon from "./Icon";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
 import { layoutViewportHeight, visibleViewport } from "@/lib/viewport";
-export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, summary, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; summary?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
   const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const suppressClickUntil = useRef(0);
   const drag = useRef<{ id: number; source: "handle" | "content"; stop: SheetStop; startY: number; height: number; lastY: number; lastTime: number; velocity: number; moved: boolean } | undefined>(undefined);
   useEffect(() => {
     const resize = () => {
-      mobile.current = window.matchMedia("(max-width:759px)").matches;
+      mobile.current = window.matchMedia("(max-width:759px), (max-height:600px) and (orientation:landscape)").matches;
       const layoutHeight = layoutViewportHeight();
       const editable = !!document.activeElement?.matches("input,textarea,[contenteditable=true]");
       const { top, height } = visibleViewport(layoutHeight, window.visualViewport?.height || window.innerHeight, window.visualViewport?.offsetTop || 0, editable);
-      stops.current = sheetStops(height);
+      const content = summaryRef.current && footerRef.current && ref.current;
+      const preview = body.current?.querySelector<HTMLElement>("[data-sheet-preview]");
+      const style = content ? getComputedStyle(ref.current!) : undefined;
+      stops.current = sheetStops(height, content ? {
+        collapsed: Math.max(44, summaryRef.current!.getBoundingClientRect().height) + parseFloat(style!.getPropertyValue("--sheet-summary-space")) + parseFloat(style!.getPropertyValue("--sheet-handle-height")) + footerRef.current!.getBoundingClientRect().height + 1,
+        preview: (preview?.getBoundingClientRect().height || 0) + 16,
+      } : undefined);
       setViewport((previous) => mobile.current ? previous?.top === top && previous.height === height ? previous : { top, height } : undefined);
       setHeight(mobile.current && variant === "resizable" ? stops.current[stop.current] : undefined);
     };
+    const observer = new ResizeObserver(resize);
+    for (const element of [summaryRef.current, footerRef.current, body.current?.querySelector("[data-sheet-preview]")]) if (element) observer.observe(element, { box: "border-box" });
     resize(); window.addEventListener("resize", resize); window.addEventListener("pageshow", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
-    return () => { window.removeEventListener("resize", resize); window.removeEventListener("pageshow", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
-  }, [variant]);
+    return () => { observer.disconnect(); window.removeEventListener("resize", resize); window.removeEventListener("pageshow", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
+  }, [variant, !!summary]);
   function revealInput() {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !ref.current?.contains(active) || !active.matches("input, textarea, select")) return;
@@ -32,7 +43,17 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     if (field.top < area.top || field.bottom > area.bottom) active.scrollIntoView({ block: "nearest" });
   }
   useEffect(() => { revealInput(); }, [viewport]);
-  function snap(next: SheetStop) { stop.current = next; setHeight(stops.current[next]); }
+  function snap(next: SheetStop) {
+    const active = document.activeElement;
+    stop.current = next; setHeight(stops.current[next]);
+    if (summary && mobile.current) {
+      if (next === 0 && active instanceof HTMLElement && body.current?.contains(active)) active.blur();
+      if (next === 0 || active?.classList.contains("sheet-back-btn") || active?.classList.contains("sheet-handle")) {
+        requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(next === 2 ? ".sheet-back-btn" : ".sheet-handle")?.focus({ preventScroll: true }));
+      }
+    }
+    if (next < 2 && body.current) body.current.scrollTop = 0;
+  }
   function beginDrag(id: number, y: number, time: number, source: "handle" | "content") {
     drag.current = { id, source, stop: stop.current, startY: y, height: ref.current!.getBoundingClientRect().height, lastY: y, lastTime: time, velocity: 0, moved: false };
   }
@@ -45,7 +66,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     if (elapsed > 0) current.velocity = (y - current.lastY) / elapsed;
     current.lastY = y; current.lastTime = time;
     const minimum = current.stop > 0 ? stops.current[current.stop - 1] : 32;
-    setHeight(Math.max(minimum, Math.min(stops.current[2] + 20, current.height - delta)));
+    setHeight(Math.max(minimum, Math.min(stops.current[2], current.height - delta)));
   }
   function finishDrag(id: number, y: number, time: number, cancelled = false) {
     const current = drag.current; if (!current || current.id !== id) return;
@@ -95,7 +116,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
       if (event.touches.length !== 1 || selection && !selection.isCollapsed) { cancel(); return; }
       const touch = event.touches[0];
       if (candidate) {
-        const decision = contentPullDecision(container.scrollTop, touch.clientX - candidate.x, touch.clientY - candidate.y);
+        const decision = contentPullDecision(container.scrollTop, touch.clientX - candidate.x, touch.clientY - candidate.y, stop.current);
         if (decision === "pending") return;
         if (decision === "scroll" || !event.cancelable) { candidate = undefined; return; }
         beginDrag(candidate.id, candidate.y, candidate.time, "content"); candidate = undefined;
@@ -113,7 +134,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
       if (event.cancelable) event.preventDefault();
       finishDrag(touch.identifier, touch.clientY, event.timeStamp);
     };
-    // Claim only the downward edge pull; regular content scrolling stays native.
+    // Claim vertical edge pulls below full height; scrolling inside a full sheet stays native.
     container.addEventListener("touchstart", startContent, { passive: true });
     container.addEventListener("touchmove", moveContent, { passive: false });
     container.addEventListener("touchend", endContent, { passive: false });
@@ -142,8 +163,16 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
   if (typeof document === "undefined") return null;
-  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""} ${className}`} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
-    {variant === "resizable" && <div className="sheet-handle" tabIndex={0} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
+  const fullScreen = !!summary && !!viewport && stop.current === 2;
+  const collapsed = !!summary && !!viewport && stop.current === 0 && !dragging;
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}${fullScreen ? " is-fullscreen" : ""}${collapsed ? " is-collapsed" : ""} ${className}`} data-resizable={!!viewport && variant === "resizable"} data-sheet-stop={stop.current} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
+    {variant === "resizable" && <div className="sheet-handle" tabIndex={fullScreen ? -1 : 0} aria-hidden={fullScreen || undefined} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></div>}
-    <div className="sheet-heading"><h2>{title}</h2>{headerActions && <div className="sheet-heading-actions">{headerActions}</div>}</div><div ref={body} className="sheet-body" onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>{footer && <div className="sheet-footer">{footer}</div>}</section></div>, document.body);
+    <div className="sheet-heading">
+      {summary && <button type="button" className="icon-btn sheet-back-btn" aria-label="뒤로 가기" onClick={() => snap(1)}><Icon name="back" width="22" /></button>}
+      {summary ? <div ref={summaryRef} className="sheet-summary">{summary}</div> : <h2>{title}</h2>}
+      {headerActions && <div className="sheet-heading-actions">{headerActions}</div>}
+    </div>
+    <div ref={body} className="sheet-body" inert={collapsed || undefined} onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>
+    {footer && <div ref={footerRef} className="sheet-footer">{footer}</div>}</section></div>, document.body);
 }

@@ -2,6 +2,22 @@ import { describe, expect, it } from "vitest";
 import { contentPullDecision, settleSheet, sheetStops } from "@/lib/sheet";
 
 describe("손잡이로 조절하는 바텀시트", () => {
+  it("장소 시트는 최소에서 제목·동작만, 중간에서 상태 선택까지, 최대에서 화면 전체를 보여줌", () => {
+    expect(sheetStops(852, { collapsed: 204, preview: 250 })).toEqual([204, 454, 852]);
+    for (const viewport of [200, 320, 375, 390, 430, 568]) {
+      const [minimum, middle, full] = sheetStops(viewport, { collapsed: 180, preview: 300 });
+      expect(minimum).toBeLessThan(middle);
+      expect(middle).toBeLessThan(full);
+      expect(full).toBe(viewport);
+    }
+  });
+  it("느린 위 당기기도 한 단계 올리며 최소에서 최대까지 건너뛰지 않음", () => {
+    const stops = sheetStops(852, { collapsed: 204, preview: 250 });
+    expect(settleSheet(stops[1] + 40, 0, stops, { stop: 1, height: stops[1] })).toBe(2);
+    expect(settleSheet(850, -3, stops, { stop: 0, height: stops[0] })).toBe(1);
+    const short = sheetStops(320, { collapsed: 150, preview: 250 });
+    expect(settleSheet(short[0] + 20, -3, short, { stop: 0, height: short[0] })).toBe(1);
+  });
   it("작은 화면과 키보드가 열린 화면에서도 세 단계가 화면 안에 남음", () => {
     for (const viewport of [320, 560, 844]) {
       const stops = sheetStops(viewport);
@@ -46,6 +62,13 @@ describe("손잡이로 조절하는 바텀시트", () => {
 });
 
 describe("상세 내용 스크롤과 시트 내리기 구분", () => {
+  it("최상단에서 위로 밀면 낮은 단계는 펼치고 최대에서는 본문을 스크롤함", () => {
+    expect(contentPullDecision(0, 2, -40, 0)).toBe("sheet");
+    expect(contentPullDecision(0, 2, -40, 1)).toBe("sheet");
+    expect(contentPullDecision(0, 2, -40, 2)).toBe("scroll");
+    expect(contentPullDecision(20, 2, -40, 1)).toBe("scroll");
+    expect(contentPullDecision(0, 40, -5, 1)).toBe("scroll");
+  });
   it("맨 위에서 아래로 당길 때만 시트가 제스처를 이어받음", () => {
     expect(contentPullDecision(0, 2, 40)).toBe("sheet");
     expect(contentPullDecision(-3, 2, 40)).toBe("sheet");
