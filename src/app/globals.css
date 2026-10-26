@@ -79,11 +79,12 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 .app-root{--header-height:0px}
 .map-surface{inset:0}
 .floating-settings.icon-btn{width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 3px 12px #45291f1f}
-.floating-filters{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);right:var(--search-edge);width:48px;height:48px}
-.floating-filters .bordered{width:48px;height:48px;border-radius:50%;box-shadow:0 2px 8px #45291f12}
+/* Small map buttons: 42px (Naver Map's small round buttons). Settings 48px and + 56px stay larger. Filter is centred under settings. */
+.floating-filters{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);right:calc(var(--search-edge) + 3px);width:42px;height:42px}
+.floating-filters .bordered{width:42px;height:42px;border-radius:50%;box-shadow:0 2px 8px #45291f12}
 .pending-map-badge{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);left:16px;display:flex;align-items:center;gap:6px;min-height:36px;padding:7px 12px;border:1px solid #ffe0e7;border-radius:20px;background:#fff;color:var(--accent-ink);font-size:12px;font-weight:650;box-shadow:0 2px 8px #45291f12}
 .map-controls{right:16px;bottom:var(--map-bottom);gap:12px;align-items:center}
-.map-controls .saved-places-btn,.map-controls .locate-btn{width:48px;height:48px;min-height:48px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.map-controls .saved-places-btn,.map-controls .locate-btn{width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .save-fab{width:56px;height:56px;min-height:56px;padding:0;border-radius:50%;box-shadow:0 4px 14px #d8315533}
 .bottom-nav{position:absolute;z-index:20;left:50%;right:auto;bottom:var(--dock-bottom);transform:translateX(-50%);width:136px;height:var(--dock-height);padding:5px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #e9e5e480;border-radius:99px;box-shadow:0 4px 20px #45291f26}
 .bottom-nav[hidden]{display:none}.bottom-nav a{flex:none;display:flex;align-items:center;justify-content:center;width:50px;height:50px;text-decoration:none;color:var(--ink);border-radius:50%}
@@ -131,7 +132,7 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 @media(min-width:760px){
   :root{--search-top:16px;--search-edge:28px;--dock-bottom:24px}
   .map-surface{inset:0}
-  .floating-filters{left:calc(var(--search-edge) + var(--search-width) - 48px);right:auto}
+  .floating-filters{left:calc(var(--search-edge) + var(--search-width) - 45px);right:auto}
   .pending-map-badge{left:28px}.map-controls{right:28px;bottom:28px}
   .view-list .places-list{padding:12px 24px calc(var(--map-bottom) + 12px);bottom:0}
   .view-list .map-controls{right:calc(50% - 336px);bottom:var(--map-bottom)}
@@ -217,7 +218,7 @@ button:enabled:active:is(.place-row,.unified-place-row,.recent-term){background:
   .sheet-place{padding-top:20px;max-height:calc(var(--app-height) * .92)}.sheet-place .sheet-body{padding:0 24px 24px}.sheet-place .sheet-heading>.icon-btn{right:36px}.detail-map{height:200px}
 }
 @media(max-width:359px){.place-carousel{--card-width:calc(100vw - 40px)}.place-card-rail{padding-inline:20px;scroll-padding-inline:20px}.place-card{border-radius:22px}.place-card-main{padding-left:15px}.place-card-main>strong{font-size:19px}.detail-title>h2{font-size:23px}.detail-title{gap:6px}}
-@media(max-height:699px) and (max-width:759px){.has-place-card .map-controls{gap:8px;flex-direction:row;bottom:calc(var(--map-bottom) + 176px)}.map-controls .saved-places-btn,.map-controls .locate-btn{width:44px;height:44px;min-height:44px}.has-place-card .save-fab{width:48px;height:48px;min-height:48px}.detail-map{height:140px}}
+@media(max-height:699px) and (max-width:759px){.has-place-card .map-controls{gap:8px;flex-direction:row;bottom:calc(var(--map-bottom) + 176px)}.has-place-card .save-fab{width:48px;height:48px;min-height:48px}.detail-map{height:140px}}
 
 /* Installed apps have no browser toolbar: use the full viewport, including the status/home-indicator areas. */
 @media(display-mode:standalone){:root{--app-height:100vh}html,body{height:var(--app-height);min-height:var(--app-height)}}
@@ -270,7 +271,7 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
   :root{--corner-right:calc(28px + env(safe-area-inset-right,0px))}
   .unified-search-header{left:calc(var(--search-edge) + env(safe-area-inset-left,0px));width:calc(var(--search-width) - 58px)}
   .is-search-idle .floating-settings.icon-btn{position:fixed;top:var(--search-top);right:calc(var(--corner-right) + 4px)}
-  .floating-filters{left:auto;right:calc(var(--corner-right) + 4px)}
+  .floating-filters{left:auto;right:calc(var(--corner-right) + 7px)}
   .map-controls,.view-list .map-controls{right:var(--corner-right);bottom:28px}
   .bottom-nav{left:75%}
 }
