@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import { contentPullDecision, sheetStops, settleSheet, type SheetStop } from "@/lib/sheet";
 import { layoutViewportHeight, visibleViewport } from "@/lib/viewport";
-export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, summary, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; summary?: ReactNode; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
+export default function Modal({ title, children, onClose, variant = "resizable", footer, headerActions, summary, fullScreenAtMax = !!summary, className = "", initialStop = 1, dragFromContent = false, dialogRole = "dialog" }: { title: string; children: ReactNode; onClose: () => void; variant?: "resizable" | "compact"; footer?: ReactNode; headerActions?: ReactNode; summary?: ReactNode; fullScreenAtMax?: boolean; className?: string; initialStop?: SheetStop; dragFromContent?: boolean; dialogRole?: "dialog" | "alertdialog" }) {
   const ref = useRef<HTMLElement>(null); const close = useRef(onClose); close.current = onClose;
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
@@ -27,6 +27,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
         collapsed: Math.max(44, summaryRef.current!.getBoundingClientRect().height) + parseFloat(style!.getPropertyValue("--sheet-summary-space")) + parseFloat(style!.getPropertyValue("--sheet-handle-height")) + footerRef.current!.getBoundingClientRect().height + 1,
         preview: (preview?.getBoundingClientRect().height || 0) + 16,
       } : undefined);
+      if (fullScreenAtMax) stops.current[2] = height;
       setViewport((previous) => mobile.current ? previous?.top === top && previous.height === height ? previous : { top, height } : undefined);
       setHeight(mobile.current && variant === "resizable" ? stops.current[stop.current] : undefined);
     };
@@ -34,7 +35,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     for (const element of [summaryRef.current, footerRef.current, body.current?.querySelector("[data-sheet-preview]")]) if (element) observer.observe(element, { box: "border-box" });
     resize(); window.addEventListener("resize", resize); window.addEventListener("pageshow", resize); window.visualViewport?.addEventListener("resize", resize); window.visualViewport?.addEventListener("scroll", resize);
     return () => { observer.disconnect(); window.removeEventListener("resize", resize); window.removeEventListener("pageshow", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
-  }, [variant, !!summary]);
+  }, [variant, !!summary, fullScreenAtMax]);
   function revealInput() {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !ref.current?.contains(active) || !active.matches("input, textarea, select")) return;
@@ -46,7 +47,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   function snap(next: SheetStop) {
     const active = document.activeElement;
     stop.current = next; setHeight(stops.current[next]);
-    if (summary && mobile.current) {
+    if (fullScreenAtMax && mobile.current) {
       if (next === 0 && active instanceof HTMLElement && body.current?.contains(active)) active.blur();
       if (next === 0 || active?.classList.contains("sheet-back-btn") || active?.classList.contains("sheet-handle")) {
         requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(next === 2 ? ".sheet-back-btn" : ".sheet-handle")?.focus({ preventScroll: true }));
@@ -78,17 +79,17 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     if (target === null) { snap(stop.current); close.current(); }
     else snap(target);
   }
-  function start(e: PointerEvent<HTMLDivElement>) {
+  function start(e: PointerEvent<HTMLElement>) {
     if (!mobile.current || !e.isPrimary || e.button !== 0) return;
     beginDrag(e.pointerId, e.clientY, e.timeStamp, "handle");
     e.currentTarget.setPointerCapture(e.pointerId);
   }
-  function move(e: PointerEvent<HTMLDivElement>) {
+  function move(e: PointerEvent<HTMLElement>) {
     if (drag.current?.source !== "handle") return;
     e.preventDefault();
     moveDrag(e.pointerId, e.clientY, e.timeStamp);
   }
-  function finish(e: PointerEvent<HTMLDivElement>, cancelled = false) {
+  function finish(e: PointerEvent<HTMLElement>, cancelled = false) {
     if (drag.current?.source === "handle") finishDrag(e.pointerId, e.clientY, e.timeStamp, cancelled);
   }
   useEffect(() => {
@@ -163,14 +164,16 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     return () => { document.removeEventListener("keydown", keyboard); if (previous?.isConnected) previous.focus(); };
   }, []);
   if (typeof document === "undefined") return null;
-  const fullScreen = !!summary && !!viewport && stop.current === 2;
+  const fullScreen = fullScreenAtMax && !!viewport && stop.current === 2;
   const collapsed = !!summary && !!viewport && stop.current === 0 && !dragging;
-  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}${fullScreen ? " is-fullscreen" : ""}${collapsed ? " is-collapsed" : ""} ${className}`} data-resizable={!!viewport && variant === "resizable"} data-sheet-stop={stop.current} style={height === undefined ? undefined : { height }} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
-    {variant === "resizable" && <div className="sheet-handle" tabIndex={fullScreen ? -1 : 0} aria-hidden={fullScreen || undefined} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start} onPointerMove={move} onPointerUp={(e) => finish(e)} onPointerCancel={(e) => finish(e, true)} onLostPointerCapture={(e) => finish(e, true)}
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}${fullScreen ? " is-fullscreen" : ""}${collapsed ? " is-collapsed" : ""} ${className}`} data-resizable={!!viewport && variant === "resizable"} data-sheet-stop={stop.current} style={height === undefined ? undefined : { height }} onPointerDown={(event) => {
+      if (dragFromContent && event.target instanceof Element && event.target.closest("[data-sheet-drag]") && !event.target.closest("button,a,input,textarea,select")) start(event);
+    }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)} onLostPointerCapture={(event) => finish(event, true)} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
+    {variant === "resizable" && <div className="sheet-handle" tabIndex={fullScreen ? -1 : 0} aria-hidden={fullScreen || undefined} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></div>}
     <div className="sheet-heading">
-      {summary && <button type="button" className="icon-btn sheet-back-btn" aria-label="뒤로 가기" onClick={() => snap(1)}><Icon name="back" width="22" /></button>}
-      {summary ? <div ref={summaryRef} className="sheet-summary">{summary}</div> : <h2>{title}</h2>}
+      {fullScreenAtMax && <button type="button" className="icon-btn sheet-back-btn" aria-label="뒤로 가기" onClick={() => snap(1)}><Icon name="back" width="22" /></button>}
+      {summary ? <div ref={summaryRef} className="sheet-summary" data-sheet-drag={dragFromContent || undefined}>{summary}</div> : <h2>{title}</h2>}
       {headerActions && <div className="sheet-heading-actions">{headerActions}</div>}
     </div>
     <div ref={body} className="sheet-body" inert={collapsed || undefined} onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}>{children}</div>

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Modal from "./Modal";
+import MapPlaceSheet from "./MapPlaceSheet";
+import ListPlaceSheet from "./ListPlaceSheet";
 import Icon from "./Icon";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, type PlaceView, placeMeta } from "@/lib/place-view";
@@ -13,8 +14,8 @@ import { useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
 const ignore = () => {};
-/** `mapPreview`: only sheets opened from the list show the mini map and "지도에서 보기"; on the map the place is already visible. */
-export default function PlaceSheet({ place, kakaoKey, mapPreview = true, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; mapPreview?: boolean; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
+/** Share mutations and draft protection; map/list components own their UI independently. */
+export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
   const { notify, store, lock } = useBoardSync();
   const copy = placeCopyContent(place);
   const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());
@@ -108,18 +109,20 @@ export default function PlaceSheet({ place, kakaoKey, mapPreview = true, onClose
     finally { deleteRequest.current = false; setBusy(false); }
   }
   const closeSheet = busy || deleting || leaving ? () => {} : () => requestLeave("close");
-  return <><Modal title={place.name} className={`sheet-place${mapPreview ? "" : " no-map-preview"}`} initialStop={1} dragFromContent onClose={closeSheet}
+  const Layout = view === "map" ? MapPlaceSheet : ListPlaceSheet;
+  return <><Layout title={place.name} onClose={closeSheet}
     summary={<div className="detail-title"><h2>{place.name}</h2><span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span></div>}
-    headerActions={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
+    closeAction={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
-    </div>}>
-    <div data-sheet-preview><p className="addr">{place.address}</p>
+    </div>}
+    overview={<><p className="addr">{place.address}</p>
     <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>함께 가볼 곳</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] || "우리"}</strong><span>발견한 사람</span></div></div>
     <div className="detail-section-heading"><span className="section-label">우리에게 어떤 곳인가요?</span></div>
     <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div>
-    </div>
-    {mapPreview && <div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
+    </>}
+    preview={<div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
+    details={<>
     {statusPending && <button className="text-btn" disabled={busy} onClick={retryStatus}>상태 저장 확인·재시도</button>}
     {activity && <p className="notice" role="status">{activity}</p>}
     {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
@@ -128,7 +131,7 @@ export default function PlaceSheet({ place, kakaoKey, mapPreview = true, onClose
       {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
       <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>
     </div>
-    </Modal>{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); if (destination === "map") onShowMap(); else onClose(); }} />}
+    </>} />{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); if (destination === "map") onShowMap(); else onClose(); }} />}
     {deleting && <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel="취소" confirmLabel="삭제하기" busy={busy} busyLabel="삭제 중…" onClose={dismissDelete} onConfirm={remove}>
       <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>두 사람의 지도에서 삭제돼요.<br />설정의 ‘삭제한 장소’에서 메모와 저장 기록까지 복구할 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
     </ActionDialog>}</>;

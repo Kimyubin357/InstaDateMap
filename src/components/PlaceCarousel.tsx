@@ -4,8 +4,8 @@ import Icon from "./Icon";
 import { STATUS_LABEL } from "@/lib/types";
 import { placeMeta, type PlaceView } from "@/lib/place-view";
 
-export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, onDismiss, newPlaceIds }: {
-  newPlaceIds?: ReadonlySet<string>; places: PlaceView[]; selectedId: string; onSelect: (id: string) => void; onOpen: (id: string) => void; onDismiss: () => void;
+export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, onDismiss, newPlaceIds, hidden = false }: {
+  hidden?: boolean; newPlaceIds?: ReadonlySet<string>; places: PlaceView[]; selectedId: string; onSelect: (id: string) => void; onOpen: (id: string) => void; onDismiss: () => void;
 }) {
   const rail = useRef<HTMLDivElement>(null);
   const settledId = useRef<string | undefined>(undefined); const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -48,7 +48,7 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
     if (next) align(next.id, true);
   }
   const index = places.findIndex((place) => place.id === selectedId);
-  return <section className="place-carousel" aria-label="저장한 장소 카드" aria-roledescription="캐러셀" onKeyDown={(event) => {
+  return <section className="place-carousel" hidden={hidden} style={hidden ? { display: "none" } : undefined} aria-label="저장한 장소 카드" aria-roledescription="캐러셀" onKeyDown={(event) => {
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); step(event.key === "ArrowRight" ? 1 : -1); }
   }}>
     <div ref={rail} className="place-card-rail" onScroll={settle}

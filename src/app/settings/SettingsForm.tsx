@@ -46,7 +46,6 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
     <section className="settings-section"><ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span>삭제한 장소</span><Icon name="chevron" /></ShellLink><p className="hint">삭제한 장소를 확인하고 복구하거나 영구 삭제해요.</p></section>
     <PushSettings />
     <section className="settings-section"><button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span>이 기기 잠그기</span></button><p className="hint">다음에 열 때 PIN을 다시 입력해요.</p></section>
-    <section className="settings-section"><h2>인스타에서 더 쉽게 저장하기</h2><p className="hint">공유 단축어에서 인스타 링크를 받아 이 앱의 <code>/add?url=공유링크</code> 주소를 열어 주세요. 예전 단축어는 새 방식으로 바꿔야 해요.</p></section>
     {error && !locking && <p role="alert" className="error">{error}</p>}
     {locking && <ActionDialog title="이 기기를 잠글까요?" message="다음에 지도를 열 때 PIN을 다시 입력해야 해요." tone="info" cancelLabel="취소" confirmLabel="잠그기" busy={busy} busyLabel="잠그는 중…" onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => action("/api/access/lock", {}).then(() => undefined)}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
     </ClientReady></main>;
