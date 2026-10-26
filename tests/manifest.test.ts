@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
 import { readFileSync } from "node:fs";
+import { appleStartupImages, appleStartupSizes } from "@/lib/splash";
 
 describe("홈 화면 앱의 이동 범위", () => {
+  it("iPhone 시작 이미지의 실제 픽셀 크기가 화면별 미디어 조건과 일치", () => {
+    appleStartupSizes.forEach(([width, height, ratio], index) => {
+      const image = appleStartupImages[index];
+      expect(image.media).toContain(`device-width: ${width}px`);
+      expect(image.media).toContain(`device-height: ${height}px`);
+      expect(image.media).toContain(`pixel-ratio: ${ratio}`);
+      expect(image.media).toContain("orientation: portrait");
+      const png = readFileSync(`public${image.url}`);
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([width * ratio, height * ratio]);
+    });
+  });
   it("iPhone 180px와 Android 192px·512px PNG 아이콘을 실제 크기로 제공", () => {
     const dimensions = (file: string) => {
       const png = readFileSync(file);

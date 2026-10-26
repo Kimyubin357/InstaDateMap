@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "splash:assets": "node scripts/generate-splash.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
