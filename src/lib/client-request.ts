@@ -26,8 +26,8 @@ export async function withRequestDeadline<T>(task: (signal: AbortSignal) => Prom
   } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", abort); }
 }
 
-export async function requestJson<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
-  const { timeoutMs = /^\/api\/(share|sources)(\/|$)/.test(url) && init.method === "POST" ? 65000 : 15000, signal, ...request } = init;
+export async function requestJson<T>(url: string, init: RequestInit & { timeoutMs?: number; notifyBoardChange?: boolean } = {}): Promise<T> {
+  const { timeoutMs = /^\/api\/(share|sources)(\/|$)/.test(url) && init.method === "POST" ? 65000 : 15000, notifyBoardChange = true, signal, ...request } = init;
   const body = await withRequestDeadline(async (signal) => {
   let res: Response;
   try { res = await fetch(url, { ...request, signal }); }
@@ -38,6 +38,6 @@ export async function requestJson<T>(url: string, init: RequestInit & { timeoutM
   if (!body) throw new ConnectionError("서버 응답을 읽지 못했어요.");
   return body as T;
   }, { signal, timeoutMs });
-  if (init?.method && !["GET", "HEAD"].includes(init.method.toUpperCase()) && /^\/api\/(places|sources|share|trash)(\/|$)/.test(url)) boardChanged();
+  if (notifyBoardChange && init?.method && !["GET", "HEAD"].includes(init.method.toUpperCase()) && /^\/api\/(places|sources|share|trash)(\/|$)/.test(url)) boardChanged();
   return body;
 }

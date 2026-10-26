@@ -23,12 +23,14 @@ export function useSourceSession(sourceId?: string, version?: string) {
     const claim = async () => {
       if (!active || flight) return;
       flight = true; setChecking(true); setError("");
-      try { await enqueue(url, () => requestJson(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body("claim"), timeoutMs: 10000 })); if (active) { setReady(true); setError(""); } }
+      // Lease-only requests do not change the map. Any interrupted-source
+      // recovery performed by the server still publishes its own revision.
+      try { await enqueue(url, () => requestJson(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body("claim"), timeoutMs: 10000, notifyBoardChange: false })); if (active) { setReady(true); setError(""); } }
       catch (e) { if (active) { setReady(false); setError(e instanceof Error ? e.message : "링크 상태를 확인하지 못했어요."); } }
       finally { flight = false; if (active) setChecking(false); }
     };
     claimRef.current = claim;
-    const release = () => { void enqueue(url, () => requestJson(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body("release"), keepalive: true, timeoutMs: 5000 })).catch(() => {}); };
+    const release = () => { void enqueue(url, () => requestJson(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body("release"), keepalive: true, timeoutMs: 5000, notifyBoardChange: false })).catch(() => {}); };
     const resume = () => { if (document.visibilityState === "visible") void claim(); };
     void claim();
     const timer = setInterval(() => { if (document.visibilityState === "visible") void claim(); }, 25000);

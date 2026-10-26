@@ -2,6 +2,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { requestJson, RequestError, RequestTimeoutError, withRequestDeadline } from "@/lib/client-request";
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("화면 요청 오류 처리", () => {
+  it("작업 권한 확보·반납만 변경 알림을 생략하며 제외·장소 저장은 계속 알림", async () => {
+    const target = new EventTarget(), changed = vi.fn(); target.addEventListener("datemap:changed", changed);
+    vi.stubGlobal("window", target);
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);
+    for (const action of ["claim", "release"]) {
+      await requestJson("/api/sources/id/session", { method: "POST", body: JSON.stringify({ action }), notifyBoardChange: false });
+    }
+    expect(changed).not.toHaveBeenCalled();
+    for (const [, init] of fetcher.mock.calls) {
+      expect(init).not.toHaveProperty("notifyBoardChange");
+    }
+    await requestJson("/api/sources/id/session", { method: "POST", body: JSON.stringify({ action: "dismiss" }) });
+    await requestJson("/api/places", { method: "POST" });
+    await requestJson("/api/places/id", { method: "PATCH", notifyBoardChange: true });
+    expect(changed).toHaveBeenCalledTimes(3);
+  });
+
   it("상태 수정·삭제 HTTP 실패를 서버 메시지로 전달", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ message: "저장 실패" }, { status: 500 })));
     await expect(requestJson("/api/places/id", { method: "PATCH" })).rejects.toThrow("저장 실패");
