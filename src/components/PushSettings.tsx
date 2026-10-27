@@ -129,7 +129,7 @@ export default function PushSettings() {
   const available = !!registration && !!config?.configured;
   const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? "이 기기에서 알림을 받고 있어요." : "상대방이 장소를 담거나 메모를 바꾸면 알려드려요.");
   return <div className="push-settings" aria-busy={busy || checking}>
-    <button type="button" className="settings-row" role="switch" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
+    <button type="button" className="settings-row" role="switch" aria-label="우리 지도 알림" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
       <Icon name="bell" /><span className="settings-copy"><span>우리 지도 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
     <span className="sr-only" role="status">{status}</span>
     {hint && !checking && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}

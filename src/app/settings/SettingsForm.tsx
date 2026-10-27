@@ -9,6 +9,7 @@ import { useBoardSync } from "@/components/BoardProvider";
 import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
+import IdentityOption from "@/components/IdentityOption";
 export default function SettingsForm({ who, names, onPinChanged }: { who: string; names: string[]; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
   const [name, setName] = useState(who); const [currentPin, setCurrent] = useState(""); const [newPin, setNew] = useState(""); const [confirmPin, setConfirm] = useState("");
@@ -16,6 +17,7 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
   const [locking, setLocking] = useState(false); const [choosing, setChoosing] = useState(false);
   const acting = useRef(false);
   const accessRetry = useRef<HTMLButtonElement>(null);
+  const identityToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { setName(who); }, [who]);
   useEffect(() => {
     if (sync.accessError) { accessRetry.current?.focus({ preventScroll: true }); accessRetry.current?.scrollIntoView({ block: "center" }); }
@@ -43,8 +45,8 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
   return <main className="form-page settings-page"><ClientReady><PageHeader title="우리 설정" />
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
-      <button className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>
-      {choosing && <div id="settings-identity" className="settings-expand"><div className="seg two" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <button key={n} disabled={busy || sync.suspended} aria-pressed={name === n} onClick={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); sync.notify(`${n}님의 기기로 기억할게요.`); } }}>{n}</button>)}</div></div>}
+      <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>
+      {choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); sync.notify(`${n}님의 기기로 기억할게요.`); } }} />)}</div></div>}
       <PushSettings />
     </section>
     <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>

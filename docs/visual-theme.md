@@ -44,8 +44,8 @@
 
 | 전달 순서 | 적용 위치 | 보관 파일 |
 | --- | --- | --- |
-| 새 1번 얼굴 | 기기 주인 선택의 유빈 | `public/illustrations/yubin.png` |
-| 새 2번 얼굴 | 기기 주인 선택의 수민 | `public/illustrations/sumin.png` |
+| 새 1번 얼굴 | 기기 주인 선택·설정의 유빈 | `public/illustrations/yubin.png` |
+| 새 2번 얼굴 | 기기 주인 선택·설정의 수민 | `public/illustrations/sumin.png` |
 | 3번 함께 서 있는 그림 | PIN 입력 화면의 데이트맵 아래 | `public/illustrations/pin-couple.png` |
 | 4번 하트 지도 핀 | iPhone·Android 홈 화면과 브라우저 아이콘 | 원본 `public/brand/app-icon-source.png` |
 | 5번 나란히 앉은 그림 | 기기 주인 선택 화면의 데이트맵 아래 | `public/illustrations/choose-couple.png` |
