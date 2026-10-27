@@ -126,14 +126,13 @@ export default function PushSettings() {
     } catch (e) { if (current === version.current) notify(friendlyMessage(e, "알림을 끄지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { endChange(); }
   }
-  return <section className="settings-section push-settings" aria-busy={busy || checking}>
-    <h2><Icon name="bell" /> 우리 지도 알림</h2><p className="lead">상대방이 장소를 담거나 메모를 추가·수정하면 알려드려요.</p>
-    {checking ? <p className="hint" role="status">알림 설정을 확인하고 있어요…</p> : <>
-      <p className="hint" role="status">{hint || (subscribed ? "이 기기에서 알림을 받고 있어요." : "이 기기의 알림이 꺼져 있어요.")}</p>
-      {registration && config?.configured && <button className={`btn${subscribed ? "" : " primary"}`} disabled={busy || suspended} onClick={subscribed ? disable : enable}>
-        {busy ? "설정 중…" : subscribed ? "이 기기 알림 끄기" : "이 기기에서 알림 받기"}</button>}
-      {hint && <button className="text-btn" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
-      <p className="hint">기기를 잠그거나 PIN을 바꾸면 알림도 멈춰요. 다시 입장한 뒤 여기에서 켜 주세요.</p>
-    </>}
-  </section>;
+  const available = !!registration && !!config?.configured;
+  const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? "이 기기에서 알림을 받고 있어요." : "상대방이 장소를 담거나 메모를 바꾸면 알려드려요.");
+  return <div className="push-settings" aria-busy={busy || checking}>
+    <button type="button" className="settings-row" role="switch" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
+      <Icon name="bell" /><span className="settings-copy"><span>우리 지도 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
+    <span className="sr-only" role="status">{status}</span>
+    {hint && !checking && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
+    {!checking && available && !subscribed && <p className="hint settings-hint">기기를 잠그거나 PIN을 바꾸면 알림도 멈춰요. 다시 입장한 뒤 여기에서 켜 주세요.</p>}
+  </div>;
 }

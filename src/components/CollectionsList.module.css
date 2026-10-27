@@ -39,3 +39,46 @@
   .overview .empty{grid-column:2;grid-row:1/4;overflow:auto;margin:0}.overview .card{min-height:140px}
 }
 @media(min-width:760px) and (orientation:landscape) and (max-height:600px){.overview{grid-template-columns:200px minmax(0,1fr)}.overview .grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* v2 (2026-10-27 시안): 세그먼트 전환, 칩 한 줄, 중립 카테고리 아이콘, 점 도장, 모음 표지·상세 정리. 하단 탐색 탭 색은 바꾸지 않는다. */
+.switch{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;padding:3px;margin-bottom:14px;border:1px dashed var(--line);border-bottom:1px dashed var(--line);border-radius:26px;background:var(--mist)}
+.switch button{min-height:44px;border-radius:22px;font-size:17px;color:var(--ink-soft)}
+.switch button[aria-pressed=true]{background:var(--forest) var(--grain);color:var(--cream);outline:1px dashed #fbf6e870;outline-offset:-4px}
+.switch button[aria-pressed=true]:after{display:none}
+.heading{margin:4px 0 10px;min-height:44px}
+.heading h2{font-size:24px}
+.heading small{font-size:16px;margin-left:2px}
+.heading h2.subheading{font-size:14px;letter-spacing:.04em;color:var(--ink-soft)}
+.workspace .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -2px 6px;padding:2px}
+.workspace .filters::-webkit-scrollbar{display:none}
+.workspace .filters :global(.list-tools){flex:none}
+.workspace .filters :global(.list-filter),.workspace .filters :global(.list-tools) select,.workspace .filters :global(.chip){flex:none;height:44px;min-height:44px;padding:0 14px;border:1px dashed #bfae8b;border-radius:22px;background:var(--cream) var(--weave);color:var(--ink);font-size:16px;line-height:1.2;white-space:nowrap}
+.workspace .filters :global(.list-filter){gap:6px}
+.workspace .filters :global(.list-filter.is-active),.workspace .filters :global(.chip[aria-pressed=true]){background:#e0e7d6;border:1px solid var(--forest);color:var(--forest)}
+.workspace .filters :global(.list-filter-count){min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--forest);color:var(--cream);font-size:13px;display:inline-flex;align-items:center;justify-content:center}
+.workspace .row{gap:14px;padding:16px 0}
+.workspace .row :global(.category-icon){width:46px;height:46px;flex:none;background:var(--cream) var(--weave);color:var(--forest);border:1px dashed #bfae8b}
+.workspace .content .row :global(.row-copy)>strong{font-size:21px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.workspace .row :global(.row-meta){font-size:16px}
+.workspace .row :global(.row-sharer){font-size:14px;margin-top:4px}
+.workspace .row>svg:last-child{color:var(--ink-soft);flex:none}
+.rowBottom{margin-top:4px}
+.membership{font-size:14px}
+.rowBottom :global(.status-tag){display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font-size:15px;border:1px dashed currentColor}
+.rowBottom :global(.status-tag)::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.card{border-color:#bfae8b;border-radius:20px;min-height:150px}
+.card strong{font-size:21px}
+.card>span{font-size:14px}
+.card.addCard{align-items:center;justify-content:center;gap:6px;background:none;box-shadow:none;border-color:var(--forest);color:var(--forest)}
+.card.addCard:before{display:none}
+.card.addCard>svg{color:var(--forest)}
+.card.addCard>span{margin-top:0;font-size:18px;color:var(--forest)}
+.detail{padding-bottom:14px}
+.detailTitle{display:flex;align-items:center;gap:12px;margin:6px 0 4px;min-width:0}
+.detailTitle>div{min-width:0}
+.tile{width:44px;height:44px;border-radius:12px;flex:none;display:grid;place-items:center;background:var(--collection-color);color:var(--cream)}
+.detail .detailTitle h2{font-size:24px;margin:0}
+.detail p.count{font-size:14px;margin:2px 0 0}
+.detail p.description{font-size:16px;color:var(--ink);margin:8px 0 0}
+.detailActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.detailActions button,.detailActions .mapButton{width:auto;min-height:44px;margin-top:0;padding:0 10px;font-size:16px;gap:6px;color:var(--ink)}
+@media(orientation:landscape) and (max-height:600px){.detailActions{grid-template-columns:1fr;margin-top:10px}.overview>.switch{gap:3px}.detailLayout .detail .detailTitle h2{font-size:22px}}
