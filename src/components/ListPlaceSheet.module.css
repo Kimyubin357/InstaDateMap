@@ -6,6 +6,7 @@
 .layout:global(.sheet-list) :global(.sheet-heading-actions){position:absolute;right:calc(var(--sheet-right) + 10px);top:12px;display:flex;align-items:center;gap:8px}
 .layout:global(.sheet-list) :global(.detail-map){margin:0}
 .layout:global(.sheet-list) :global(.detail-title){margin:22px 0 0;align-items:flex-start}
+.layout:global(.sheet-list) :global(.detail-title)>h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(prefers-reduced-motion:reduce){.layout{transition:none}}
 
 .layout:global(.sheet-list) :global(.sheet-back-btn){display:none;width:44px;height:44px}
@@ -15,6 +16,7 @@
 .layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-heading-actions){position:static}
 .layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-back-btn){display:inline-flex}
 .layout:global(.sheet-list):global(.is-fullscreen) :global(.sheet-body){flex:1}
+.layout:global(.sheet-list):global(.is-fullscreen) :global(.detail-title)>h2{overflow:visible;text-overflow:clip;white-space:normal}
 @media(orientation:landscape) and (max-height:600px){
   .layout:global(.sheet-list):global(.is-fullscreen){--sheet-left:max(20px,env(safe-area-inset-left,0px));--sheet-right:max(20px,env(safe-area-inset-right,0px))}
 }
