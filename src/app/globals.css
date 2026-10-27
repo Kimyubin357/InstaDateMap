@@ -135,7 +135,6 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
   .floating-filters{left:calc(var(--search-edge) + var(--search-width) - 45px);right:auto}
   .pending-map-badge{left:28px}.map-controls{right:28px;bottom:28px}
   .view-list .places-list{padding:12px 24px calc(var(--map-bottom) + 12px);bottom:0}
-  .view-list .map-controls{right:calc(50% - 336px);bottom:var(--map-bottom)}
   .view-map .toast,.sync-notice,.view-list .toast{left:50%;right:auto;transform:translateX(-50%);width:480px;bottom:var(--map-bottom)}
   .unified-search-header{left:var(--search-edge);right:auto;width:var(--search-width)}.unified-search-body{left:28px;right:auto;width:420px;bottom:24px;border-radius:22px;padding-left:24px;padding-right:24px}
   .search-group-heading h1,.search-group-heading h2{font-size:20px}.search-place-copy strong{font-size:18px}
@@ -280,11 +279,10 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 .sheet-place .sheet-body,.sheet-place .sheet-footer{padding-left:var(--sheet-left);padding-right:var(--sheet-right)}
 @media(min-width:760px){.sheet-place{--sheet-left:24px;--sheet-right:24px}}
 
-/* Collection screens keep the existing two-tab shell and reserve space for all actions. */
+/* Lists scroll behind the floating dock; end padding keeps the final row reachable. */
 html{-webkit-text-size-adjust:100%}
-.view-list .places-list.collections-list{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));bottom:calc(var(--nav-height) + 12px);padding-bottom:24px}
+.view-list .places-list.collections-list{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));bottom:0;padding-bottom:calc(var(--nav-height) + 24px);scroll-padding-bottom:calc(var(--nav-height) + 24px)}
 .collections-list .list-tools select{font:inherit;font-size:17px;min-height:44px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--ink);background:var(--cream) var(--weave)}
-.view-list .map-controls{bottom:var(--dock-bottom)}
 .collection-map-scope{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);left:max(16px,env(safe-area-inset-left));max-width:calc(100% - 90px);display:flex;border:1px dashed var(--forest);border-radius:12px;background:var(--cream) var(--weave);color:var(--forest);box-shadow:var(--print-shadow)}
 .collection-map-scope button{background:none;border:0;color:inherit;min-height:44px;display:flex;gap:8px;align-items:center;padding:6px 10px;font-size:18px;min-width:44px}.collection-map-scope button:first-child{min-width:0}.collection-map-scope span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .has-pending-links .collection-map-scope{top:calc(var(--search-top) + 102px)}
@@ -292,8 +290,7 @@ html{-webkit-text-size-adjust:100%}
   :root{--search-top:max(8px,env(safe-area-inset-top));--dock-height:50px;--dock-bottom:max(8px,env(safe-area-inset-bottom))}
   .unified-search-header{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right))}
   .bottom-nav{height:50px;width:128px;left:75%}.bottom-nav a{width:44px;height:44px}
-  .view-list .places-list.collections-list{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));width:auto;transform:none;padding:0 0 16px;top:calc(var(--search-top) + var(--list-top))}
-  .view-list .map-controls{bottom:var(--dock-bottom);right:max(16px,env(safe-area-inset-right))}.view-list .save-fab{height:48px;min-height:48px;width:48px}
+  .view-list .places-list.collections-list{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));width:auto;transform:none;padding:0 0 calc(var(--nav-height) + 24px);top:calc(var(--search-top) + var(--list-top))}
   .map-controls,.has-place-card .map-controls{right:max(16px,env(safe-area-inset-right));bottom:calc(var(--dock-bottom) + 60px);flex-direction:row;gap:8px}.map-controls .save-fab{height:44px;width:44px;min-height:44px}
   .floating-filters{right:max(16px,env(safe-area-inset-right));top:calc(var(--search-top) + 60px)}
   .place-carousel{left:max(8px,env(safe-area-inset-left));right:auto;width:46%;transform:none;bottom:var(--dock-bottom);--card-width:calc(100% - 16px)}.place-card-rail{padding-inline:8px;scroll-padding-inline:8px}.place-card{height:154px}.place-card-main{padding:12px 14px}.place-card-main>strong{font-size:21px}.carousel-step{display:none}
@@ -307,9 +304,8 @@ html{-webkit-text-size-adjust:100%}
 }
 /* Keep the already-agreed wide-landscape corner placement; compact rows are for narrow phones. */
 @media(min-width:760px) and (orientation:landscape) and (max-height:600px){
-  .view-map .map-controls,.view-map.has-place-card .map-controls{bottom:var(--edge-bottom);flex-direction:column;gap:12px}
-  .view-map .map-controls .save-fab{width:56px;height:56px;min-height:56px}
-  .view-list .map-controls{bottom:var(--edge-bottom)}
+  .map-controls,.has-place-card .map-controls{bottom:var(--edge-bottom);flex-direction:column;gap:12px}
+  .map-controls .save-fab{width:56px;height:56px;min-height:56px}
   .place-carousel{left:50%;right:auto;transform:translateX(-50%);width:460px;--card-width:400px;bottom:var(--map-bottom)}
   .place-card-rail{padding-inline:30px;scroll-padding-inline:30px}.place-card{height:164px}.carousel-step{display:flex}
 }
