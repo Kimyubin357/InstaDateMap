@@ -12,6 +12,10 @@ import { useBoardSync } from "./BoardProvider";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import ActionDialog from "./ActionDialog";
+import SwipeablePlaceRow from "./SwipeablePlaceRow";
+import PlaceDeleteDialog from "./PlaceDeleteDialog";
+import PlacesDeleteDialog from "./PlacesDeleteDialog";
+import SelectedPlacesBar from "./SelectedPlacesBar";
 import styles from "./CollectionsList.module.css";
 
 const EMPTY: CollectionView[] = [];
@@ -29,6 +33,9 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   const navigation = useSearchParams().toString();
   const current = collections.find((c) => c.id === currentId);
   const [selecting, setSelecting] = useState(false), [selected, setSelected] = useState<string[]>([]);
+  const [revealedId, setRevealedId] = useState<string | null>(null), [deletingPlace, setDeletingPlace] = useState<PlaceView | null>(null);
+  const [deletingPlaces, setDeletingPlaces] = useState<PlaceView[] | null>(null);
+  const workspace = useRef<HTMLElement>(null), selectionButton = useRef<HTMLButtonElement>(null);
   const [unfiled, setUnfiled] = useState(false), [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null), [editor, setEditor] = useState<Editor | null>(null);
   const [destinations, setDestinations] = useState<string[]>([]), [placeQuery, setPlaceQuery] = useState("");
@@ -52,6 +59,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   const showCollections = mode === "collections" && !currentId;
   const dirty = !!editor && JSON.stringify(editor) !== initialEditor.current;
   const frozen = busy || write.pending;
+  useEffect(() => { setRevealedId(null); }, [mode, currentId, selecting, navigation, dialog]);
   useEffect(() => { setSelected([]); setSelecting(false); setUnfiled(false); setQuery(""); }, [mode, currentId]);
   useEffect(() => {
     const id = new URLSearchParams(navigation).get("organize");
@@ -126,6 +134,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   function openPicker() { resetWrite(); setDestinations([]); setDialog("picker"); }
   function completeMembership(r: CollectionResult, text: string) {
     setDialog(null); setSelecting(false); setSelected([]); setError("");
+    focusSelectionAction(true);
     if (r.changed) notify(text, "success", { label: "실행 취소", onClick: collectionUndo(r.operation_id, async () => { store.invalidate(); await store.refresh(); }, lock) });
     else notify("이미 모두 담겨 있어요.", "info");
   }
@@ -133,10 +142,44 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     const latest = collections.find((c) => c.id === editor?.id);
     if (latest) beginEditor(latest, returnToPicker.current); else finishClose();
   }
+  function closePlaceDeletion(deleted = false) {
+    const index = rows.findIndex((p) => p.id === deletingPlace?.id);
+    const focusId = deleted ? (rows[index + 1] ?? rows[index - 1])?.id : deletingPlace?.id;
+    setDeletingPlace(null); setRevealedId(null);
+    requestAnimationFrame(() => {
+      const target = focusId ? workspace.current?.querySelector<HTMLButtonElement>(`[data-place-id="${CSS.escape(focusId)}"] .place-row`) : null;
+      // The deleted row cannot receive the native dialog's return focus.
+      const fallback = selectionButton.current?.disabled ? null : selectionButton.current;
+      (target ?? fallback ?? workspace.current?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus({ preventScroll: true });
+    });
+  }
+  function selectCurrentList() {
+    const visibleIds = new Set(rows.map((p) => p.id));
+    if (rows.every((p) => chosen.includes(p.id))) setSelected(chosen.filter((id) => !visibleIds.has(id)));
+    else {
+      const next = [...new Set([...chosen, ...visibleIds])];
+      setSelected(next.slice(0, 200));
+      if (next.length > 200) setError("한 번에 200개까지 고를 수 있어요.");
+    }
+  }
+  function closePlacesDeletion(deleted: string[] = [], complete = false) {
+    setDeletingPlaces(null);
+    setSelected((ids) => complete ? [] : ids.filter((id) => !deleted.includes(id)));
+    if (complete) setSelecting(false);
+    focusSelectionAction(complete);
+  }
+  function focusSelectionAction(complete: boolean) {
+    requestAnimationFrame(() => {
+      const root = workspace.current?.closest(".app-root") ?? document.body;
+      const action = complete ? null : root.querySelector<HTMLButtonElement>("[data-selection-actions] button:last-child:not(:disabled)");
+      const header = selectionButton.current?.disabled ? null : selectionButton.current;
+      (action ?? header ?? workspace.current?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus({ preventScroll: true });
+    });
+  }
   function placeRow(p: PlaceView, selection: boolean, modal = false) {
     const joined = memberships.get(p.id) ?? [];
-    return <button type="button" key={p.id} className={`place-row ${styles.row}${selection && chosen.includes(p.id) ? ` ${styles.checked}` : ""}`} aria-pressed={selection ? chosen.includes(p.id) : undefined} disabled={modal && frozen}
-      onClick={() => selection ? toggle(p.id, chosen, setSelected) : onOpen(p.id)}>
+    const className = `place-row ${styles.row}${selection && chosen.includes(p.id) ? ` ${styles.checked}` : ""}`;
+    const content = <>
       {selection ? <span className={styles.check}><Icon name={chosen.includes(p.id) ? "check" : "plus"} width={18} /></span> : <span className={`category-icon category-${categoryIcon(p.category)}`}><Icon name={categoryIcon(p.category)} width={26} /></span>}
       <span className="row-copy">
         <strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge">NEW</span>}</strong>
@@ -151,12 +194,18 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         {current && p.memo && <small className={styles.memo}>{p.memo}</small>}
       </span>
       {!selection && <Icon name="chevron" width={18} />}
-    </button>;
+    </>;
+    if (selection) return <button type="button" key={p.id} className={className} aria-pressed={chosen.includes(p.id)} disabled={modal && frozen} onClick={() => toggle(p.id, chosen, setSelected)}>{content}</button>;
+    return <SwipeablePlaceRow key={p.id} placeId={p.id} name={p.name} className={className} open={revealedId === p.id}
+      onReveal={(open) => setRevealedId((id) => open ? p.id : id === p.id ? null : id)}
+      onOpen={() => onOpen(p.id)} onDelete={() => setDeletingPlace(p)}>{content}</SwipeablePlaceRow>;
   }
   const dialogError = error && <div className={styles.error} role="alert"><p>{error}</p>{conflict && dialog === "editor" && <button className="btn" onClick={reloadEditor}>최신 내용 불러오기</button>}{conflict && dialog !== "editor" && <button className="btn" onClick={finishClose}>목록에서 다시 고르기</button>}</div>;
   const closeButton = <button className="icon-btn sheet-close-btn" aria-label="모음 창 닫기" disabled={busy} onClick={dismiss}><Icon name="close" width={18} /></button>;
   const label = busy ? "처리 확인 중…" : write.pending ? "처리 확인·재시도" : "";
-  return <section className={`${styles.workspace}${showCollections ? ` ${styles.overview}` : ""}`} aria-label="저장한 장소와 모음">
+  return <section ref={workspace} data-selecting={selecting} className={`${styles.workspace}${showCollections ? ` ${styles.overview}` : ""}`} aria-label="저장한 장소와 모음">
+    {deletingPlace && <PlaceDeleteDialog place={deletingPlace} onClose={() => closePlaceDeletion()} onDeleted={() => closePlaceDeletion(true)} />}
+    {deletingPlaces && <PlacesDeleteDialog places={deletingPlaces} onClose={closePlacesDeletion} onDeleted={() => closePlacesDeletion([], true)} />}
     <div className={styles.switch} aria-label="리스트 보기 방식"><button aria-pressed={mode === "all" && !currentId} onClick={() => onNavigate("all")}>전체 장소</button><button aria-pressed={mode === "collections" || !!currentId} onClick={() => onNavigate("collections")}>모음</button></div>
     <div className={current ? styles.detailLayout : undefined}>
     {current && <header className={styles.detail} style={{ "--collection-color": `var(--collection-${current.color})` } as CSSProperties}>
@@ -172,15 +221,15 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {loaded && !collections.length && <div className={styles.empty}><Icon name="heart" width={36} /><h3>함께 갈 곳을 모아봐요</h3><p>‘부산 주말’, ‘비 오는 날’처럼<br />다시 찾고 싶은 이름을 붙여보세요.</p><button className="btn primary" onClick={() => beginEditor()}>첫 모음 만들기</button></div>}
       {query && !collections.some((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) && <p className={styles.empty}>이 이름의 모음은 없어요.</p>}
     </> : <>
-      <div className={styles.heading}><h2 className={current && !selecting ? styles.subheading : undefined}>{selecting ? `${chosen.length}곳 선택` : current ? `장소 ${rows.length}` : <>저장한 장소 <small>{rows.length}곳</small></>}</h2><div className={styles.tools}>
+      <div className={styles.heading}><h2 aria-live={selecting ? "polite" : undefined} className={current && !selecting ? styles.subheading : undefined}>{selecting ? `${chosen.length}곳 선택` : current ? `장소 ${rows.length}` : <>저장한 장소 <small>{rows.length}곳</small></>}</h2><div className={styles.tools}>
         
-        <button className="text-btn" disabled={!loaded || (!rows.length && !selecting)} onClick={() => { setSelecting(!selecting); setSelected([]); }}>{selecting ? "취소" : "선택"}</button>
+        <button ref={selectionButton} className="text-btn" disabled={!loaded || (!rows.length && !selecting)} onClick={() => { setSelecting(!selecting); setSelected([]); }}>{selecting ? "취소" : "선택"}</button>
       </div></div>
       <div className={styles.filters}>{tools}{!current && <button className="chip" aria-pressed={unfiled} onClick={() => setUnfiled(!unfiled)}>미분류 {places.filter((p) => !memberships.has(p.id)).length}</button>}</div>
-      {selecting && <div className={styles.selectionHint}><button className="text-btn" onClick={() => setSelected(rows.slice(0, 200).map((p) => p.id))}>현재 목록 선택{rows.length > 200 ? " (최대 200곳)" : ""}</button>{chosen.some((id) => !rows.some((p) => p.id === id)) && <span>숨겨진 선택 {chosen.filter((id) => !rows.some((p) => p.id === id)).length}곳 포함</span>}</div>}
+      {selecting && <div className={styles.selectionHint}><button className="text-btn" disabled={!rows.length} onClick={selectCurrentList}>{rows.length > 0 && rows.every((p) => chosen.includes(p.id)) ? "현재 목록 해제" : "현재 목록 선택"}{rows.length > 200 ? " (최대 200곳)" : ""}</button>{current && <button className="text-btn" disabled={!chosen.length} onClick={() => { resetWrite(); setDialog("remove"); }}>이 모음에서 빼기</button>}{chosen.some((id) => !rows.some((p) => p.id === id)) && <span>숨겨진 선택 {chosen.filter((id) => !rows.some((p) => p.id === id)).length}곳 포함</span>}</div>}
       {rows.map((p) => placeRow(p, selecting))}
       {loaded && !rows.length && <div className={styles.empty}><Icon name={current ? current.icon : "heart"} width={32} /><h3>{current && !current.place_ids.length ? "이 모음에 장소를 담아봐요" : unfiled ? "미분류 장소가 없어요" : places.length ? "조건에 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h3><p>{current && !current.place_ids.length ? "이미 저장한 장소에서 골라 담을 수 있어요." : "저장한 장소는 여기에서 함께 볼 수 있어요."}</p>{current && !current.place_ids.length ? <button className="btn" onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}>장소 담기</button> : places.length > 0 && <button className="text-btn" onClick={() => { setUnfiled(false); onReset(); }}>전체 장소 보기</button>}</div>}
-      {selecting && <div className={styles.selectionBar}><button className="btn primary" disabled={!chosen.length} onClick={openPicker}>모음에 담기 · {chosen.length}</button>{current && <button className="btn" disabled={!chosen.length} onClick={() => { resetWrite(); setDialog("remove"); }}>이 모음에서 빼기</button>}</div>}
+      {selecting && <SelectedPlacesBar workspace={workspace} count={chosen.length} onCollect={openPicker} onDelete={() => setDeletingPlaces(places.filter((p) => chosen.includes(p.id)))} />}
     </>}
     </div></div>
     {!dialog && dialogError}

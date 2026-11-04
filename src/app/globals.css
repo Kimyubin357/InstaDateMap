@@ -340,3 +340,8 @@ body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .globa
 @media(max-width:759px) and (orientation:landscape) and (max-height:600px){
   body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .global-feedback.is-map{bottom:calc(var(--dock-bottom) + 60px + 44px + 12px)}
 }
+
+/* Selecting places replaces navigation with the approved, fixed action bar. */
+.view-list:has([data-selecting=true]) :is(.map-controls,.bottom-nav){display:none}
+.view-list:has([data-selecting=true]) .places-list.collections-list{padding-bottom:calc(100px + var(--safe-b));scroll-padding-bottom:calc(100px + var(--safe-b))}
+body:has(.persistent-map:not(.is-away) .view-list [data-selecting=true]):not(:has(.modal-root)) .global-feedback.is-map{bottom:calc(77px + max(12px,var(--safe-b)))}

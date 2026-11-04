@@ -1,0 +1,12 @@
+.swipe{--swipe-offset:0px;position:relative;isolation:isolate;overflow:hidden;border-bottom:1px dashed var(--line);min-width:0}
+.swipe .surface{position:relative;z-index:1;border-bottom:0;background:var(--paper) var(--weave);transform:translateX(var(--swipe-offset));transition:transform .18s ease,background-color .12s ease;touch-action:pan-y pinch-zoom;user-select:none;-webkit-user-select:none}
+.swipe .surface:enabled:active{scale:1;background-color:var(--paper)}
+.swipe .surface:focus-visible{outline-offset:-3px}
+.swipe.dragging .surface{transition:none;cursor:grabbing}
+.swipe .action{position:absolute;z-index:0;top:8px;bottom:8px;right:0;width:76px;min-height:44px;padding:8px 6px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:var(--accent) var(--grain);color:var(--cream);font-size:18px;outline:1px dashed var(--cream);outline-offset:-5px}
+.swipe .action:disabled{opacity:1;cursor:default}
+.swipe .action:enabled:active{scale:1;background-color:var(--accent-ink)}
+.swipe .action:focus-visible{outline:2px solid var(--forest);outline-offset:-2px}
+.reveal{position:absolute;z-index:2;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.reveal:focus-visible{width:auto;height:44px;right:4px;top:50%;transform:translateY(-50%);padding:0 12px;clip-path:none;display:flex;align-items:center;gap:6px;background:var(--cream) var(--weave);color:var(--accent-ink);border:1px dashed var(--line);border-radius:8px;font-size:16px;outline-offset:-3px}
+@media(prefers-reduced-motion:reduce){.swipe .surface{transition:none}}
