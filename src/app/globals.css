@@ -38,7 +38,8 @@ button,input,textarea,select{font:inherit;color:inherit} button,a{-webkit-tap-hi
 .sheet.is-dragging{transition:none;user-select:none}
 .sheet-handle{display:flex;align-items:center;justify-content:center;width:100%;height:36px;flex:none;padding:0;border:0;background:none;touch-action:none;cursor:grab}
 .sheet-handle:active{cursor:grabbing}
-.sheet-handle:focus-visible{outline:2px solid var(--accent);outline-offset:-5px;border-radius:12px}
+/* Keep sheet focus and keyboard controls without framing the whole surface or handle. */
+.sheet:focus,.sheet-handle:focus{outline:none}
 .action-dialog{position:fixed;inset:0;margin:auto;width:min(360px,calc(100vw - 40px));max-height:calc(var(--app-height) - 48px);padding:26px 24px 24px;border:0;border-radius:26px;background:#fff;color:var(--ink);box-shadow:0 16px 64px #35201838;overflow:auto;overscroll-behavior:contain;text-align:center}
 .action-dialog[open]{display:block;animation:action-dialog-in .15s ease-out}.action-dialog::backdrop{background:#2f1f1966}
 .action-dialog form{margin:0}.action-dialog-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto 18px;border-radius:20px;background:var(--accent-soft);color:var(--accent-ink)}
@@ -64,7 +65,6 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 .sheet-footer{flex:none;padding:0 20px calc(var(--safe-b) + 20px);background:#fff}
 .sheet-footer .actions{margin:0}
 .sheet-footer .btn.primary{font-size:16px}
-.sheet-compact:focus{outline:none}
 .map-controls{bottom:calc(var(--safe-b) + 20px);gap:12px}
 .save-fab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:54px;padding:14px 18px;border-radius:28px;background:var(--accent);color:#fff;font-size:16px;font-weight:750;text-decoration:none;box-shadow:0 5px 18px #d8315540}
 .places-list{bottom:0;padding-bottom:calc(var(--safe-b) + 100px)}
@@ -223,7 +223,10 @@ html[data-map-viewport=true],html[data-map-viewport=true] body{overflow:hidden}
 .global-feedback{position:fixed;z-index:60;left:16px;right:16px;bottom:calc(var(--safe-b) + 16px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .global-feedback.is-map{right:88px;bottom:var(--map-bottom)}
 .global-feedback>.toast,.global-feedback>.sync-notice{position:static;inset:auto;width:auto;transform:none;pointer-events:auto}
-.global-feedback .toast .icon-btn{width:32px;height:32px;flex:none}.global-feedback .toast{padding:8px 10px 8px 14px;min-height:48px}
+.global-feedback .toast{padding:8px 14px;min-height:48px;line-height:1.4}
+.global-feedback .toast>svg{flex:none}.global-feedback .toast>span{min-width:0;overflow-wrap:anywhere}
+.global-feedback .sync-notice>span{min-width:0;overflow-wrap:anywhere}.global-feedback .sync-notice small{display:block;margin-top:4px;font-size:15px;color:var(--ink-soft)}
+.global-feedback .sync-notice .text-btn{min-height:44px;white-space:nowrap}
 body:has(.persistent-map:not(.is-away) .has-place-card) .global-feedback.is-map{bottom:calc(var(--map-bottom) + 182px)}
 body:has(.modal-root) .global-feedback{left:16px;right:16px;bottom:calc(var(--safe-b) + 88px)}
 body:has(.modal-root) .global-feedback>.sync-notice{display:none}
@@ -244,7 +247,7 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 .trash-actions .btn { flex: 1; min-height: 44px; }
 .settings-link { color: inherit; text-decoration: none; }
 
-.toast-action { flex: none; padding: 10px 4px; min-height: 44px; display: inline-flex; align-items: center; color: inherit; font-weight: 750; white-space: nowrap; text-decoration: underline; }
+.toast-action { flex: none; padding: 10px 4px; min-height: 44px; display: inline-flex; align-items: center; color: inherit; border:0; background:none; font:inherit; white-space: nowrap; text-decoration: underline; text-underline-offset:3px; }
 .trash-restored { padding: 16px; border: 1px solid var(--line); border-radius: 14px; }
 .trash-restored h2 { font-size: 18px; margin-bottom: 8px; }
 .trash-restored > div { display: flex; align-items: center; gap: 12px; }
@@ -321,3 +324,19 @@ html{-webkit-text-size-adjust:100%}
 .sheet-map-filters .filter-close-btn>svg{position:relative;width:18px;height:18px}
 .sheet-map-filters .filter-close-btn:enabled:active::before{background-color:var(--mist)}
 @media(orientation:landscape) and (max-height:600px){.sheet-map-filters .sheet-handle{height:26px}.sheet-map-filters .sheet-heading h2{font-size:24px}.sheet-map-filters .sheet-heading{padding-bottom:0}.sheet-map-filters .sheet-footer{padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}.sheet-map-filters .sheet-footer .btn{min-height:44px;padding:8px 12px}.sheet-map-filters .sheet-body h3{margin:12px 0 8px}}
+
+/* List feedback uses the shared layer above both the add button and navigation. */
+body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .global-feedback.is-map{
+  top:auto;bottom:calc(max(var(--nav-height),calc(var(--edge-bottom,var(--dock-bottom)) + 56px)) + 12px);
+  left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));
+  width:auto;max-width:480px;margin-inline:auto;transform:none;
+}
+
+/* Feedback clears the unchanged phone add-button position. */
+@media(max-width:759px) and (orientation:portrait){
+  body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .global-feedback.is-map{bottom:calc(var(--map-bottom) + 56px + 12px)}
+}
+
+@media(max-width:759px) and (orientation:landscape) and (max-height:600px){
+  body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .global-feedback.is-map{bottom:calc(var(--dock-bottom) + 60px + 44px + 12px)}
+}

@@ -310,3 +310,5 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .push-settings .settings-recheck{display:inline-flex;align-self:flex-start;margin-top:4px;font-size:16px}
 .settings-hint.hint{font-size:14px;line-height:1.5;margin:8px 0 4px}
 @media(prefers-reduced-motion:reduce){.settings-switch::after{transition:none}}
+
+.place-source-actions .place-organize-btn{color:var(--forest);border:1px dashed var(--line);background:var(--cream) var(--weave);box-shadow:var(--print-shadow)}

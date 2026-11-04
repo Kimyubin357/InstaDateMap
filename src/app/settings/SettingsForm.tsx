@@ -35,7 +35,7 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
       else if (path.endsWith("/pin")) {
         // The write succeeded: discard the PINs before the separate, retryable context read.
         setCurrent(""); setNew(""); setConfirm(""); setEditing(false);
-        await sync.resetAccess(); onPinChanged(data.message || "PIN을 바꿨어요.");
+        await sync.resetAccess(); onPinChanged("PIN을 바꿨어요.");
       }
       else if (path.endsWith("/identity")) { const access = sync.store.getSnapshot().access; if (access) await sync.store.authorize({ ...access, who: (body as { name: string }).name }); }
       return data;
@@ -46,7 +46,7 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
       <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>
-      {choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); sync.notify(`${n}님의 기기로 기억할게요.`); } }} />)}</div></div>}
+      {choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); } }} />)}</div></div>}
       <PushSettings />
     </section>
     <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>

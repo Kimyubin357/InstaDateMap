@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { COLLECTION_COLORS, COLLECTION_ICONS, collectionName, type CollectionCommand, type CollectionResult, type CollectionView } from "@/lib/collections";
 import { friendlyMessage, requestJson, RequestError, ConnectionError } from "@/lib/client-request";
 import { VerifiedWrite, CHECKING_SAVE } from "@/lib/verified-write";
+import { collectionUndo } from "@/lib/collection-undo";
 import { distanceM, placeMeta, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
 import { STATUS_LABEL } from "@/lib/types";
@@ -33,7 +34,6 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   const [destinations, setDestinations] = useState<string[]>([]), [placeQuery, setPlaceQuery] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [discard, setDiscard] = useState(false), [conflict, setConflict] = useState(false);
-  const [undo, setUndo] = useState<{ id: string; text: string } | null>(null);
   const [write, setWrite] = useState(() => new VerifiedWrite<CollectionResult>());
   const pendingWrite = useRef<{ id: string; command: CollectionCommand } | null>(null);
   const initialEditor = useRef(""), returnToPicker = useRef(false), flight = useRef(false);
@@ -67,10 +67,6 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     const prevent = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener("beforeunload", prevent); return () => window.removeEventListener("beforeunload", prevent);
   }, [dirty, busy, write.pending]);
-  useEffect(() => {
-    if (!undo) return;
-    const timer = setTimeout(() => setUndo(null), 60000); return () => clearTimeout(timer);
-  }, [undo]);
   function resetWrite() { pendingWrite.current = null; setWrite(new VerifiedWrite()); setError(""); setConflict(false); }
   function beginEditor(c?: CollectionView, fromPicker = false) {
     resetWrite(); returnToPicker.current = fromPicker;
@@ -130,7 +126,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   function openPicker() { resetWrite(); setDestinations([]); setDialog("picker"); }
   function completeMembership(r: CollectionResult, text: string) {
     setDialog(null); setSelecting(false); setSelected([]); setError("");
-    if (r.changed) setUndo({ id: r.operation_id, text });
+    if (r.changed) notify(text, "success", { label: "실행 취소", onClick: collectionUndo(r.operation_id, async () => { store.invalidate(); await store.refresh(); }, lock) });
     else notify("이미 모두 담겨 있어요.", "info");
   }
   function reloadEditor() {
@@ -142,7 +138,18 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     return <button type="button" key={p.id} className={`place-row ${styles.row}${selection && chosen.includes(p.id) ? ` ${styles.checked}` : ""}`} aria-pressed={selection ? chosen.includes(p.id) : undefined} disabled={modal && frozen}
       onClick={() => selection ? toggle(p.id, chosen, setSelected) : onOpen(p.id)}>
       {selection ? <span className={styles.check}><Icon name={chosen.includes(p.id) ? "check" : "plus"} width={18} /></span> : <span className={`category-icon category-${categoryIcon(p.category)}`}><Icon name={categoryIcon(p.category)} width={26} /></span>}
-      <span className="row-copy"><strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge">NEW</span>}</strong><span className="row-meta">{placeMeta(p)}{distanceOrigin ? ` · ${(distanceM(distanceOrigin, p) / 1000).toFixed(1)}km` : ""}</span><span className={styles.rowBottom}><span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>{!current && joined.length > 0 && <small className={styles.membership}>{joined[0].name}{joined.length > 1 ? ` +${joined.length - 1}` : ""}</small>}</span><small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>{current && p.memo && <small className={styles.memo}>{p.memo}</small>}</span>
+      <span className="row-copy">
+        <strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge">NEW</span>}</strong>
+        <span className={styles.metaLine}>
+          <span className="row-meta">{placeMeta(p)}{distanceOrigin ? ` · ${(distanceM(distanceOrigin, p) / 1000).toFixed(1)}km` : ""}</span>
+          <span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>
+        </span>
+        <span className={styles.attribution}>
+          <small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>
+          {!current && joined.length > 0 && <small className={styles.membership} title={joined.map((c) => c.name).join(", ")}><span className={styles.membershipName}>모음: {joined[0].name}</span>{joined.length > 1 && <span className={styles.membershipCount}>+{joined.length - 1}</span>}</small>}
+        </span>
+        {current && p.memo && <small className={styles.memo}>{p.memo}</small>}
+      </span>
       {!selection && <Icon name="chevron" width={18} />}
     </button>;
   }
@@ -176,7 +183,6 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {selecting && <div className={styles.selectionBar}><button className="btn primary" disabled={!chosen.length} onClick={openPicker}>모음에 담기 · {chosen.length}</button>{current && <button className="btn" disabled={!chosen.length} onClick={() => { resetWrite(); setDialog("remove"); }}>이 모음에서 빼기</button>}</div>}
     </>}
     </div></div>
-    {undo && <div className={styles.undo} role="status"><span>{undo.text}</span><button className="text-btn" disabled={busy} onClick={() => { void mutate({ action: "undo", target: undo.id }, () => { setUndo(null); notify("이번 변경을 되돌렸어요."); }); }}>{busy ? "확인 중…" : "실행 취소"}</button><button className="icon-btn" aria-label="완료 안내 닫기" disabled={busy} onClick={() => setUndo(null)}><Icon name="close" width={18} /></button></div>}
     {!dialog && dialogError}
     {dialog === "editor" && editor && <Modal title={editor.version ? "모음 수정" : "새 모음 만들기"} variant="compact" className={styles.modal} headerActions={closeButton} onClose={dismiss} footer={<div className="actions"><button className="btn" disabled={busy} onClick={dismiss}>취소</button><button className="btn primary" disabled={busy || conflict || !collectionName(editor.name)} onClick={saveEditor}>{label || (editor.version ? "변경 저장" : "모음 만들기")}</button></div>}>
       <form id="collection-editor" onSubmit={(e) => { e.preventDefault(); saveEditor(); }} className={styles.editor}>
@@ -188,18 +194,18 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         {editor.version && <button type="button" className={styles.delete} disabled={frozen} onClick={() => { resetWrite(); setDialog("delete"); }}><Icon name="trash" width={18} />모음 삭제</button>}
       </form>
     </Modal>}
-    {dialog === "picker" && <Modal title="모음에 담기" initialStop={2} fullScreenAtMax className={styles.modal} headerActions={closeButton} onClose={dismiss} footer={<div className="actions"><button className="btn" disabled={busy} onClick={dismiss}>취소</button><button className="btn primary" disabled={busy || !chosen.length || !destinations.length || conflict} onClick={() => void mutate({ action: "add", collection_ids: destinations, place_ids: chosen }, (r) => completeMembership(r, "선택한 장소를 모음에 담았어요."))}>{label || `${chosen.length}곳 담기`}</button></div>}>
+    {dialog === "picker" && <Modal title="모음에 담기" initialStop={2} fullScreenAtMax className={styles.modal} headerActions={closeButton} onClose={dismiss} footer={<div className="actions"><button className="btn" disabled={busy} onClick={dismiss}>취소</button><button className="btn primary" disabled={busy || !chosen.length || !destinations.length || conflict} onClick={() => void mutate({ action: "add", collection_ids: destinations, place_ids: chosen }, (r) => completeMembership(r, "모음에 담았어요."))}>{label || `${chosen.length}곳 담기`}</button></div>}>
       <p className={styles.lead}>여러 모음에 함께 담을 수 있어요.<br />원래 모음에서도 그대로 볼 수 있어요.</p>
       {collections.map((c) => { const count = chosen.filter((id) => c.place_ids.includes(id)).length; return <button key={c.id} className={styles.pickRow} disabled={frozen} aria-pressed={destinations.includes(c.id)} onClick={() => toggle(c.id, destinations, setDestinations, 50)}><span className={styles.check}><Icon name={destinations.includes(c.id) ? "check" : "plus"} width={18} /></span><Icon name={c.icon} /><span><strong>{c.name}</strong><small>{count === chosen.length && count ? "모두 담겨 있음" : count ? `${count}곳 이미 담김` : `${c.place_ids.length}곳`}</small></span></button>; })}
       <button className={`text-btn ${styles.createInPicker}`} disabled={frozen} onClick={() => beginEditor(undefined, true)}><Icon name="plus" />새 모음 만들기</button>{dialogError}
     </Modal>}
-    {dialog === "places" && current && <Modal title="저장한 장소에서 담기" initialStop={2} fullScreenAtMax className={styles.modal} headerActions={closeButton} onClose={dismiss} footer={<div className="actions"><button className="btn" disabled={busy} onClick={dismiss}>취소</button><button className="btn primary" disabled={busy || !chosen.length || conflict} onClick={() => void mutate({ action: "add", collection_ids: [current.id], place_ids: chosen }, (r) => completeMembership(r, "이 모음에 장소를 담았어요."))}>{label || `${chosen.length}곳 담기`}</button></div>}>
+    {dialog === "places" && current && <Modal title="저장한 장소에서 담기" initialStop={2} fullScreenAtMax className={styles.modal} headerActions={closeButton} onClose={dismiss} footer={<div className="actions"><button className="btn" disabled={busy} onClick={dismiss}>취소</button><button className="btn primary" disabled={busy || !chosen.length || conflict} onClick={() => void mutate({ action: "add", collection_ids: [current.id], place_ids: chosen }, (r) => completeMembership(r, "모음에 담았어요."))}>{label || `${chosen.length}곳 담기`}</button></div>}>
       <label className={styles.search}><Icon name="search" width={18} /><input disabled={frozen} aria-label="담을 장소 검색" placeholder="장소 이름, 지역으로 찾기" value={placeQuery} onChange={(e) => setPlaceQuery(e.target.value)} /></label><p className={styles.lead}>이미 담긴 장소는 제외했어요. {chosen.length}곳 선택</p>
       {places.filter((p) => !current.place_ids.includes(p.id) && `${p.name} ${p.address}`.includes(placeQuery.trim())).map((p) => placeRow(p, true, true))}
       {!places.some((p) => !current.place_ids.includes(p.id) && `${p.name} ${p.address}`.includes(placeQuery.trim())) && <p className={styles.empty}>담을 장소가 없어요.<br />검색어를 바꾸거나 새 장소를 저장해 주세요.</p>}{dialogError}
     </Modal>}
-    {dialog === "delete" && editor && <ActionDialog title="이 모음을 삭제할까요?" message={`‘${editor.name}’ 모음만 삭제해요. 담겨 있던 장소와 메모는 전체 장소에 그대로 남아요.`} destructive cancelLabel="취소" confirmLabel={label || "모음 삭제"} busy={busy} onClose={() => { if (write.pending) dismiss(); else if (!busy) { resetWrite(); setDialog("editor"); } }} onConfirm={() => mutate({ action: "delete", id: editor.id, version: editor.version! }, () => { setDialog(null); setEditor(null); onNavigate("collections"); notify("모음을 삭제했어요. 장소는 그대로 남아 있어요."); })}>{dialogError}</ActionDialog>}
-    {dialog === "remove" && current && <ActionDialog title={`${chosen.length}곳을 이 모음에서 뺄까요?`} message="전체 장소와 다른 모음에는 그대로 남아요." cancelLabel="취소" confirmLabel={label || "이 모음에서 빼기"} busy={busy} onClose={dismiss} onConfirm={() => mutate({ action: "remove", collection_ids: [current.id], place_ids: chosen }, (r) => completeMembership(r, "이 모음에서 장소를 뺐어요."))}>{dialogError}</ActionDialog>}
+    {dialog === "delete" && editor && <ActionDialog title="이 모음을 삭제할까요?" message={`‘${editor.name}’ 모음만 삭제해요. 담겨 있던 장소와 메모는 전체 장소에 그대로 남아요.`} destructive cancelLabel="취소" confirmLabel={label || "모음 삭제"} busy={busy} onClose={() => { if (write.pending) dismiss(); else if (!busy) { resetWrite(); setDialog("editor"); } }} onConfirm={() => mutate({ action: "delete", id: editor.id, version: editor.version! }, () => { setDialog(null); setEditor(null); onNavigate("collections"); notify("모음을 삭제했어요."); })}>{dialogError}</ActionDialog>}
+    {dialog === "remove" && current && <ActionDialog title={`${chosen.length}곳을 이 모음에서 뺄까요?`} message="전체 장소와 다른 모음에는 그대로 남아요." cancelLabel="취소" confirmLabel={label || "이 모음에서 빼기"} busy={busy} onClose={dismiss} onConfirm={() => mutate({ action: "remove", collection_ids: [current.id], place_ids: chosen }, (r) => completeMembership(r, "모음에서 뺐어요."))}>{dialogError}</ActionDialog>}
     {discard && <ActionDialog title={write.pending ? "처리 확인을 그만할까요?" : "작성 중인 내용을 닫을까요?"} message={write.pending ? "요청이 이미 처리되었을 수 있어요. 닫은 뒤 목록을 새로 확인해 주세요." : "저장하지 않은 변경 내용은 사라져요."} cancelLabel="계속하기" confirmLabel="닫기" onClose={() => setDiscard(false)} onConfirm={() => { store.invalidate(); finishClose(); }} />}
   </section>;
 }

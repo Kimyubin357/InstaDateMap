@@ -107,7 +107,6 @@ export default function PushSettings() {
       if (current !== version.current) return;
       const granted = Notification.permission === "granted";
       setSubscribed(granted); setHint(granted ? "" : "기기 설정에서 데이트맵 알림을 허용한 뒤 다시 확인해 주세요.");
-      if (granted) notify("상대방의 새 장소와 메모 소식을 알려드릴게요.");
     } catch (e) { await created?.unsubscribe().catch(() => {}); if (current === version.current) notify(e instanceof DOMException && e.name === "NotAllowedError" ? "기기 설정에서 데이트맵 알림을 허용해 주세요." : friendlyMessage(e, "알림을 켜지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { endChange(); }
   }
@@ -122,7 +121,7 @@ export default function PushSettings() {
         await subscription.unsubscribe().catch(() => {});
       }
       if (current !== version.current) return;
-      setSubscribed(false); notify("이 기기의 장소 알림을 껐어요.");
+      setSubscribed(false);
     } catch (e) { if (current === version.current) notify(friendlyMessage(e, "알림을 끄지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { endChange(); }
   }

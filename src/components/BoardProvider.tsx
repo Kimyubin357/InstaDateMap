@@ -49,10 +49,15 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const [homeHref, setHomeHref] = useState("/");
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [toast, setToast] = useState<ToastNotice | null>(null);
-  const dismissToast = useCallback(() => setToast(null), []);
+  const toastId = useRef(0);
+  const dismissToast = useCallback((notice: ToastNotice) => setToast((current) => current === notice ? null : current), []);
+  const completeToastAction = useCallback((notice: ToastNotice, message: string) => {
+    const next: ToastNotice = { id: ++toastId.current, message, tone: "success" };
+    setToast((current) => current === notice ? next : current);
+  }, []);
   const notify = useCallback((message: string, tone: "success" | "error" | "info" = "success", action?: ToastAction) => {
     if (tone === "error") { setToast(null); setNotice({ message, tone }); }
-    else { setNotice(null); setToast({ message, tone, action }); }
+    else { setNotice(null); setToast({ id: ++toastId.current, message, tone, action }); }
   }, []);
   useEffect(() => { if (pathname === "/") setHomeHref(backHref); else if (pathname === "/search") setHomeHref("/search"); }, [pathname, backHref]);
   const suspend = () => { setSuspended(true); store.suspend(); };
@@ -136,7 +141,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       {accessError && pathname !== "/settings" && <ActionDialog title="입장 정보를 다시 확인해 주세요" message={accessError} tone="error" confirmLabel="입장 정보 다시 확인" onClose={() => { void resetAccess(false); }} />}
-      <Feedback toast={toast} onDismiss={dismissToast} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
+      <Feedback toast={toast} onDismiss={dismissToast} onActionComplete={completeToastAction} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
     </>}
     {children}</> }
   </Context.Provider>;

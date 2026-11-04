@@ -40,7 +40,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   useEffect(() => {
     if (loaded && !error && collectionId && data?.collections && !collection) {
       const q = new URLSearchParams(window.location.search); q.delete("collection");
-      navigateShell(`/?${q}`, true); notify("이 모음이 삭제되었어요. 다른 모음을 골라 주세요.", "info");
+      navigateShell(`/?${q}`, true); notify("이 모음은 삭제되었어요.", "info");
     }
   }, [collectionId, collection, loaded, error, data?.collections, notify]);
   const [view, setView] = useState<"map" | "list">("map");
@@ -128,7 +128,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses([...STATUS_ORDER]); setCategory(""); }
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true, level: 3 } : { sequence: ++requestSequence.current, kind: "saved" });
-    notify(restoredArrival.current ? "복구한 장소를 보여드릴게요." : savedArrival === "0" ? "저장할 장소 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 담아둔 장소예요. 기존 메모와 상태를 유지했어요." : "장소를 우리 지도에 담았어요.", "success", place ? { label: "모음에 담기", href: `/?view=list&organize=${place.id}` } : undefined);
+    if (!restoredArrival.current) notify(savedArrival === "0" ? "저장 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 저장한 장소예요." : "장소를 저장했어요.");
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate"); url.searchParams.delete("restored"); url.searchParams.delete("view"); url.searchParams.delete("collection"); url.searchParams.delete("section");
     history.replaceState(history.state, "", url.pathname + url.search);
@@ -152,7 +152,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!navigator.geolocation) { notify("이 기기에서는 위치를 확인할 수 없어요.", "info"); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition((p) => { const value = { lat: p.coords.latitude, lng: p.coords.longitude }; setOrigin(value); if (forSort) setSort("near"); else setMapLocation(value); setLocating(false); },
-      () => { setLocating(false); notify("위치를 확인하지 못했어요. 위치 권한을 확인하거나 최근 저장순으로 봐 주세요.", "info"); }, { timeout: 12000, maximumAge: 30000 });
+      () => { setLocating(false); notify("위치를 확인하지 못했어요.", "info"); }, { timeout: 12000, maximumAge: 30000 });
   }
   function reset() { setStatuses([...STATUS_ORDER]); setCategory(""); }
   function toggleStatus(status: PlaceStatus) {

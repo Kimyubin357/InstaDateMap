@@ -42,7 +42,7 @@ export default function TrashPlaces() {
       setPlaces((rows) => rows.filter((row) => row.id !== place.id));
       setPurging(null);
       if (!purge) setRestoredPlaces((rows) => [place, ...rows.filter((row) => row.id !== place.id)]);
-      notify(purge ? "장소를 영구 삭제했어요." : "장소를 지도에 복구했어요.", "success", purge ? undefined : { label: "장소 보기", href: `/?restored=${encodeURIComponent(place.id)}` });
+      notify(purge ? "장소를 영구 삭제했어요." : "장소를 복구했어요.", "success", purge ? undefined : { label: "장소 보기", href: `/?restored=${encodeURIComponent(place.id)}` });
       void store.refresh();
     } catch (e) { setActionError(e instanceof Error ? e.message : "처리 결과를 확인하지 못했어요. 목록을 다시 확인해 주세요."); }
     finally { ++readVersion.current; writing.current = false; setBusy(false); setRefresh((n) => n + 1); }
