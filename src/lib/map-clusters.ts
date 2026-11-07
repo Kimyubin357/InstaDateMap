@@ -3,11 +3,11 @@ import type { MapRegion } from "./map-regions";
 import { REGION_NAMES } from "./place-view";
 
 // Kakao levels increase as the map zooms out (scale bar: 9 = 4km, 12 = 32km). Below CLUSTER_MIN_LEVEL every place
-// keeps its own name pin. 도 12–14 · 시 9–11 · 구 7–8 · 동 4–6.
+// keeps its own name pin. 도 13–14 · 시 10–12 · 구 7–9 · 동 4–6 (구 kept wide like 직방/다방's 시군구 tier).
 export const CLUSTER_MIN_LEVEL = 4;
 export const DISTRICT_CLUSTER_LEVEL = 7;
-export const CITY_CLUSTER_LEVEL = 9;
-export const PROVINCE_CLUSTER_LEVEL = 12;
+export const CITY_CLUSTER_LEVEL = 10;
+export const PROVINCE_CLUSTER_LEVEL = 13;
 export interface ClusterPlace { id: string; status: PlaceStatus }
 export interface ScreenPoint { x: number; y: number }
 export interface MarkerSize { width: number; height: number }
@@ -102,8 +102,8 @@ export function stackCards<T extends ClusterPlace>(cards: readonly RegionCard<T>
 }
 
 const TIERS: RegionTier[] = ["province", "city", "district", "local"];
-/** The least zoomed-in Kakao level of each tier (도 14 · 시 11 · 구 8 · 동 6). */
-const TIER_TOP: Record<RegionTier, number> = { province: 14, city: 11, district: 8, local: 6 };
+/** The least zoomed-in Kakao level of each tier (도 14 · 시 12 · 구 9 · 동 6). */
+const TIER_TOP: Record<RegionTier, number> = { province: 14, city: 12, district: 9, local: 6 };
 /**
  * Tapping a card must change what is shown: zoom at least into the next tier, skipping tiers where the
  * card's places are still the very same area under another tier name (서울 도 → 서울 시 → 구,

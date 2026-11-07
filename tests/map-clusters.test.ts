@@ -16,11 +16,11 @@ const cards = (places: P[], level: number, extra: { isNew?: (p: P) => boolean; a
 const labels = (list: { label: string | null }[]) => list.map((c) => c.label).sort();
 
 describe("지역 집계 카드", () => {
-  it("확대 단계에 따라 도(12~14) → 시(9~11) → 구(7~8) → 동(4~6) 단위로 나눔", () => {
-    expect([14, 12, 11, 9, 8, 7, 6, 4].map(regionTier)).toEqual(["province", "province", "city", "city", "district", "district", "local", "local"]);
+  it("확대 단계에 따라 도(13~14) → 시(10~12) → 구(7~9) → 동(4~6) 단위로 나눔", () => {
+    expect([14, 13, 12, 10, 9, 7, 6, 4].map(regionTier)).toEqual(["province", "province", "city", "city", "district", "district", "local", "local"]);
     const places = [place("a", seongsu), place("b", oksu), place("c", mapo), place("d", gwacheon), place("e", suwon)];
-    expect(labels(cards(places, 12))).toEqual(["경기", "서울"]);
-    expect(labels(cards(places, 9))).toEqual(["과천시", "서울", "수원시"]);
+    expect(labels(cards(places, 13))).toEqual(["경기", "서울"]);
+    expect(labels(cards(places, 10))).toEqual(["과천시", "서울", "수원시"]);
     expect(labels(cards(places, 7))).toEqual(["과천시", "마포구", "성동구", "장안구"]);
     expect(labels(cards(places, 6))).toEqual(["성수1가1동", "연남동", "옥수동", "정자1동", "중앙동"]);
   });
@@ -45,7 +45,7 @@ describe("지역 집계 카드", () => {
     expect([card.visited, card.total]).toEqual([3, 4]);
     const [district] = cards(shown, 7, { allPlaces: all });
     expect([district.visited, district.total]).toEqual([3, 4]);
-    const [city] = cards(shown, 9, { allPlaces: all });
+    const [city] = cards(shown, 10, { allPlaces: all });
     expect([city.visited, city.total]).toEqual([4, 5]);
   });
   it("NEW 장소 수를 카드마다 셈", () => {
@@ -71,11 +71,11 @@ describe("지역 집계 카드", () => {
 describe("카드 겹침", () => {
   const order = (list: { label: string | null }[]) => stackCards(list as never).map((c: { label: string | null }) => c.label);
   it("숨기지 않고 모두 그리며 장소가 많은 카드를 위(뒤 순서)에 둠", () => {
-    const list = cards([place("a", seongsu), place("b", seongsu), place("c", gwacheon), place("d", suwon), place("e", suwon), place("f", suwon)], 9);
+    const list = cards([place("a", seongsu), place("b", seongsu), place("c", gwacheon), place("d", suwon), place("e", suwon), place("f", suwon)], 10);
     expect(order(list)).toEqual(["과천시", "서울", "수원시"]);
   });
   it("장소 수가 같으면 가나다순으로 앞선 지역이 위, 이름 없는 카드는 맨 아래", () => {
-    const list = cards([place("a", gwacheon), place("b", seongsu), place("c", null)], 9);
+    const list = cards([place("a", gwacheon), place("b", seongsu), place("c", null)], 10);
     expect(order(list)).toEqual([null, "서울", "과천시"]);
   });
 });
@@ -86,18 +86,18 @@ describe("카드를 누를 때 확대 목표", () => {
     const [card] = cards(places, level);
     return zoomInLevel(card, (p) => p.region);
   };
-  it("적어도 다음 단계(도→시 11, 시→구 8, 구→동 6)까지 확대함", () => {
-    expect(target([place("a", gwacheon), place("b", suwon)], 12)).toBe(11);
-    expect(target([place("a", suwon), place("b", { ...suwon, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 행궁동" })], 10)).toBe(8);
+  it("적어도 다음 단계(도→시 12, 시→구 9, 구→동 6)까지 확대함", () => {
+    expect(target([place("a", gwacheon), place("b", suwon)], 13)).toBe(12);
+    expect(target([place("a", suwon), place("b", { ...suwon, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 행궁동" })], 10)).toBe(9);
     expect(target([place("a", seongsu), place("b", oksu)], 8)).toBe(6);
   });
   it("이름만 같은 단계는 건너뜀: 서울 도→구, 세종 도→동, 과천시 시→동", () => {
-    expect(target([place("a", seongsu), place("b", mapo)], 13)).toBe(8);
-    expect(target([place("a", sejong), place("b", sejong)], 12)).toBe(6);
+    expect(target([place("a", seongsu), place("b", mapo)], 13)).toBe(9);
+    expect(target([place("a", sejong), place("b", sejong)], 13)).toBe(6);
     expect(target([place("a", gwacheon), place("b", gwacheon)], 10)).toBe(6);
   });
   it("지역을 모르는 장소가 섞이면 건너뛰지 않음", () => {
     const [card] = cards([place("a", seongsu), place("b", { ...seongsu, city: null })], 13);
-    expect(zoomInLevel(card, (p) => p.region)).toBe(11);
+    expect(zoomInLevel(card, (p) => p.region)).toBe(12);
   });
 });
