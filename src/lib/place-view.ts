@@ -5,6 +5,8 @@ export interface PlaceView {
   sources: { url: string; media_type: string }[]; created_at: string; last_saved_at: string;
 }
 export const STATUS_ORDER: PlaceStatus[] = ["wish", "again", "visited", "meh"];
+/** Map and list open on the places still to visit; filter reset returns here. */
+export const DEFAULT_STATUSES: PlaceStatus[] = ["wish", "again"];
 export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const rad = (n: number) => n * Math.PI / 180;
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;

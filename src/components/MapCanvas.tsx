@@ -5,26 +5,34 @@ import "@/app/map-recovery.css";
 import { STATUS_LABEL } from "@/lib/types";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
-import { CLUSTER_MIN_LEVEL, clusterPlaces } from "@/lib/map-clusters";
+import { CLUSTER_MIN_LEVEL, hideOverlappingCards, regionCards, type RegionCard } from "@/lib/map-clusters";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
 export interface MapPosition { lat: number; lng: number; level: number }
-export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number };
+/** A failed interactive map reports here so the map screen can show it with the other map states. */
+export interface MapRecovery { loading: boolean; retry?: () => void }
+export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number }
+  | { sequence: number; kind: "bounds"; points: { lat: number; lng: number }[] };
+export interface MapInsets { top: number; right: number; bottom: number; left: number }
+/** A neighbourhood card opens its place list; the map then fits those places beside the list. */
+export interface RegionSelection { label: string | null; ids: string[] }
 declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: () => void } } } }
 
-function clusterButton(total: number, visited: number, region: string | null) {
-  const button = document.createElement("button"); button.type = "button"; button.className = "cluster-pin";
-  button.dataset.total = String(total); button.dataset.visited = String(visited);
-  button.setAttribute("aria-label", `${region || ""} 저장한 장소 ${total}곳, 가본 곳 ${visited}곳. ${total === 1 ? "장소 카드 보기" : "지도 확대"}`);
-  button.title = `${region || ""} · 저장 ${total}곳 · 방문 ${visited}/${total} · ${total === 1 ? "눌러서 장소 보기" : "눌러서 확대"}`;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 56 56"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
-  const circle = document.createElementNS(svg.namespaceURI, "circle");
-  for (const [key, value] of Object.entries({ cx: "28", cy: "28", r: "24", pathLength: "100", class: "cluster-ring-progress",
-    "stroke-dasharray": `${visited / total * 100} 100`, transform: "rotate(-90 28 28)" })) circle.setAttribute(key, value);
-  svg.append(circle);
-  const count = document.createElement("span"); count.textContent = total.toLocaleString("ko-KR"); count.setAttribute("aria-hidden", "true");
-  if (total > 99) button.classList.add("cluster-pin-large");
-  button.append(svg, count);
+function regionCardButton(card: RegionCard<PlaceView>) {
+  const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}`;
+  const single = card.places.length === 1;
+  const where = card.label || "이 지역";
+  button.setAttribute("aria-label", `${where} 가고 싶음 ${card.wish}곳, 지도에 ${card.places.length}곳, 지역 전체 ${card.total}곳 중 ${card.visited}곳 다녀옴${card.fresh ? `, 새 장소 ${card.fresh}곳` : ""}. ${single ? "장소 카드 보기" : card.tier === "local" ? "장소 목록 보기" : "지도 확대"}`);
+  if (card.label) { const name = document.createElement("span"); name.className = "region-card-name"; name.textContent = card.label; button.append(name); }
+  const count = document.createElement("strong"); count.className = "region-card-count"; count.textContent = card.wish.toLocaleString("ko-KR"); button.append(count);
+  if (card.fresh) {
+    const badge = document.createElement("span"); badge.className = "region-card-new";
+    const word = document.createElement("b"); word.textContent = "NEW";
+    badge.append(word, document.createTextNode(` ${card.fresh}`)); button.append(badge);
+  }
+  const track = document.createElement("span"); track.className = "region-card-progress";
+  const fill = document.createElement("i"); fill.style.width = `${card.total ? Math.round(card.visited / card.total * 100) : 0}%`;
+  track.append(fill); button.append(track);
+  for (const node of button.children) node.setAttribute("aria-hidden", "true");
   return button;
 }
 
@@ -54,13 +62,18 @@ function lookupRegion(services: any, point: RegionPoint) {
   });
 }
 
-export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds }: {
+export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds, onRecovery, allPlaces, onRegionOpen, fitPadding }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
   viewRequest: MapViewRequest | null;
   onBlank?: () => void; interactive?: boolean;
   focusPadding?: () => { top: number; bottom: number } | null;
   onShowList?: () => void; newPlaceIds?: ReadonlySet<string>;
+  onRecovery?: (state: MapRecovery | null) => void;
+  /** Every saved place, filters ignored: region progress counts them all. */
+  allPlaces?: PlaceView[];
+  onRegionOpen?: (selection: RegionSelection) => void;
+  fitPadding?: () => MapInsets | null;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
   const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
@@ -69,10 +82,13 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   const [regions] = useState(() => new MapRegionCache());
   const [regionVersion, setRegionVersion] = useState(0);
   const [lookupRetry, setLookupRetry] = useState(0);
-  const coordinateKey = places.map(regionPointKey).sort().join("|");
+  const regionSource = allPlaces ?? places;
+  const coordinateKey = regionSource.map(regionPointKey).sort().join("|");
   const position = useRef(initialPosition); const onMove = useRef(onPosition); onMove.current = onPosition;
   const pick = useRef(onPick); pick.current = onPick;
   const blank = useRef(onBlank); blank.current = onBlank;
+  const openRegion = useRef(onRegionOpen); openRegion.current = onRegionOpen;
+  const fitInsets = useRef(fitPadding); fitInsets.current = fitPadding;
   const cancelMotion = useRef<(() => void) | undefined>(undefined);
   const moving = useRef(false);
   const padding = useRef(focusPadding); padding.current = focusPadding;
@@ -85,6 +101,11 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   const latestOnlineVersion = useRef(0); const attemptOnlineVersion = useRef(0);
   const appliedRequest = useRef<number | undefined>(undefined);
   const layoutSize = useRef({ width: 0, height: 0 });
+  const recovery = useRef(onRecovery); recovery.current = onRecovery;
+  useEffect(() => {
+    recovery.current?.(error ? { loading, retry: apiKey ? () => setLoadAttempt((attempt) => attempt + 1) : undefined } : null);
+  }, [error, loading, apiKey]);
+  useEffect(() => () => recovery.current?.(null), []);
   function placeCenter(point: { lat: number; lng: number }) {
     const k = window.kakao.maps, target = new k.LatLng(point.lat, point.lng), insets = padding.current?.();
     if (!insets || !el.current) return target;
@@ -113,6 +134,18 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     else {
       const bounds = new k.LatLngBounds(); places.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
       map.current.setBounds(bounds, 120, 90, 125, 90);
+    }
+    rememberPosition();
+  }
+  function fitPoints(points: { lat: number; lng: number }[]) {
+    if (!points.length) return;
+    const k = window.kakao.maps, insets = fitInsets.current?.() ?? { top: 120, right: 90, bottom: 125, left: 90 };
+    const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
+    if (Math.max(...lats) - Math.min(...lats) < 1e-6 && Math.max(...lngs) - Math.min(...lngs) < 1e-6) {
+      map.current.setLevel(CLUSTER_MIN_LEVEL - 1); map.current.setCenter(new k.LatLng(points[0].lat, points[0].lng));
+    } else {
+      const bounds = new k.LatLngBounds(); points.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
+      map.current.setBounds(bounds, insets.top, insets.right, insets.bottom, insets.left);
     }
     rememberPosition();
   }
@@ -167,7 +200,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   useEffect(() => {
     if (!ready || !interactive || !active || level < CLUSTER_MIN_LEVEL) return;
     let cancelled = false; let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    const points = [...new Map(places.map((p) => [regionPointKey(p), { lat: p.lat, lng: p.lng }])).values()];
+    const points = [...new Map(regionSource.map((p) => [regionPointKey(p), { lat: p.lat, lng: p.lng }])).values()];
     async function run() {
       const missing = points.filter((p) => regions.get(p) === undefined);
       for (let i = 0; i < missing.length && !cancelled; i += 4) {
@@ -195,44 +228,47 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     const previousFocus = pendingMarkerFocus.current || markers.current.find((marker) => marker.button === document.activeElement)?.ids;
     markers.current.forEach((m) => m.overlay.setMap(null));
     const projection = map.current.getProjection();
-    const buttons = new Map(places.map((p) => [p.id, placeButton(p, interactive, newPlaceIds?.has(p.id))]));
-    // Batch layout reads: use the actual font/nameplate dimensions, not an 80px radius.
-    const measure = document.createElement("div");
-    measure.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;visibility:hidden;pointer-events:none";
-    for (const button of buttons.values()) measure.append(button);
-    el.current!.parentElement!.append(measure);
-    const sizes = new Map([...buttons].map(([id, button]) => [id, { width: button.offsetWidth, height: button.offsetHeight }]));
-    measure.remove();
     const displayLevel = interactive ? map.current.getLevel() : 0;
-    const groups = clusterPlaces(places, (p) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng)), {
-      level: displayLevel, region: (p) => regions.get(p), size: (p) => sizes.get(p.id)!,
-    });
-    markers.current = groups.map((group) => {
-      // Keep zoomed-out markers compact even for a single or not-yet-resolved place.
-      if (displayLevel >= CLUSTER_MIN_LEVEL) {
-        const button = clusterButton(group.places.length, group.visited, group.region);
-        const point = projection.coordsFromContainerPoint(new k.Point(group.x, group.y));
-        const ids = group.places.map((place) => place.id);
+    if (displayLevel >= CLUSTER_MIN_LEVEL) {
+      // Zoomed out: one card per administrative area (docs/redesign/map-home-compare.md).
+      const cards = regionCards(places, (p) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng)), {
+        level: displayLevel, region: (p) => regions.get(p), isNew: (p) => !!newPlaceIds?.has(p.id), allPlaces,
+      });
+      const buttons = new Map(cards.map((card) => [card.key, regionCardButton(card)]));
+      // Batch layout reads with the real font so overlap checks use the drawn card size.
+      const measure = document.createElement("div");
+      measure.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;visibility:hidden;pointer-events:none";
+      for (const button of buttons.values()) measure.append(button);
+      el.current!.parentElement!.append(measure);
+      const sizes = new Map([...buttons].map(([key, button]) => [key, { width: button.offsetWidth, height: button.offsetHeight }]));
+      measure.remove();
+      markers.current = hideOverlappingCards(cards, (card) => sizes.get(card.key)!).map((card) => {
+        const button = buttons.get(card.key)!;
+        const point = projection.coordsFromContainerPoint(new k.Point(card.x, card.y));
+        const ids = card.places.map((place) => place.id);
         button.classList.toggle("active", ids.includes(focused.current || ""));
         button.onclick = (event) => {
           k.event.preventMap(); cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined;
-          if (group.places.length === 1) { pick.current(group.places[0].id); return; }
+          if (card.places.length === 1) { pick.current(card.places[0].id); return; }
+          if (card.tier === "local" && openRegion.current) { openRegion.current({ label: card.label, ids }); return; }
           if (event.detail === 0) pendingMarkerFocus.current = ids;
-          map.current.setLevel(Math.max(3, map.current.getLevel() - 2), { anchor: point, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
+          fitPoints(card.places);
         };
         const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? 5 : 1 });
         overlay.setMap(map.current); return { ids, button, overlay };
-      } else {
-        const p = group.places[0], button = buttons.get(p.id)!;
+      });
+    } else {
+      markers.current = [...new Map(places.map((p) => [p.id, p])).values()].sort((a, b) => a.id.localeCompare(b.id)).map((p) => {
+        const button = placeButton(p, interactive, newPlaceIds?.has(p.id));
         button.classList.toggle("active", p.id === focused.current);
         button.onclick = () => { k.event.preventMap(); if (interactive) pick.current(p.id); };
         const marker = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === selectedId ? 5 : 1 });
         marker.setMap(map.current); return { ids: [p.id], button, overlay: marker };
-      }
-    });
+      });
+    }
     if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
     pendingMarkerFocus.current = undefined;
-  }, [places, ready, level, interactive, regions, regionVersion, newPlaceIds]);
+  }, [places, allPlaces, ready, level, interactive, regions, regionVersion, newPlaceIds]);
   useEffect(() => {
     for (const marker of markers.current) {
       const selected = marker.ids.includes(selectedId || "");
@@ -276,6 +312,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     cancelMotion.current?.();
     moving.current = false;
     if (viewRequest.kind === "saved") { framedPlace.current = undefined; showSaved(); }
+    else if (viewRequest.kind === "bounds") { framedPlace.current = undefined; fitPoints(viewRequest.points); }
     else {
       const k = window.kakao.maps;
       framedPlace.current = viewRequest;
@@ -293,7 +330,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       } else { map.current.setLevel(targetLevel); map.current.setCenter(placeCenter(viewRequest)); rememberPosition(); }
     }
   }, [ready, active, viewRequest, places]);
-  return <><div ref={el} className="map-canvas" aria-label={interactive ? "저장한 장소 지도" : "장소 위치 미리보기"} />{error && <div className={`map-recovery${interactive ? "" : " map-recovery-preview"}`} aria-busy={loading}>
+  return <><div ref={el} className="map-canvas" aria-label={interactive ? "저장한 장소 지도" : "장소 위치 미리보기"} />{error && !onRecovery && <div className={`map-recovery${interactive ? "" : " map-recovery-preview"}`} aria-busy={loading}>
     <p role="status">{loading ? "지도를 다시 불러오는 중…" : error}</p>
     {interactive && !loading && <p className="map-recovery-hint">연결을 확인하고 다시 시도해 주세요.</p>}
     <div className="map-recovery-actions">{apiKey && <button className="btn" disabled={loading} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{interactive ? "지도 다시 불러오기" : "다시 시도"}</button>}
