@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S1 처음 열기</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+LAB.sequence({
+  id: 's1',
+  title: 'S1 처음 열기 — 불러오기 · 전체 보기 · 0곳 · 실패',
+  lead: '홈의 뼈대는 세로·가로 모두 같은 4개 영역입니다. <b>①검색·필터·설정 줄</b>, <b>②상태 칩 줄</b>(확인 대기·새 장소·필터·모음 + 세로에서는 내 위치/전체), <b>③장소 카드 자리</b>(미리보기·목록·저장 결과), <b>④이동·추가</b>(지도/리스트 전환과 + 장소 추가). 세로는 ①②가 위, ③④가 아래로 쌓이고, 가로는 ①③이 왼쪽 열, ②가 지도 위 가운데, ④가 오른쪽 열입니다. 각 영역은 쌓이는 순서가 정해져 있어 서로 덮지 않습니다.',
+  sizes: ['p393', 'l844'],
+  frames: [
+    { t: '앱 열기 — 불러오는 중', sc: { loading: true, hideMarkers: true, view: { default: true } },
+      note: '지도 바탕과 버튼을 먼저 그리고, 칩 자리에 ‘불러오는 중’을 둡니다. 검색·추가는 바로 누를 수 있습니다.' },
+    { t: '저장한 장소 전체가 들어온 지도', sc: { view: { fit: 'all' }, newChip: 2 },
+      note: '처음 열면 모든 장소가 들어오게 맞춥니다. 부산 1곳 때문에 전국 단계: 서울은 ‘서울 24 · 가고 싶음 12’ 이름표 하나, 부산은 숫자 없이 장소 표시. 새 장소가 있으면 위에 ‘NEW 새 장소 2’ 칩이 생깁니다.' },
+    { t: '장소 0곳', state: true, sc: { empty: true, view: { default: true }, card: { type: 'empty' } },
+      note: '빈 지도 대신 첫 장소를 담는 방법을 알려 줍니다. 버튼을 하나 더 만들지 않고 늘 있는 ＋ 장소 추가를 가리킵니다(주요 버튼은 화면에 하나).' },
+    { t: '장소 불러오기 실패', state: true, sc: { hideMarkers: true, view: { default: true }, card: { type: 'loadError' } },
+      note: '지도는 보이지만 장소를 못 불러온 상태. 카드 자리에 이유와 ‘다시 시도’를 둡니다.' },
+    { t: '지도 자체 로드 실패', state: true, sc: { mapFail: true, hideMarkers: true, card: { type: 'mapError' } },
+      note: '지도 타일 대신 빗금 바탕. ‘다시 시도’와 ‘리스트로 보기’를 함께 둡니다. 검색·추가·설정은 그대로 씁니다.' },
+  ],
+});
+</script>
+</body>
+</html>

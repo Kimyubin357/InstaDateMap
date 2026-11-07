@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S7 상세 편집</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const V = { view: { fit: 'seongsu', focusOn: 3, min: 120 }, sel: 3 };
+const D = { type: 'detail', id: 3 };
+const VIS = { 3: { st: 'visited' } };
+const ADD = ' 다녀옴! 바질 베이글 진짜 맛있었음. 다음엔 평일에 오자';
+const NEWMEMO = LAB.LONGMEMO + ADD;
+const p = (o) => Object.assign({}, V, o);
+LAB.sequence({
+  id: 's7',
+  title: 'S7 상세 편집 — 상태 → 메모 → 저장 안 하고 나가기 확인 → 저장',
+  lead: '상태 4종은 가장 자주 하는 편집이라 <b>상세 아래쪽에 고정</b>합니다(스크롤해도 늘 엄지 자리). 누르면 바로 저장되고 결과는 바로 위 한 줄에서 알려 줍니다. 메모는 키보드 위 전용 편집 화면에서 쓰고, 저장하지 않고 닫으면 확인합니다.',
+  sizes: ['p393', 'l844'],
+  frames: [
+    { t: '상세 — 긴 이름·긴 메모', sc: p({ panel: Object.assign({}, D), tap: 'k:st-visited' }), note: '' },
+    { t: '다녀옴 누름 → 저장 중', sc: p({ patch: VIS, panel: Object.assign({ saving: 'visited' }, D) }),
+      note: '누른 버튼이 바로 바뀌고 ‘저장 중’. 연타해도 마지막 선택만 저장합니다.' },
+    { t: '저장됨', sc: p({ patch: VIS, panel: Object.assign({ note: '다녀옴으로 바꿨어요' }, D), tap: 'k:memo' }), note: '' },
+    { t: '메모 쓰기 (키보드 열림)', sc: p({ patch: VIS, panel: D, editor: { id: 3, text: NEWMEMO, dirty: true }, tap: 'k:edcancel' }),
+      note: '글이 길면 커서 쪽(끝)을 보여 줍니다. 저장 안 됨 표시와 글자 수는 키보드 바로 위.' },
+    { t: '저장 안 하고 닫으려 함 → 확인', sc: p({ patch: VIS, panel: Object.assign({ draft: true }, D), editor: { id: 3, text: NEWMEMO, dirty: true, kb: false }, dialog: { type: 'unsaved' }, tap: 'k:dlg-save' }),
+      note: '주요 버튼은 ‘저장하고 나가기’, 지우는 선택은 점선으로 구분해 맨 아래.' },
+    { t: '메모 저장됨', sc: p({ patch: { 3: { st: 'visited', memo: NEWMEMO } }, panel: Object.assign({ note: '메모를 저장했어요' }, D), tap: 'k:showmap' }), note: '' },
+    { t: '지도에서 보기', sc: { view: { center: 3, s: 1400 }, sel: 3, patch: { 3: { st: 'visited', memo: NEWMEMO } }, card: { type: 'preview', id: 3, list: [3, 1, 8, 11, 2], ctxLabel: '이 근처' } },
+      note: '상세를 닫고 가게 단계로 그 장소를 가운데 둡니다. 미리보기가 남아 다시 상세로 돌아갈 수 있습니다.' },
+    { t: '상대와 메모 충돌', state: true, sc: p({ patch: VIS, panel: D, dialog: { type: 'conflict', mine: '다녀옴! 바질 베이글 진짜 맛있었음. 다음엔 평일에 오자' } }),
+      note: '상대의 현재 메모와 내 초안을 나란히(가로) / 위아래(세로) 보여 줍니다. 고르기 전까지 초안은 남아 있습니다.' },
+    { t: '최신 내용 확인 중 (상세를 열 때)', state: true, sc: p({ panel: Object.assign({ checking: true }, D) }),
+      note: '상세를 열면 상대가 그사이 고친 메모가 있는지 먼저 확인합니다. 확인 중에도 내용은 보이고 상태 버튼은 누를 수 있습니다.' },
+    { t: '상태 저장 실패 → 다시 시도', state: true, sc: p({ panel: Object.assign({ fail: true }, D) }),
+      note: '실패하면 원래 상태로 돌려 두고, 같은 줄에서 다시 시도.' },
+    { t: '장소 삭제 확인', state: true, sc: p({ panel: D, dialog: { type: 'delete', id: 3 } }),
+      note: '설정에서 되살릴 수 있다고 안내합니다. 삭제 버튼은 상세 맨 아래, 점선으로 따로 둡니다.' },
+  ],
+});
+</script>
+</body>
+</html>

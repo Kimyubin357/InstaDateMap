@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S6 필터</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const SEOUL = { view: { fit: 'seoul' } };
+LAB.sequence({
+  id: 's6',
+  title: 'S6 필터 — 가고 싶음만 → 결과 → 걸림 표시 → 해제',
+  lead: '필터 시트는 지도 기호의 <b>범례를 겸합니다</b>(상태 버튼 = 지도에 쓰는 기호 + 이름 + 곳 수). 고르는 즉시 뒤의 지도가 바뀌고, ‘완료’에 결과 곳 수가 나옵니다. 필터가 걸리면 필터 버튼이 검게 바뀌고 숫자가 붙으며, 칩 줄에 ‘가고 싶음만 ✕’가 남아 한 번에 풀 수 있습니다.',
+  sizes: ['p393', 'l844'],
+  frames: [
+    { t: '필터 열기', sc: Object.assign({ tap: 'k:filter' }, SEOUL), note: '' },
+    { t: '필터 시트 (전체)', sc: Object.assign({ panel: { type: 'filter' }, tap: 'k:fs-want' }, SEOUL),
+      note: '상태는 여러 개, 종류는 하나만. 세로는 아래 시트, 가로는 왼쪽 패널이라 지도가 옆에서 바로 바뀌는 걸 볼 수 있습니다.' },
+    { t: '가고 싶음만 고름 (지도 즉시 반영)', sc: Object.assign({ filter: { st: ['want'] }, panel: { type: 'filter', st: ['want'] }, tap: 'k:fdone' }, SEOUL),
+      note: '‘전체’가 켜진 상태에서 가고 싶음을 누르면 가고 싶음만 남습니다.' },
+    { t: '결과 지도 + 필터 걸림 표시', sc: Object.assign({ filter: { st: ['want'] }, tap: 'k:chip-st' }, SEOUL),
+      note: '필터 버튼(검정 + 1)과 칩 ‘가고 싶음만 ✕’ 두 곳에 늘 보입니다. 묶음 이름표는 ‘모두 가고 싶음’으로 바뀝니다.' },
+    { t: '해제', sc: Object.assign({ toast: { text: '필터를 해제했어요', action: '되돌리기' } }, SEOUL),
+      note: '칩의 ✕ 한 번으로 해제. 실수로 풀었을 때를 위해 알림에 ‘되돌리기’를 둡니다.' },
+    { t: '필터 결과 0곳', state: true, sc: Object.assign({ filter: { st: ['meh'], kind: '카페' }, card: { type: 'zero' } }, SEOUL),
+      note: '빈 지도 대신 이유와 ‘필터 초기화’.' },
+    { t: '모음 하나만 보기 (리스트의 모음에서 들어옴)', state: true, sc: { collection: '성수 카페', view: { fit: 'all' } },
+      note: '칩 줄에 모음 이름과 장소 수, ✕로 해제. 지도는 모음의 장소에 맞춥니다. 필터와 함께 걸 수 있습니다.' },
+  ],
+});
+</script>
+</body>
+</html>

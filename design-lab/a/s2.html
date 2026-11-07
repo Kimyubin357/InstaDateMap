@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S2 둘러보고 고르기</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const NEW2 = { newChip: 2 };
+LAB.sequence({
+  id: 's2',
+  title: 'S2 둘러보고 고르기 — 넓은 지역 → 동네 → 미리보기 → 옆 장소 → 상세',
+  lead: '묶음 이름표를 누르면 <b>지도가 그 묶음 범위로 한 번에 맞춰지고, 같은 순간 묶인 장소 목록이 열립니다.</b> 그래서 어느 단계에서든 “묶음 1번 + 목록 1번 = 2번”이면 원하는 장소의 미리보기에 닿습니다. 지도에서 계속 좁혀 가는 길(3번 프레임)도 남겨 둡니다. 점선 테두리와 ‘탭’ 표시가 있는 곳을 누르면 다음 프레임으로 이동합니다.',
+  sizes: ['p393', 'l844', 'p320', 'l568', 'l667', 'l932'],
+  frames: [
+    { t: '넓은 지역 — 전국', sc: Object.assign({ view: { fit: 'all' }, tap: 'gp:3' }, NEW2),
+      note: '부산 1곳 때문에 전국 단계입니다. 서울 24곳은 ‘서울 24 · 가고 싶음 12’ 이름표 하나, 부산은 1곳이라 숫자 없이 상태 기호와 이름으로 나옵니다. 새 장소 2곳은 서울 이름표의 ‘NEW 2’ 꼬리표로 드러납니다.' },
+    { t: '서울 묶음 탭 → 범위 맞춤 + 목록', sc: Object.assign({ view: { fit: 'seoul' }, card: { type: 'group', title: '서울', ids: 'seoul' }, tap: ['g:성수동', 'k:sec-성동구'] }, NEW2),
+      note: '탭 1번. 지도는 서울 범위로 한 번에 맞춰지고(2단계씩 반복 확대 없음), 목록은 새로 저장 → 구별 순서입니다. 여기서 행을 누르면 바로 미리보기(탭 2번). 구 제목을 누르면 그 구만 확대합니다.' },
+    { t: '성수동 이름표 탭 → 동네 단계', sc: Object.assign({ view: { fit: 'seongsu' }, card: { type: 'group', title: '성수동', ids: 'seongsu' }, tap: 'p:12' }, NEW2),
+      note: '동네 단계부터는 묶지 않습니다. 12곳이 모두 상태 기호로 보이고, 이름표는 겹치지 않는 것만 우선순위(NEW → 가고 싶음 → 또 갈래 → 다녀옴 → 별로)로 붙습니다.' },
+    { t: '미리보기 (성수동 1 / 12)', sc: Object.assign({ view: { fit: 'seongsu', focusOn: 12, min: 120 }, sel: 12, card: { type: 'preview', id: 12, list: 'seongsuOrder', ctxLabel: '성수동 12곳' }, tap: 'k:next' }, NEW2),
+      note: '미리보기는 아래(세로) 또는 왼쪽 아래(가로)에만 붙고 지도는 남은 영역에 장소를 가운데로 둡니다. 순번은 목록 순서와 같습니다. 카드를 좌우로 밀어도 넘어가고, 같은 일을 하는 이전/다음 버튼을 항상 둡니다.' },
+    { t: '다음 장소 (2 / 12) — 지도가 따라감', sc: Object.assign({ view: { fit: 'seongsu', focusOn: 3, min: 120 }, sel: 3, card: { type: 'preview', id: 3, list: 'seongsuOrder', ctxLabel: '성수동 12곳' }, tap: 'k:detail' }, NEW2),
+      note: '아주 긴 이름은 미리보기에서 2줄(좁은 화면 1줄)까지 보이고, 상세에서 전체가 줄바꿈됩니다. 선택한 장소는 확대·축소와 상관없이 묶이지 않습니다.' },
+    { t: '상세', sc: Object.assign({ view: { fit: 'seongsu', focusOn: 3, min: 120 }, sel: 3, panel: { type: 'detail', id: 3 } }, NEW2),
+      note: '세로는 전체 높이 시트, 가로는 왼쪽 패널 + 오른쪽 지도. 상태 4종은 엄지가 닿는 아래 고정 줄에 있습니다. 긴 메모도 전부 보입니다.' },
+  ],
+});
+</script>
+</body>
+</html>
