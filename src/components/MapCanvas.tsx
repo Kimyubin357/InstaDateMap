@@ -5,7 +5,7 @@ import "@/app/map-recovery.css";
 import { STATUS_LABEL } from "@/lib/types";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
-import { CLUSTER_MIN_LEVEL, regionCards, stackCards, type RegionCard } from "@/lib/map-clusters";
+import { CLUSTER_MIN_LEVEL, regionCards, stackCards, zoomInLevel, type RegionCard } from "@/lib/map-clusters";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
 export interface MapPosition { lat: number; lng: number; level: number }
 /** A failed interactive map reports here so the map screen can show it with the other map states. */
@@ -140,7 +140,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     }
     rememberPosition();
   }
-  function fitPoints(points: { lat: number; lng: number }[]) {
+  /** Fit the points; with `atMost`, never stay wider than that level and zoom in around their centre instead. */
+  function fitPoints(points: { lat: number; lng: number }[], atMost?: number) {
     if (!points.length) return;
     const k = window.kakao.maps, insets = fitInsets.current?.() ?? { top: 120, right: 90, bottom: 125, left: 90 };
     const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
@@ -149,6 +150,16 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     } else {
       const bounds = new k.LatLngBounds(); points.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
       map.current.setBounds(bounds, insets.top, insets.right, insets.bottom, insets.left);
+      // A few places a street apart must not dive to Kakao's closest level; name pins (level 3) are enough.
+      if (map.current.getLevel() < CLUSTER_MIN_LEVEL - 1) map.current.setLevel(CLUSTER_MIN_LEVEL - 1);
+    }
+    if (atMost !== undefined && map.current.getLevel() > atMost && el.current) {
+      // Wide areas (서울 전체) would otherwise refit to the same or a wider level and look unresponsive.
+      const centre = new k.LatLng(lats.reduce((a, b) => a + b, 0) / lats.length, lngs.reduce((a, b) => a + b, 0) / lngs.length);
+      map.current.setLevel(atMost); map.current.setCenter(centre);
+      const { clientWidth: width, clientHeight: height } = el.current, at = map.current.getProjection().containerPointFromCoords(centre);
+      const shift = new k.Point(width / 2 + at.x - (insets.left + width - insets.right) / 2, height / 2 + at.y - (insets.top + height - insets.bottom) / 2);
+      map.current.setCenter(map.current.getProjection().coordsFromContainerPoint(shift));
     }
     rememberPosition();
   }
@@ -248,7 +259,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
           if (card.places.length === 1) { pick.current(card.places[0].id); return; }
           if (card.tier === "local" && openRegion.current) { openRegion.current({ label: card.label, ids }); return; }
           if (event.detail === 0) pendingMarkerFocus.current = ids;
-          fitPoints(card.places);
+          fitPoints(card.places, zoomInLevel(card, (p) => regions.get(p)));
         };
         const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? SELECTED_Z : z });
         overlay.setMap(map.current); return { ids, button, overlay, z };

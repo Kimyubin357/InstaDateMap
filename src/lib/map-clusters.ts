@@ -100,3 +100,18 @@ export function stackCards<T extends ClusterPlace>(cards: readonly RegionCard<T>
     || Number(b.label === null) - Number(a.label === null)
     || (b.label ?? "").localeCompare(a.label ?? "", "ko") || b.key.localeCompare(a.key));
 }
+
+const TIERS: RegionTier[] = ["province", "city", "district", "local"];
+/** The least zoomed-in Kakao level of each tier (도 14 · 시 11 · 구 8 · 동 6). */
+const TIER_TOP: Record<RegionTier, number> = { province: 14, city: 11, district: 8, local: 6 };
+/**
+ * Tapping a card must change what is shown: zoom at least into the next tier, skipping tiers where the
+ * card's places are still the very same area under another tier name (서울 도 → 서울 시 → 구,
+ * 세종 → 동, 과천시 → 동). Returns the Kakao level to zoom in to at most.
+ */
+export function zoomInLevel<T extends ClusterPlace>(card: RegionCard<T>, region: (place: T) => MapRegion | null | undefined) {
+  let index = TIERS.indexOf(card.tier) + 1;
+  while (index < TIERS.length - 1 && card.area !== null
+    && card.places.every((place) => regionArea(region(place), TIERS[index]) === card.area)) index++;
+  return TIER_TOP[TIERS[Math.min(index, TIERS.length - 1)]];
+}

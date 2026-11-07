@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { regionCards, regionTier, shortRegionName, stackCards, type ScreenPoint } from "@/lib/map-clusters";
+import { regionCards, regionTier, shortRegionName, stackCards, zoomInLevel, type ScreenPoint } from "@/lib/map-clusters";
 import type { MapRegion } from "@/lib/map-regions";
 import type { PlaceStatus } from "@/lib/types";
 
@@ -77,5 +77,27 @@ describe("카드 겹침", () => {
   it("장소 수가 같으면 가나다순으로 앞선 지역이 위, 이름 없는 카드는 맨 아래", () => {
     const list = cards([place("a", gwacheon), place("b", seongsu), place("c", null)], 9);
     expect(order(list)).toEqual([null, "서울", "과천시"]);
+  });
+});
+
+describe("카드를 누를 때 확대 목표", () => {
+  const sejong: MapRegion = { province: "세종특별자치시", city: "세종특별자치시", district: "세종특별자치시", local: "세종특별자치시 한솔동" };
+  const target = (places: P[], level: number) => {
+    const [card] = cards(places, level);
+    return zoomInLevel(card, (p) => p.region);
+  };
+  it("적어도 다음 단계(도→시 11, 시→구 8, 구→동 6)까지 확대함", () => {
+    expect(target([place("a", gwacheon), place("b", suwon)], 12)).toBe(11);
+    expect(target([place("a", suwon), place("b", { ...suwon, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 행궁동" })], 10)).toBe(8);
+    expect(target([place("a", seongsu), place("b", oksu)], 8)).toBe(6);
+  });
+  it("이름만 같은 단계는 건너뜀: 서울 도→구, 세종 도→동, 과천시 시→동", () => {
+    expect(target([place("a", seongsu), place("b", mapo)], 13)).toBe(8);
+    expect(target([place("a", sejong), place("b", sejong)], 12)).toBe(6);
+    expect(target([place("a", gwacheon), place("b", gwacheon)], 10)).toBe(6);
+  });
+  it("지역을 모르는 장소가 섞이면 건너뛰지 않음", () => {
+    const [card] = cards([place("a", seongsu), place("b", { ...seongsu, city: null })], 13);
+    expect(zoomInLevel(card, (p) => p.region)).toBe(11);
   });
 });
