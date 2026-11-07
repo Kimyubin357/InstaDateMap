@@ -22,7 +22,8 @@ export function sortPlaces(places: PlaceView[], origin?: { lat: number; lng: num
     (b.last_saved_at || b.created_at).localeCompare(a.last_saved_at || a.created_at));
 }
 
-const REGION_NAMES: Record<string, string> = {
+/** Short province names, also used for the zoomed-out map cards (경기도 → 경기). */
+export const REGION_NAMES: Record<string, string> = {
   서울특별시: "서울", 서울시: "서울", 부산광역시: "부산", 부산시: "부산",
   대구광역시: "대구", 대구시: "대구", 인천광역시: "인천", 인천시: "인천",
   광주광역시: "광주", 대전광역시: "대전", 대전시: "대전", 울산광역시: "울산", 울산시: "울산",

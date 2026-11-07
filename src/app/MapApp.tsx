@@ -128,6 +128,20 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const regionPlaces = useMemo(() => { if (!regionSelection) return []; const ids = new Set(regionSelection.ids); return mapPlaces.filter((p) => ids.has(p.id)); }, [regionSelection, mapPlaces]);
   // The list follows the current filter; it closes when nothing is left or the map is hidden.
   useEffect(() => { if (regionSelection && (view !== "map" || !active || !regionPlaces.length)) setRegionSelection(null); }, [regionSelection, view, active, regionPlaces.length]);
+  // A tap anywhere outside the list closes it; the tapped control still does its own job (another
+  // neighbourhood card reopens the list for its area). Dragging the map leaves the list open.
+  useEffect(() => {
+    if (!regionSelection) return;
+    let start: { x: number; y: number } | null = null;
+    const down = (event: PointerEvent) => { start = { x: event.clientX, y: event.clientY }; };
+    const click = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest(".region-sheet")) return;
+      if (start && event.detail !== 0 && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) return;
+      setRegionSelection(null);
+    };
+    document.addEventListener("pointerdown", down, true); document.addEventListener("click", click, true);
+    return () => { document.removeEventListener("pointerdown", down, true); document.removeEventListener("click", click, true); };
+  }, [regionSelection]);
   // Fit the neighbourhood after the list has laid out, so the places land in the map area beside it.
   useEffect(() => {
     if (!regionSelection) return;

@@ -1,16 +1,19 @@
 import type { PlaceStatus } from "./types";
 import type { MapRegion } from "./map-regions";
+import { REGION_NAMES } from "./place-view";
 
-// Kakao levels increase as the map zooms out. Below CLUSTER_MIN_LEVEL every place keeps its own name pin.
+// Kakao levels increase as the map zooms out (scale bar: 9 = 4km, 12 = 32km). Below CLUSTER_MIN_LEVEL every place
+// keeps its own name pin. 도 12–14 · 시 9–11 · 구 7–8 · 동 4–6.
 export const CLUSTER_MIN_LEVEL = 4;
-export const DISTRICT_CLUSTER_LEVEL = 8;
-export const CITY_CLUSTER_LEVEL = 10;
+export const DISTRICT_CLUSTER_LEVEL = 7;
+export const CITY_CLUSTER_LEVEL = 9;
+export const PROVINCE_CLUSTER_LEVEL = 12;
 export interface ClusterPlace { id: string; status: PlaceStatus }
 export interface ScreenPoint { x: number; y: number }
 export interface MarkerSize { width: number; height: number }
-export type RegionTier = "city" | "district" | "local";
+export type RegionTier = "province" | "city" | "district" | "local";
 
-/** One card per administrative area: 서울 → 성동구 → 성수1가1동 as the map zooms in. */
+/** One card per administrative area: 경기 → 수원시 → 장안구 → 정자1동 as the map zooms in. */
 export interface RegionCard<T extends ClusterPlace> extends ScreenPoint {
   key: string;
   tier: RegionTier;
@@ -29,20 +32,20 @@ export interface RegionCard<T extends ClusterPlace> extends ScreenPoint {
 }
 
 export function regionTier(level: number): RegionTier {
-  return level >= CITY_CLUSTER_LEVEL ? "city" : level >= DISTRICT_CLUSTER_LEVEL ? "district" : "local";
+  return level >= PROVINCE_CLUSTER_LEVEL ? "province" : level >= CITY_CLUSTER_LEVEL ? "city" : level >= DISTRICT_CLUSTER_LEVEL ? "district" : "local";
 }
 
 /** Areas never fall back to a wider one: unknown parts stay separate rather than merging wrongly. */
 export function regionArea(region: MapRegion | null | undefined, tier: RegionTier) {
   if (!region) return null;
-  return (tier === "city" ? region.city : tier === "district" ? region.district : region.local) || null;
+  return (tier === "province" ? region.province : tier === "city" ? region.city : tier === "district" ? region.district : region.local) || null;
 }
 
 const METROPOLITAN = /(특별시|광역시|특별자치시)$/;
-/** "서울특별시" → "서울", "경기도 수원시 장안구" → "장안구", "… 성수1가1동" → "성수1가1동". */
+/** "서울특별시" → "서울", "경기도" → "경기", "경기도 수원시 장안구" → "장안구", "… 성수1가1동" → "성수1가1동". */
 export function shortRegionName(area: string) {
   const last = area.trim().split(/\s+/).at(-1) || "";
-  return last.replace(METROPOLITAN, "") || last;
+  return REGION_NAMES[last] || last.replace(METROPOLITAN, "") || last;
 }
 
 interface CardOptions<T> {
@@ -87,24 +90,13 @@ export function regionCards<T extends ClusterPlace>(places: readonly T[], projec
   });
 }
 
-/** Cards are drawn above their point with an 8px tail, like the earlier count pins. */
-const TAIL = 8, GAP = 4;
 /**
- * City and district cards that collide keep the one with more places on the map (ties: name order,
- * unnamed last). The hidden area's places are not added elsewhere; zooming in reveals them.
- * Neighbourhood cards are left as they are for now (to be judged on a real map).
+ * Overlapping cards are not hidden: they stay where their places are and simply overlap, so a peeking edge
+ * invites zooming in. Returns the cards back to front: more places on the map are drawn on top
+ * (ties: name order wins, unnamed cards at the back).
  */
-export function hideOverlappingCards<T extends ClusterPlace>(cards: readonly RegionCard<T>[], size: (card: RegionCard<T>) => MarkerSize): RegionCard<T>[] {
-  if (!cards.length || cards[0].tier === "local") return [...cards];
-  const ordered = [...cards].sort((a, b) => b.places.length - a.places.length
-    || Number(a.label === null) - Number(b.label === null)
-    || (a.label ?? "").localeCompare(b.label ?? "", "ko") || a.key.localeCompare(b.key));
-  const kept: { card: RegionCard<T>; left: number; right: number; top: number; bottom: number }[] = [];
-  for (const card of ordered) {
-    const { width, height } = size(card);
-    const box = { card, left: card.x - width / 2 - GAP, right: card.x + width / 2 + GAP, top: card.y - TAIL - height - GAP, bottom: card.y + GAP };
-    if (kept.some((k) => box.left < k.right && box.right > k.left && box.top < k.bottom && box.bottom > k.top)) continue;
-    kept.push(box);
-  }
-  return kept.map(({ card }) => card);
+export function stackCards<T extends ClusterPlace>(cards: readonly RegionCard<T>[]): RegionCard<T>[] {
+  return [...cards].sort((a, b) => a.places.length - b.places.length
+    || Number(b.label === null) - Number(a.label === null)
+    || (b.label ?? "").localeCompare(a.label ?? "", "ko") || b.key.localeCompare(a.key));
 }

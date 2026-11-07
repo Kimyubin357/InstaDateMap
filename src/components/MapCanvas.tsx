@@ -5,7 +5,7 @@ import "@/app/map-recovery.css";
 import { STATUS_LABEL } from "@/lib/types";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
-import { CLUSTER_MIN_LEVEL, hideOverlappingCards, regionCards, type RegionCard } from "@/lib/map-clusters";
+import { CLUSTER_MIN_LEVEL, regionCards, stackCards, type RegionCard } from "@/lib/map-clusters";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
 export interface MapPosition { lat: number; lng: number; level: number }
 /** A failed interactive map reports here so the map screen can show it with the other map states. */
@@ -16,6 +16,9 @@ export interface MapInsets { top: number; right: number; bottom: number; left: n
 /** A neighbourhood card opens its place list; the map then fits those places beside the list. */
 export interface RegionSelection { label: string | null; ids: string[] }
 declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: () => void } } } }
+
+/** A card holding the selected place stays above every stacked card. */
+const SELECTED_Z = 100000;
 
 function regionCardButton(card: RegionCard<PlaceView>) {
   const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}`;
@@ -76,7 +79,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   fitPadding?: () => MapInsets | null;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
-  const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any }[]>([]); const me = useRef<any>(null);
+  const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any; z: number }[]>([]); const me = useRef<any>(null);
   const [level, setLevel] = useState(initialPosition?.level ?? 7);
   const pendingMarkerFocus = useRef<string[] | undefined>(undefined);
   const [regions] = useState(() => new MapRegionCache());
@@ -234,16 +237,9 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       const cards = regionCards(places, (p) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng)), {
         level: displayLevel, region: (p) => regions.get(p), isNew: (p) => !!newPlaceIds?.has(p.id), allPlaces,
       });
-      const buttons = new Map(cards.map((card) => [card.key, regionCardButton(card)]));
-      // Batch layout reads with the real font so overlap checks use the drawn card size.
-      const measure = document.createElement("div");
-      measure.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:flex-start;visibility:hidden;pointer-events:none";
-      for (const button of buttons.values()) measure.append(button);
-      el.current!.parentElement!.append(measure);
-      const sizes = new Map([...buttons].map(([key, button]) => [key, { width: button.offsetWidth, height: button.offsetHeight }]));
-      measure.remove();
-      markers.current = hideOverlappingCards(cards, (card) => sizes.get(card.key)!).map((card) => {
-        const button = buttons.get(card.key)!;
+      // Back to front: cards with more places are drawn over the ones they overlap.
+      markers.current = stackCards(cards).map((card, order) => {
+        const button = regionCardButton(card), z = 10 + order;
         const point = projection.coordsFromContainerPoint(new k.Point(card.x, card.y));
         const ids = card.places.map((place) => place.id);
         button.classList.toggle("active", ids.includes(focused.current || ""));
@@ -254,8 +250,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
           if (event.detail === 0) pendingMarkerFocus.current = ids;
           fitPoints(card.places);
         };
-        const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? 5 : 1 });
-        overlay.setMap(map.current); return { ids, button, overlay };
+        const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? SELECTED_Z : z });
+        overlay.setMap(map.current); return { ids, button, overlay, z };
       });
     } else {
       markers.current = [...new Map(places.map((p) => [p.id, p])).values()].sort((a, b) => a.id.localeCompare(b.id)).map((p) => {
@@ -263,7 +259,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
         button.classList.toggle("active", p.id === focused.current);
         button.onclick = () => { k.event.preventMap(); if (interactive) pick.current(p.id); };
         const marker = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === selectedId ? 5 : 1 });
-        marker.setMap(map.current); return { ids: [p.id], button, overlay: marker };
+        marker.setMap(map.current); return { ids: [p.id], button, overlay: marker, z: 1 };
       });
     }
     if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
@@ -273,7 +269,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     for (const marker of markers.current) {
       const selected = marker.ids.includes(selectedId || "");
       marker.button.classList.toggle("active", selected);
-      marker.overlay.setZIndex(selected ? 5 : 1);
+      marker.overlay.setZIndex(selected ? (marker.z > 1 ? SELECTED_Z : 5) : marker.z);
     }
   }, [selectedId, places, ready, level]);
   useEffect(() => {

@@ -7,7 +7,7 @@ afterEach(() => vi.useRealTimers());
 
 describe("카카오 행정구역 구분", () => {
   it("법정동이 먼저 있어도 행정동을 선택함", () => {
-    expect(administrativeRegion([{ ...h, region_type: "B", region_3depth_name: "정자동" }, h])).toEqual({ city: "경기도 수원시", district: "경기도 수원시 장안구", local: "경기도 수원시 장안구 정자1동" });
+    expect(administrativeRegion([{ ...h, region_type: "B", region_3depth_name: "정자동" }, h])).toEqual({ province: "경기도", city: "경기도 수원시", district: "경기도 수원시 장안구", local: "경기도 수원시 장안구 정자1동" });
   });
   it("동 없이 읍·면만 있는 지역도 상위 구역까지 포함함", () => {
     expect(administrativeRegion([{ ...h, region_2depth_name: "양평군", region_3depth_name: "서종면" }])?.local).toBe("경기도 양평군 서종면");

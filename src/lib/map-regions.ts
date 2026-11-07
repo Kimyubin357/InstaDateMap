@@ -1,4 +1,5 @@
-export interface MapRegion { city: string | null; district: string; local: string | null }
+/** province is Kakao's first-level name ("경기도", "서울특별시"); the others are full keys from it. */
+export interface MapRegion { province: string; city: string | null; district: string; local: string | null }
 export interface RegionDocument {
   region_type: string; region_1depth_name: string; region_2depth_name: string;
   region_3depth_name: string;
@@ -19,7 +20,7 @@ export function administrativeRegion(documents: RegionDocument[]): MapRegion | n
   // cities contain districts directly; their counties still stay independent.
   const city = /[시군]$/.test(cityOrCounty) ? `${province} ${cityOrCounty}` :
     /(?:특별시|광역시|특별자치시)$/.test(province) ? province : null;
-  return { city, district, local: d.region_3depth_name ? `${district} ${d.region_3depth_name}` : null };
+  return { province, city, district, local: d.region_3depth_name ? `${district} ${d.region_3depth_name}` : null };
 }
 
 /** Kept with the mounted map, never in the place cache or authentication storage. */
