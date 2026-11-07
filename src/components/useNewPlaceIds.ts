@@ -10,11 +10,11 @@ export default function useNewPlaceIds(places: PlaceView[]) {
     const update = () => {
       clearTimeout(timer);
       const time = Date.now(); setNow(time);
-      const expirations = places.filter((p) => isNewPlace(p.created_at, time)).map((p) => Date.parse(p.created_at) + NEW_PLACE_WINDOW);
+      const expirations = places.filter((p) => isNewPlace(p.created_at, time, p.status)).map((p) => Date.parse(p.created_at) + NEW_PLACE_WINDOW);
       if (expirations.length) timer = setTimeout(update, Math.min(...expirations) - time + 1);
     };
     update(); document.addEventListener("visibilitychange", update);
     return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", update); };
   }, [places]);
-  return useMemo(() => new Set(places.filter((p) => isNewPlace(p.created_at, now)).map((p) => p.id)), [places, now]);
+  return useMemo(() => new Set(places.filter((p) => isNewPlace(p.created_at, now, p.status)).map((p) => p.id)), [places, now]);
 }

@@ -79,9 +79,7 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 .app-root{--header-height:0px}
 .map-surface{inset:0}
 .floating-settings.icon-btn{width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 3px 12px #45291f1f}
-/* Small map buttons: 42px (Naver Map's small round buttons). Settings 48px and + 56px stay larger. Filter is centred under settings. */
-.floating-filters{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);right:calc(var(--search-edge) + 3px);width:42px;height:42px}
-.floating-filters .bordered{width:42px;height:42px;border-radius:50%;box-shadow:0 2px 8px #45291f12}
+/* Small map buttons: 42px (Naver Map's small round buttons). Search-row filter and settings 48px, + 56px. */
 .pending-map-badge{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);left:16px;display:flex;align-items:center;gap:6px;min-height:36px;padding:7px 12px;border:1px solid #ffe0e7;border-radius:20px;background:#fff;color:var(--accent-ink);font-size:12px;font-weight:650;box-shadow:0 2px 8px #45291f12}
 .map-controls{right:16px;bottom:var(--map-bottom);gap:12px;align-items:center}
 .map-controls .saved-places-btn,.map-controls .locate-btn{width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
@@ -132,7 +130,6 @@ html,body,.places-list,.sheet-body,.chips{touch-action:pan-x pan-y}
 @media(min-width:760px){
   :root{--search-top:16px;--search-edge:28px;--dock-bottom:24px}
   .map-surface{inset:0}
-  .floating-filters{left:calc(var(--search-edge) + var(--search-width) - 45px);right:auto}
   .pending-map-badge{left:28px}.map-controls{right:28px;bottom:28px}
   .view-list .places-list{padding:12px 24px calc(var(--map-bottom) + 12px);bottom:0}
   .view-map .toast,.sync-notice,.view-list .toast{left:50%;right:auto;transform:translateX(-50%);width:480px;bottom:var(--map-bottom)}
@@ -263,7 +260,7 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
 
 .pending-summary { padding: 12px; font-size: 14px; line-height: 1.55; margin-bottom: 8px; }
 
-/* Wide landscape: settings sits beside search; filters share the right-hand map-tool column.
+/* Wide landscape: filter and settings sit beside search.
    The list tab uses the same corner for +. Landscape progress is tracked in AGENTS.md. */
 @media(min-width:760px) and (orientation:landscape){
   /* Hug the safe area like Naver Map: 16px beside the left/right insets, 8px above the home indicator, 10px from the top. */
@@ -272,7 +269,6 @@ body:has(.persistent-map:not(.is-away) .has-place-card):has(.modal-root) .global
   .unified-search-header{left:var(--edge-left);width:calc(var(--search-width) - 58px)}
   .pending-map-badge{left:var(--edge-left)}
   .is-search-idle .floating-settings.icon-btn{position:static}
-  .floating-filters{left:auto;right:calc(var(--corner-right) + 7px)}
   .map-controls,.view-list .map-controls,.has-place-card .map-controls{right:var(--corner-right);bottom:var(--edge-bottom)}
   .bottom-nav{left:75%}
 }
@@ -295,7 +291,6 @@ html{-webkit-text-size-adjust:100%}
   .bottom-nav{height:50px;width:128px;left:75%}.bottom-nav a{width:44px;height:44px}
   .view-list .places-list.collections-list{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));width:auto;transform:none;padding:0 0 calc(var(--nav-height) + 24px);top:calc(var(--search-top) + var(--list-top))}
   .map-controls,.has-place-card .map-controls{right:max(16px,env(safe-area-inset-right));bottom:calc(var(--dock-bottom) + 60px);flex-direction:row;gap:8px}.map-controls .save-fab{height:44px;width:44px;min-height:44px}
-  .floating-filters{right:max(16px,env(safe-area-inset-right));top:calc(var(--search-top) + 60px)}
   .place-carousel{left:max(8px,env(safe-area-inset-left));right:auto;width:46%;transform:none;bottom:var(--dock-bottom);--card-width:calc(100% - 16px)}.place-card-rail{padding-inline:8px;scroll-padding-inline:8px}.place-card{height:154px}.place-card-main{padding:12px 14px}.place-card-main>strong{font-size:21px}.carousel-step{display:none}
   .global-feedback.is-map,body:has(.persistent-map:not(.is-away) .has-place-card) .global-feedback.is-map{top:calc(var(--search-top) + 60px);bottom:auto;left:max(16px,env(safe-area-inset-left));right:90px;width:auto;max-width:420px;transform:none}
   body:has(.modal-root) .global-feedback.is-map{top:auto;bottom:calc(var(--safe-b) + 72px)}
@@ -309,8 +304,6 @@ html{-webkit-text-size-adjust:100%}
 @media(min-width:760px) and (orientation:landscape) and (max-height:600px){
   .map-controls,.has-place-card .map-controls{bottom:var(--edge-bottom);flex-direction:column;gap:12px}
   .map-controls .save-fab{width:56px;height:56px;min-height:56px}
-  /* Centre the 42px filter on the existing 56px-wide tool column. */
-  .floating-filters{right:calc(max(16px,env(safe-area-inset-right)) + 7px)}
   .place-carousel{left:50%;right:auto;transform:translateX(-50%);width:460px;--card-width:400px;bottom:var(--map-bottom)}
   .place-card-rail{padding-inline:30px;scroll-padding-inline:30px}.place-card{height:164px}.carousel-step{display:flex}
 }
@@ -347,3 +340,54 @@ body:has(.persistent-map:not(.is-away) .view-list):not(:has(.modal-root)) .globa
 .view-list:has([data-selecting=true]) :is(.map-controls,.bottom-nav){display:none}
 .view-list:has([data-selecting=true]) .places-list.collections-list{padding-bottom:calc(100px + var(--safe-b));scroll-padding-bottom:calc(100px + var(--safe-b))}
 body:has(.persistent-map:not(.is-away) .view-list [data-selecting=true]):not(:has(.modal-root)) .global-feedback.is-map{bottom:calc(77px + max(12px,var(--safe-b)))}
+
+/* Map home redesign, step 1 (docs/redesign/map-home-compare.md): 검색 · 필터 · 설정 in one row,
+   then pending links above new places, left-aligned under search. */
+.search-header-tools{display:flex;flex:none}.search-header-tools[hidden]{display:none}
+.search-filter-btn.icon-btn{position:relative;width:48px;height:48px;border-radius:50%}
+.map-chip-stack{position:absolute;z-index:10;top:calc(var(--search-top) + 60px);left:var(--search-edge);right:var(--search-edge);bottom:var(--dock-bottom);display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none}
+.map-chip-stack>*{pointer-events:auto;flex:none}
+.map-chip-stack>.pending-map-badge,.map-chip-stack>.collection-map-scope{position:static;max-width:100%}
+.new-places-chip{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px 6px 8px;border:1px dashed var(--line);border-radius:22px;background:var(--cream) var(--weave);color:var(--ink);font:inherit;font-size:16px;box-shadow:var(--print-shadow)}
+.new-places-chip .new-place-badge{font-size:12px}
+@media(min-width:760px) and (orientation:landscape){.map-chip-stack{left:var(--edge-left);right:auto;width:calc(var(--search-width) - 58px)}}
+@media(orientation:landscape) and (max-height:600px){
+  .unified-search-header{right:auto;width:min(calc(var(--search-width) - 58px),calc(100% - 2 * max(16px,env(safe-area-inset-left))))}
+  /* The left column may reach the navigation's left edge (nav centre at 75%, 128px wide) but never under it. */
+  .map-chip-stack{left:max(16px,env(safe-area-inset-left));right:auto;width:min(calc(var(--search-width) - 58px),calc(75% - 64px - 8px - max(16px,env(safe-area-inset-left))))}
+}
+
+/* Map states: portrait = centred modal (dims and blocks the screen, decision under review); landscape = left-column card. */
+.map-status-dialog{text-align:center;padding-top:30px}
+.map-status-dialog .action-dialog-icon{margin-bottom:14px}
+.map-status-close.icon-btn{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:var(--ink-soft);border-radius:50%}
+.map-status-actions{flex-wrap:wrap}.map-status-actions>.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.map-status-card{position:relative;width:100%;box-sizing:border-box;min-height:0;overflow:auto;padding:16px 48px 16px 16px;border:1px dashed var(--line);border-radius:20px;background:var(--cream) var(--weave);color:var(--ink);box-shadow:var(--print-shadow)}
+.map-status-card .map-status-icon{display:none}
+.map-status-card h2{margin:0;font-size:20px;line-height:1.4;overflow-wrap:anywhere}
+.map-status-card .action-dialog-content{margin-top:6px;font-size:16px;line-height:1.5}
+.map-status-card .map-status-actions{margin-top:12px}.map-status-card .map-status-actions>.btn{min-height:44px;font-size:16px}
+.map-surface.is-map-failed{background:var(--paper,#f4efdf) repeating-linear-gradient(45deg,#382f2512 0 8px,transparent 8px 16px)}
+/* Neighbourhood list (mockup A, S2 frame 2): portrait sheet stops above the navigation; landscape fills the left column. */
+.region-sheet{position:absolute;z-index:12;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:var(--map-bottom);max-height:min(46%,440px);display:flex;flex-direction:column;border:1px dashed var(--line);border-radius:22px;background:var(--cream) var(--weave);color:var(--ink);box-shadow:var(--print-shadow);overflow:hidden;animation:panel-in .18s cubic-bezier(.2,.8,.2,1)}
+.region-sheet-head{flex:none;display:flex;align-items:flex-start;gap:8px;padding:14px 8px 8px 18px;border-bottom:1px dashed var(--line)}
+.region-sheet-title{flex:1;min-width:0}.region-sheet-title h2{margin:0;font-size:21px;line-height:1.35;overflow-wrap:anywhere}
+.region-sheet-title p{margin:2px 0 0;font-size:15px;color:var(--ink-soft)}.region-sheet-title .new-place-badge{font-size:11px}
+.region-sheet-close.icon-btn{flex:none;width:44px;height:44px;border-radius:50%;color:var(--ink-soft)}
+.region-sheet-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 14px 12px}
+.region-sheet-body h3{margin:12px 4px 4px;font-size:15px;font-weight:400;color:var(--ink-soft)}.region-sheet-body h3 small{font-size:13px}
+.region-sheet-body ul{list-style:none;margin:0;padding:0}
+.region-place-row{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:8px 4px;border:0;border-bottom:1px dashed var(--line);background:none;color:var(--ink);font:inherit;text-align:left}
+.region-place-row .status-tag{flex:none}
+.region-place-copy{flex:1;min-width:0;display:flex;flex-direction:column}.region-place-copy strong{font-size:17px;font-weight:400;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.region-place-copy small{font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.region-place-row>svg{flex:none;color:var(--ink-soft)}
+.map-chip-stack>.region-sheet{position:relative;left:auto;right:auto;bottom:auto;width:100%;max-height:none;min-height:0;flex:0 1 auto}
+.map-chip-stack>.map-status-card{flex:0 1 auto;min-height:0}
+@media(orientation:landscape) and (max-height:600px){
+  .map-status-card{padding:10px 44px 10px 14px}
+  .map-status-card h2{font-size:18px}
+  .map-status-card .action-dialog-content{margin-top:2px;font-size:14px;line-height:1.45}
+  .map-status-card .map-status-actions{margin-top:8px}.map-status-card .map-status-actions>.btn{padding-top:8px;padding-bottom:8px}
+  .map-status-card .map-status-close.icon-btn{top:0;right:0}
+}

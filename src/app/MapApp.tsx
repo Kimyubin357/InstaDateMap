@@ -3,17 +3,21 @@ import CollectionsList from "@/components/CollectionsList";
 import useNewPlaceIds from "@/components/useNewPlaceIds";
 import PendingLinks from "@/components/PendingLinks";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { SEARCH_TOOLS_ID } from "@/lib/search-tools";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
-import MapCanvas, { type MapPosition, type MapViewRequest } from "@/components/MapCanvas";
+import MapCanvas, { type MapInsets, type MapPosition, type MapRecovery, type MapViewRequest, type RegionSelection } from "@/components/MapCanvas";
+import RegionPlacesList from "@/components/RegionPlacesList";
+import MapStatus, { useLandscape, type MapStatusContent } from "@/components/MapStatus";
 import PlaceSheet from "@/components/PlaceSheet";
 import BottomNav from "@/components/BottomNav";
 import ShellLink from "@/components/ShellLink";
 import PlaceCarousel from "@/components/PlaceCarousel";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
-import { STATUS_ORDER, filterPlaces, sortPlaces, type PlaceView } from "@/lib/place-view";
+import { DEFAULT_STATUSES, STATUS_ORDER, filterPlaces, sortPlaces, type PlaceView } from "@/lib/place-view";
 import { navigateShell } from "@/lib/shell-navigation";
 type Overlay = "filters" | "pending" | "place" | null;
 const NO_PLACES: PlaceView[] = [];
@@ -45,7 +49,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   }, [collectionId, collection, loaded, error, data?.collections, notify]);
   const [view, setView] = useState<"map" | "list">("map");
   useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(viewHref(view)); }, [active, view, navigation, onViewChange]);
-  const [statuses, setStatuses] = useState<PlaceStatus[]>([...STATUS_ORDER]); const [category, setCategory] = useState("");
+  const [statuses, setStatuses] = useState<PlaceStatus[]>([...DEFAULT_STATUSES]); const [category, setCategory] = useState("");
   const [overlay, setOverlay] = useState<Overlay>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [focusedId, setFocusedId] = useState<string | null>(null);
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -55,6 +59,12 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const restoredArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
   const list = useRef<HTMLDivElement>(null);
+  const [searchTools, setSearchTools] = useState<HTMLElement | null>(null);
+  const [mapRecovery, setMapRecovery] = useState<MapRecovery | null>(null);
+  const [dismissedStatus, setDismissedStatus] = useState<string | null>(null);
+  const landscape = useLandscape();
+  const [regionSelection, setRegionSelection] = useState<RegionSelection | null>(null);
+  useEffect(() => { setSearchTools(document.getElementById(SEARCH_TOOLS_ID)); }, []);
   const listPositions = useRef(new Map<string, number>());
   const listKey = `${listMode}:${collectionId ?? ""}`;
   const root = useRef<HTMLDivElement>(null);
@@ -115,6 +125,15 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const searchDetail = new URLSearchParams(navigation).get("from") === "search";
   const mapPlaces = useMemo(() => searchDetail && selected && !visible.some((p) => p.id === selected.id) ? [...visible, selected] : visible, [searchDetail, selected, visible]);
   const focused = mapPlaces.find((place) => place.id === focusedId);
+  const regionPlaces = useMemo(() => { if (!regionSelection) return []; const ids = new Set(regionSelection.ids); return mapPlaces.filter((p) => ids.has(p.id)); }, [regionSelection, mapPlaces]);
+  // The list follows the current filter; it closes when nothing is left or the map is hidden.
+  useEffect(() => { if (regionSelection && (view !== "map" || !active || !regionPlaces.length)) setRegionSelection(null); }, [regionSelection, view, active, regionPlaces.length]);
+  // Fit the neighbourhood after the list has laid out, so the places land in the map area beside it.
+  useEffect(() => {
+    if (!regionSelection) return;
+    const frame = requestAnimationFrame(() => setMapRequest({ sequence: ++requestSequence.current, kind: "bounds", points: regionPlaces.map((p) => ({ lat: p.lat, lng: p.lng })) }));
+    return () => cancelAnimationFrame(frame);
+  }, [regionSelection]);
   useEffect(() => {
     const params = new URLSearchParams(navigation);
     if (!active || !selected || params.get("from") !== "search") return;
@@ -125,7 +144,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     const place = places.find((p) => p.id === savedArrival);
     if (!place && (syncing || error || !["0", "1"].includes(savedArrival))) return;
     setView("map");
-    if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses([...STATUS_ORDER]); setCategory(""); }
+    if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses(statusesShowing(place)); setCategory(""); }
     setFocusedId(place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true, level: 3 } : { sequence: ++requestSequence.current, kind: "saved" });
     if (!restoredArrival.current) notify(savedArrival === "0" ? "저장 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 저장한 장소예요." : "장소를 저장했어요.");
@@ -134,7 +153,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     history.replaceState(history.state, "", url.pathname + url.search);
   }, [active, loaded, places, savedArrival, syncing, error]);
   function showPlaceOnMap(place: PlaceView) {
-    if (!visible.some((p) => p.id === place.id)) reset();
+    if (!visible.some((p) => p.id === place.id)) { setStatuses(statusesShowing(place)); setCategory(""); }
     setView("map"); setFocusedId(place.id);
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng });
     const params = new URLSearchParams(window.location.search);
@@ -154,7 +173,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     navigator.geolocation.getCurrentPosition((p) => { const value = { lat: p.coords.latitude, lng: p.coords.longitude }; setOrigin(value); if (forSort) setSort("near"); else setMapLocation(value); setLocating(false); },
       () => { setLocating(false); notify("위치를 확인하지 못했어요.", "info"); }, { timeout: 12000, maximumAge: 30000 });
   }
-  function reset() { setStatuses([...STATUS_ORDER]); setCategory(""); }
+  function reset() { setStatuses([...DEFAULT_STATUSES]); setCategory(""); }
+  /** The default filter, widened to every status only when the place itself would stay hidden. */
+  function statusesShowing(place?: PlaceView) { return !place || DEFAULT_STATUSES.includes(place.status) ? [...DEFAULT_STATUSES] : [...STATUS_ORDER]; }
   function toggleStatus(status: PlaceStatus) {
     setStatuses((current) => {
       if (!current.length || current.length === STATUS_ORDER.length) return [status];
@@ -167,28 +188,69 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setFocusedId(id);
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true });
   }
+  /** Map area left free by search, chips, an open region list and the bottom navigation. */
+  function fitPadding(): MapInsets | null {
+    const box = root.current?.getBoundingClientRect(); if (!box) return null;
+    const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
+    const stackTop = [...(root.current?.querySelectorAll(".map-chip-stack>:not(.region-sheet):not(.map-status-card)") ?? [])].reduce((bottom, el) => Math.max(bottom, el.getBoundingClientRect().bottom), rect(".unified-search-header")?.bottom ?? box.top + 80);
+    const sheet = root.current?.querySelector<HTMLElement>(".region-sheet")?.getBoundingClientRect();
+    const nav = rect(".bottom-nav");
+    const inset = { top: stackTop - box.top + 24, right: 72, bottom: box.bottom - (nav?.top ?? box.bottom) + 24, left: 40 };
+    if (sheet && landscape) inset.left = sheet.right - box.left + 24;
+    else if (sheet) inset.bottom = box.bottom - sheet.top + 24;
+    return inset;
+  }
   function focusPadding() {
     const deck = root.current?.querySelector<HTMLElement>(".place-carousel");
     if (!deck || !root.current) return null;
     const search = document.querySelector(".unified-search-header")?.getBoundingClientRect();
     return { top: (search?.bottom || 80) + 16, bottom: root.current.clientHeight - deck.offsetTop + 10 };
   }
+  // Map states (docs/redesign/map-home-compare.md): portrait = centred modal over a dim screen, landscape = left-column card.
+  const statusKind = !active || view !== "map" || overlay ? null
+    : !loaded && !error ? "loading" : error && !loaded ? "error"
+    : mapRecovery ? (mapRecovery.loading ? "map-loading" : "map-error")
+    : loaded && !error && visible.length === 0 ? (places.length ? "filtered" : "empty") : null;
+  // Closing hides one occurrence; the same situation arising again (or with another filter) shows it again.
+  const statusSignature = statusKind ? `${statusKind}:${statusKind === "filtered" ? `${statuses.join(",")}|${category}|${collectionId ?? ""}` : statusKind === "error" ? error : ""}` : "";
+  useEffect(() => { setDismissedStatus(null); }, [statusSignature]);
+  const status: MapStatusContent | null = !statusKind || dismissedStatus === statusSignature ? null
+    : statusKind === "loading" ? { tone: "info", icon: "heart", title: "우리 장소를 불러오는 중…", closable: false }
+    : statusKind === "error" ? { tone: "error", icon: "close", title: "장소를 불러오지 못했어요", message: "인터넷 연결을 확인한 뒤 다시 시도해 주세요.", closable: true,
+      actions: <button type="button" className="btn primary" onClick={() => void store.refresh()}>다시 시도</button> }
+    : statusKind === "map-loading" ? { tone: "info", icon: "pin", title: "지도를 다시 불러오는 중…", closable: false }
+    : statusKind === "map-error" ? { tone: "error", icon: "close", title: "지도를 불러오지 못했어요", message: "잠시 후 다시 시도하거나, 저장한 장소를 리스트로 볼 수 있어요.", closable: true,
+      actions: <>{mapRecovery?.retry && <button type="button" className="btn primary" onClick={mapRecovery.retry}>다시 시도</button>}<button type="button" className="btn" onClick={() => navigateShell(viewHref("list"))}>리스트로 보기</button></> }
+    : statusKind === "empty" ? { tone: "info", icon: "heart", title: "우리의 첫 장소를 담아봐요", message: "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요.", closable: true,
+      actions: <ShellLink href="/add" className="btn primary">장소 추가</ShellLink> }
+    : { tone: "info", icon: "heart", title: "아직 맞는 장소가 없어요", message: "필터를 조금 바꿔볼까요?", closable: true,
+      actions: <button type="button" className="btn primary" onClick={reset}>필터 초기화</button> };
+  const regionView = regionSelection && regionPlaces.length > 0 && view === "map" && <RegionPlacesList label={regionSelection.label} places={regionPlaces} newPlaceIds={newPlaceIds}
+    onClose={() => setRegionSelection(null)} onPick={(id) => { setRegionSelection(null); previewPlace(id); }} />;
+  const statusView = status && <MapStatus status={status} landscape={landscape} onClose={() => setDismissedStatus(statusSignature)} />;
   const showPlaceCard = view === "map" && !!focused && !(overlay === "place" && selected);
   const all = statuses.length === STATUS_ORDER.length;
   return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} />}</div>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} onRegionOpen={(selection) => { setFocusedId(null); setRegionSelection(selection); }} />}</div>
     <h1 className="sr-only">{board}</h1>
-    {view === "map" && <div className="floating-filters"><button className="icon-btn bordered" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button></div>}
+    {view === "map" && searchTools && createPortal(<button className="icon-btn bordered search-filter-btn" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button>, searchTools)}
+    <div className="map-chip-stack">
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
+    {/* Next step wires this to the new-place view; for now it only reports the count. */}
+    {view === "map" && newPlaceIds.size > 0 && <button type="button" className="new-places-chip" aria-label={`새 장소 ${newPlaceIds.size}곳`}><span className="new-place-badge" aria-hidden="true">NEW</span><span>새 장소 {newPlaceIds.size}</span></button>}
     {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><Icon name={collection.icon} width={18} /><span>{collection.name} · {visible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
+    {landscape && statusView}
+    {landscape && regionView}
+    </div>
+    {!landscape && regionView}
+    {!landscape && statusView}
     {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
       <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode} loaded={loaded} distanceOrigin={sort === "near" ? origin : null} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
         onMap={(id) => { setFocusedId(null); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}
         tools={<div className="list-tools"><button className={`list-filter${category || !all ? " is-active" : ""}`} aria-label="상세 필터" aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><Icon name="sliders" width="16" /><span>필터</span>{(category || !all) && <span className="list-filter-count" aria-hidden="true">{(category ? 1 : 0) + (all ? 0 : 1)}</span>}</button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>} />
     </div>}
-    {view === "map" && loaded && !error && visible.length === 0 && <div className={`empty-state ${view === "map" ? "on-map" : "on-list"}`}><Icon name="heart" width="36" height="36" /><h2>{places.length ? "아직 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h2><p>{places.length ? "필터를 조금 바꿔볼까요?" : "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요."}</p>{places.length > 0 && <button className="text-btn" onClick={reset}>필터 초기화</button>}</div>}
-    {!loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
-    {error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
+    {view === "list" && !loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
+    {view === "list" && error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
     {view === "map" && focused && <PlaceCarousel hidden={!showPlaceCard} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />

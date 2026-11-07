@@ -14,6 +14,7 @@ import { shareDestination } from "@/lib/share-navigation";
 import type { ShareResult } from "@/lib/share-stream";
 import type { KakaoPlace } from "@/lib/types";
 import { navigateShell } from "@/lib/shell-navigation";
+import { SEARCH_TOOLS_ID } from "@/lib/search-tools";
 
 export default function SearchApp({ active, backHref, viewport }: { active: boolean; backHref: string; viewport: { keyboard: boolean; height: number; top: number } }) {
   const { store, lock } = useBoardSync(); const { access, snapshot } = useBoardState();
@@ -98,6 +99,7 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
     <div className="search-content-viewport" style={active && viewport.keyboard ? { height: viewport.height, top: viewport.top, bottom: "auto" } : undefined}>
     <header className="unified-search-header">
       <form role="search" onClick={() => input.current?.focus({ preventScroll: true })} onSubmit={(e) => { e.preventDefault(); run(); }}><Icon name="search" width="20" /><input ref={input} aria-label="통합 장소 검색" placeholder="장소 이름, 지역으로 검색" value={active ? state.query : ""} onFocus={open} onChange={(e) => { open(); changeQuery(e.target.value); }} maxLength={100} enterKeyHint="search" autoComplete="off" />{active && state.query && <button type="button" className="icon-btn" aria-label="검색어 지우기" onClick={clear}><Icon name="close" width="20" /></button>}<button type="submit" className="sr-only">검색 실행</button></form>
+      <div id={SEARCH_TOOLS_ID} className="search-header-tools" hidden={active} />
       {active ? <button type="button" className="search-cancel" onClick={cancel}>취소</button> : <ShellLink href="/settings" className="icon-btn floating-settings" aria-label="우리 설정"><Icon name="settings" width="21" /></ShellLink>}
     </header>
     <div className="unified-search-body" aria-hidden={!active} ref={scroll} onScroll={(e) => { scrollTop.current = e.currentTarget.scrollTop; }}>
