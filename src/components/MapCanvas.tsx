@@ -10,7 +10,7 @@ import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocume
 export interface MapPosition { lat: number; lng: number; level: number }
 /** A failed interactive map reports here so the map screen can show it with the other map states. */
 export interface MapRecovery { loading: boolean; retry?: () => void }
-export type MapViewRequest = { sequence: number; kind: "saved" } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number }
+export type MapViewRequest = { sequence: number; kind: "saved"; closer?: boolean } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number }
   | { sequence: number; kind: "bounds"; points: { lat: number; lng: number }[] };
 export interface MapInsets { top: number; right: number; bottom: number; left: number }
 /** A neighbourhood card opens its place list; the map then fits those places beside the list. */
@@ -130,7 +130,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     layoutSize.current = { width: el.current?.clientWidth || 0, height: el.current?.clientHeight || 0 };
     map.current.relayout(); map.current.setCenter(framedPlace.current && focused.current && !moving.current ? placeCenter(framedPlace.current) : center); rememberPosition();
   }
-  function showSaved() {
+  /** Fit every saved place; `closer` (the 전체 보기 button) then zooms one level in around the same centre. */
+  function showSaved(closer = false) {
     if (!places.length) return;
     const k = window.kakao.maps;
     if (places.length === 1) { map.current.setLevel(4); map.current.setCenter(new k.LatLng(places[0].lat, places[0].lng)); }
@@ -138,6 +139,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       const bounds = new k.LatLngBounds(); places.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
       map.current.setBounds(bounds, 120, 90, 125, 90);
     }
+    if (closer && map.current.getLevel() > 1) map.current.setLevel(map.current.getLevel() - 1);
     rememberPosition();
   }
   /** Fit the points; with `atMost`, never stay wider than that level and zoom in around their centre instead. */
@@ -318,7 +320,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     appliedRequest.current = viewRequest.sequence;
     cancelMotion.current?.();
     moving.current = false;
-    if (viewRequest.kind === "saved") { framedPlace.current = undefined; showSaved(); }
+    if (viewRequest.kind === "saved") { framedPlace.current = undefined; showSaved(viewRequest.closer); }
     else if (viewRequest.kind === "bounds") { framedPlace.current = undefined; fitPoints(viewRequest.points); }
     else {
       const k = window.kakao.maps;
