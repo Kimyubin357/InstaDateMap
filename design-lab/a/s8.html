@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S8 길찾기</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const V = { view: { center: 20, s: 300 }, sel: 20 };
+const NEAR = [20, 18, 17, 22];
+LAB.sequence({
+  id: 's8',
+  title: 'S8 길찾기 — 미리보기 또는 상세 → 카카오맵',
+  lead: '길찾기는 미리보기에서 한 번(상세를 거치지 않음), 상세에서도 첫 줄 버튼으로 한 번에 엽니다. 확인 단계 없이 카카오맵 앱으로 넘어가며, 앱이 없으면 카카오맵 웹으로 엽니다.',
+  sizes: ['p393', 'l844'],
+  frames: [
+    { t: '미리보기에서 길찾기', sc: Object.assign({ card: { type: 'preview', id: 20, list: NEAR, ctxLabel: '이 근처' }, tap: 'k:route' }, V), note: '' },
+    { t: '카카오맵 (외부)', sc: { kind: 'external', ext: { dest: '서촌 그림책 전시' } }, note: '돌아오면 미리보기가 그대로 열려 있습니다.' },
+    { t: '상세에서 카카오맵 길찾기', state: true, sc: Object.assign({ panel: { type: 'detail', id: 20 }, tap: 'k:kakao' }, V), note: '' },
+    { t: '카카오맵 (외부)', sc: { kind: 'external', ext: { dest: '서촌 그림책 전시' } }, note: '' },
+  ],
+});
+</script>
+</body>
+</html>

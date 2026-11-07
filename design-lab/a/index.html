@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · 지도 홈 재설계</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="nav"></div>
+<main class="wrap doc">
+<h1>시안 A — 지도 홈·장소 상세 (회색조 와이어프레임)</h1>
+<p class="lead">기준: <code>docs/redesign/map-home-spec.md</code>만 보고 새로 설계했습니다(기존 화면·코드 미참조). 판단 대상은 위치·순서·단계 수·정보 우선순위이며 색·장식은 다루지 않습니다. 모든 프레임은 정확한 기기 픽셀 크기이고, 빗금은 안전영역(세로 위 59·아래 34, 가로 좌우 59·아래 21)입니다. 각 시퀀스 페이지 위쪽에 자동 검사 결과(터치 44px, 간격 8px, 안전영역, 블록 겹침, 글자 넘침)가 나옵니다.</p>
+
+<div class="cards" style="margin-top:12px">
+  <a href="clusters.html"><b>묶음 단계</b><small>같은 25곳 · 넓은 지역 → 구 → 동네 → 가게 · 6개 크기</small></a>
+  <a href="s1.html"><b>S1 처음 열기</b><small>불러오기 · 전체 보기 · 0곳 · 실패 2종</small></a>
+  <a href="s2.html"><b>S2 둘러보고 고르기</b><small>6개 크기 · 묶음 → 목록 → 미리보기 → 상세</small></a>
+  <a href="s3.html"><b>S3 등록 후 (1곳)</b><small>저장 결과 카드에서 상태·메모</small></a>
+  <a href="s4.html"><b>S4 등록 후 (여러 곳)</b><small>6개 크기 · 3곳 범위 맞춤 + 번호</small></a>
+  <a href="s5.html"><b>S5 상대의 새 장소</b><small>6개 크기 · 알림 → 새 장소 → 미리보기</small></a>
+  <a href="s6.html"><b>S6 필터</b><small>가고 싶음만 · 걸림 표시 · 해제 · 0곳 · 모음</small></a>
+  <a href="s7.html"><b>S7 상세 편집</b><small>상태 · 메모 · 나가기 확인 · 충돌 · 삭제</small></a>
+  <a href="s8.html"><b>S8 길찾기</b><small>미리보기/상세 → 카카오맵</small></a>
+</div>
+
+<h2>설계 요지</h2>
+<ol>
+  <li><b>네 영역, 정해진 쌓기 순서.</b> ①검색·필터·설정 ②상태 칩(확인 대기·새 장소·필터·모음) ③장소 카드 자리(미리보기·묶음 목록·저장 결과) ④이동·추가(지도/리스트, ＋). 세로는 ①② 위 / ③④ 아래, 가로는 ①③ 왼쪽 열 / ② 지도 위 가운데 / ④ 오른쪽 열 / 알림은 지도 아래 가운데. 각 영역이 자기 줄 안에서만 쌓여서 카드·알림·확인 대기가 서로 덮을 수 없습니다. 지도는 이 영역들을 뺀 <b>남은 사각형</b>에 맞춰 범위를 잡습니다.</li>
+  <li><b>가로는 따로 배치.</b> 가로에서 높이가 가장 귀하므로 카드·목록·상세·필터를 왼쪽 열로 보내고, 지도/리스트 전환·내 위치·전체·＋는 오른손 엄지가 닿는 오른쪽 열에 세웁니다. 모든 것이 노치 59px 안쪽과 홈 표시줄 위에 있습니다.</li>
+  <li><b>묶음 = 지역 이름표.</b> 숫자 원 대신 “성수동 12 / 가고 싶음 7”. 1곳은 절대 숫자가 되지 않고, 동네 단계부터는 묶지 않습니다. 묶음을 누르면 <b>범위 맞춤과 목록이 동시에</b> → 축소 상태에서도 탭 2번이면 미리보기.</li>
+  <li><b>등록 직후·상대의 새 장소 = 결과 카드 + 집중 표시.</b> 저장한 곳 전부에 범위를 맞추고, 그 장소들은 묶지 않으며(여러 곳이면 ①②③ 번호), 나머지는 흐리게 둡니다. 카드 자체가 “저장했어요” 알림이고 그 안에서 상태·메모를 바로 고칩니다.</li>
+  <li><b>자주 하는 편집은 엄지 자리.</b> 상태 4종은 상세 아래 고정 줄과 저장 결과 카드 안에 있고, 누르는 즉시 저장되며 결과는 바로 위 한 줄에서 알려 줍니다. 필터의 상태 버튼은 지도 기호와 같은 모양이라 범례를 겸합니다.</li>
+</ol>
+
+<h3>상태 4종과 지도 표시물 (색 없이 구분)</h3>
+<div class="legend" id="legend"></div>
+
+<h3>구조 한눈에 (미리보기가 열린 홈)</h3>
+<div class="frames" id="anatomy"></div>
+
+<h2>5장 질문에 대한 답</h2>
+<div class="qa"><b>숫자만 보고 “무엇이 몇 곳”인지 알 수 있나요? 1곳일 때도 숫자가 필요한가요?</b>
+숫자만 두지 않습니다. 묶음은 <b>지역 이름 + 곳 수</b>(첫 줄)와 <b>“가고 싶음 n”</b>(둘째 줄, 전부면 “모두 가고 싶음”, 없으면 “모두 다녀옴”)를 함께 보여 줍니다. 1곳은 숫자가 필요 없으므로 묶지 않고 상태 기호(여유가 있으면 이름까지)로 둡니다. 의미가 드러나지 않던 “다녀온 비율” 진행 링은 없앴습니다.</div>
+<div class="qa"><b>묶음을 누르면 확대인가요, 목록인가요?</b>
+둘 다, 동시에 합니다. 기본 동작은 <b>묶음 범위로 한 번에 맞추기 + 같은 순간 목록 열기</b>(세로는 아래 42% 높이, 가로는 왼쪽 열)입니다. 2단계씩 반복해서 확대하던 동작은 없앴습니다. 목록은 새로 저장 → 하위 지역(구별) 또는 상태(가고 싶음 / 다녀온 곳) 순서이고, 구 제목은 “그 구만 확대” 버튼입니다. 목록을 닫으면 지도만 남습니다. → <a href="s2.html">S2</a> 2·3번</div>
+<div class="qa"><b>상태(가고 싶음 대 다녀옴)와 “새로 등록한 장소”가 축소 상태에서도 드러나야 하나요?</b>
+네. 가고 싶음은 묶음 이름표 둘째 줄의 개수로 드러나고, 다녀옴 쪽은 “전체 − 가고 싶음”으로 읽힙니다(4종 전부를 축소 상태에 넣으면 읽기 어려워짐). 1곳 표시물은 모양으로 4종(빈 원·체크·하트·점선 원)이 구분됩니다. NEW는 묶음의 “NEW n” 꼬리표로 남고, 다른 묶음과 겹치지 않으면 따로 떨어진 표시물(N 배지)로 남습니다. → <a href="clusters.html">묶음 단계</a> 1·2번</div>
+<div class="qa"><b>여러 곳을 한 번에 저장한 직후에는?</b>
+<b>전부 범위 맞추기</b>를 기본으로 합니다. 각 장소에 링크 속 순서대로 ①②③을 붙이고, 같은 번호의 결과 목록 카드를 띄웁니다. 번호 표시는 어떤 단계에서도 묶이지 않고, 겹치는 묶음 이름표는 비켜서 점선으로 원래 자리를 가리킵니다. 차례로 보기는 미리보기의 이전/다음이 그 3곳 안에서만 돌면서 지도를 따라가게 합니다. → <a href="s4.html">S4</a></div>
+<div class="qa"><b>이름표가 겹칠 때 묶음 대신 쓸 방법은?</b>
+동네·가게 단계에서는 묶지 않고 세 가지를 씁니다. (a) <b>우선순위 이름표</b>: 선택 → 방금 저장 → NEW → 가고 싶음 → 또 갈래 → 다녀옴 → 별로 순으로, 겹치지 않는 것만 이름을 붙이고 나머지는 기호만 둡니다. (b) <b>펼치기</b>: 기호끼리 겹치면 둘레로 벌리고 실제 위치를 점선으로 잇습니다. (c) <b>이름 줄임</b>: 동네 9자 / 가게 14자에서 줄이고, 전체 이름은 미리보기·상세에서 봅니다. 묶음은 넓은 지역·구 단계에서, 표시물 터치 영역(44px)이 8px 안으로 붙을 때만 씁니다.</div>
+<div class="qa"><b>서울 전체 → 동네 → 가게로 확대하는 동안 같은 장소를 따라갈 수 있나요?</b>
+네. ① 이름표가 지역 이름이라 “서울 → 성수동 → 기호 → 이름”이 말로 이어지고, ② 선택한 장소는 어떤 단계에서도 묶이지 않고 따로 크게 남으며(겹치는 이름표는 비켜남), ③ 묶음 탭이 범위 맞춤 한 번이라 중간 단계가 적습니다. → <a href="clusters.html#clusters-p393-5">묶음 단계 5~8번</a></div>
+<h3>성공 기준 대응</h3>
+<table>
+<tr><th>성공 기준</th><th>시안 A에서</th><th>확인 프레임</th></tr>
+<tr><td>설명 없이 “어디에 몇 곳, 그중 가고 싶은 곳이 어디”</td><td>이름표 문장 그대로: “성수동 12 / 가고 싶음 7”</td><td><a href="clusters.html">묶음 단계 1·2</a></td></tr>
+<tr><td>축소 상태에서 미리보기까지 2번 이내</td><td>묶음 탭(범위+목록) → 목록 행 탭</td><td><a href="s2.html#s2-p393-2">S2-2</a> → 행 → <a href="s2.html#s2-p393-4">S2-4</a></td></tr>
+<tr><td>여러 곳 등록 직후 지도를 움직이지 않고 전부 확인</td><td>전부 범위 맞춤 + 번호 + 집중 표시 + 결과 목록</td><td><a href="s4.html#s4-p393-2">S4-2</a> (6개 크기)</td></tr>
+<tr><td>상대의 새 장소를 알림 후 바로 찾기</td><td>알림으로 열면 같은 결과 카드, 아니면 “새 장소 n” 칩 1번</td><td><a href="s5.html#s5-p393-2">S5-2</a>, <a href="s5.html#s5-p393-4">S5-4</a></td></tr>
+</table>
+
+<h2>기능 목록 대비 누락 없음 체크표</h2>
+<table>
+<tr><th>명세</th><th>기능</th><th>세로 위치</th><th>가로 위치</th><th>프레임</th></tr>
+<tr><td>3-1</td><td>전체 한눈에, 처음엔 모두 들어오게</td><td colspan="2">지도: 남은 사각형에 전체 범위 맞춤</td><td><a href="s1.html#s1-p393-2">S1-2</a></td></tr>
+<tr><td>3-2</td><td>이동·확대·축소</td><td colspan="2">지도 기본 제스처(바꾸지 않음)</td><td><a href="clusters.html">묶음 단계</a></td></tr>
+<tr><td>3-3</td><td>장소 하나 미리보기 → 이웃 → 상세</td><td>아래 카드 자리</td><td>왼쪽 열 아래</td><td><a href="s2.html#s2-p393-4">S2-4~6</a></td></tr>
+<tr><td>3-4</td><td>검색 시작</td><td>맨 위 검색 줄</td><td>왼쪽 열 맨 위</td><td>모든 홈 프레임</td></tr>
+<tr><td>3-5</td><td>필터(상태 여러 개+전체 / 종류 하나 / 걸림 늘 표시)</td><td>위 필터 버튼 → 아래 시트, 걸림: 버튼 검정+숫자, 칩</td><td>필터 버튼 → 왼쪽 패널, 칩은 지도 위</td><td><a href="s6.html">S6</a></td></tr>
+<tr><td>3-6</td><td>모음 하나만 보기(이름·장소 수·해제)</td><td>칩 줄 “성수 카페 4곳 ✕”</td><td>지도 위 칩</td><td><a href="s6.html#s6-p393-7">S6-7</a></td></tr>
+<tr><td>3-7</td><td>내 위치</td><td>위 둘째 줄 오른쪽</td><td>오른쪽 열</td><td>모든 홈 프레임</td></tr>
+<tr><td>3-8</td><td>저장한 장소 전체 보기</td><td>위 둘째 줄 “전체”</td><td>오른쪽 열 “전체”</td><td>모든 홈 프레임</td></tr>
+<tr><td>3-9</td><td>장소 추가(가장 중요)</td><td>오른쪽 아래 큰 “＋ 장소 추가”</td><td>오른쪽 열 맨 아래 56px</td><td><a href="s3.html#s3-p393-1">S3-1</a></td></tr>
+<tr><td>3-10</td><td>지도 ↔ 리스트</td><td>아래 왼쪽 전환</td><td>오른쪽 열 위</td><td>모든 홈 프레임</td></tr>
+<tr><td>3-11</td><td>설정</td><td>맨 위 오른쪽</td><td>왼쪽 열 맨 위</td><td>모든 홈 프레임</td></tr>
+<tr><td>3-12</td><td>확인 대기 링크 N개(있을 때만) → 이어서 처리</td><td>칩 줄 “확인 대기 n”(점선)</td><td>지도 위 칩</td><td><a href="s3.html#s3-p393-1">S3-1</a>, <a href="s5.html#s5-p393-3">S5-3</a></td></tr>
+<tr><td>4 미리보기</td><td>이름·상태·종류/주소·메모 앞부분·저장한 사람·NEW·순번 N/전체</td><td colspan="2">미리보기 카드(긴 이름: 세로 2줄 / 좁은 화면 1줄)</td><td><a href="s2.html#s2-p393-4">S2-4·5</a></td></tr>
+<tr><td>4 미리보기</td><td>이웃으로 넘기면 지도도 따라감 · 닫기</td><td colspan="2">이전/다음 버튼 + 카드 밀기, ✕</td><td><a href="s2.html#s2-p393-5">S2-5</a></td></tr>
+<tr><td>4 상세</td><td>상태 4종 바꾸기(가장 자주)</td><td colspan="2">상세 아래 고정 줄, 저장 결과 카드</td><td><a href="s7.html">S7-1~3</a></td></tr>
+<tr><td>4 상세</td><td>메모 쓰기·저장 / 나가기 확인 / 충돌 시 상대 메모+내 초안</td><td colspan="2">키보드 위 편집 화면, 확인 상자, 충돌 상자</td><td><a href="s7.html#s7-p393-4">S7-4·5·8</a></td></tr>
+<tr><td>4 상세</td><td>카카오맵에서 열기 · 주소 복사</td><td colspan="2">상세 첫 줄 버튼 3개(길찾기·주소 복사·지도에서 보기), 미리보기에도 길찾기</td><td><a href="s8.html">S8</a></td></tr>
+<tr><td>4 상세</td><td>지도에서 보기</td><td colspan="2">상세 첫 줄 → 가게 단계 + 미리보기</td><td><a href="s7.html#s7-p393-7">S7-7</a></td></tr>
+<tr><td>4 상세</td><td>모음에 담기 · 원본 인스타(여러 개)</td><td colspan="2">상세 중간: 모음 칩 + “모음에 담기”, 원본 게시물 1·2 행</td><td><a href="s2.html#s2-p393-6">S2-6</a></td></tr>
+<tr><td>4 상세</td><td>삭제(확인, 설정에서 복구 안내)</td><td colspan="2">상세 맨 아래 점선 버튼 → 확인 상자</td><td><a href="s7.html#s7-p393-11">S7-11</a></td></tr>
+<tr><td>4 상세</td><td>작은 위치 미리보기 지도</td><td colspan="2">메모 아래 작은 지도 + 주소</td><td><a href="s2.html#s2-p393-6">S2-6</a></td></tr>
+<tr><td>4 상세</td><td>저장 중 · 확인 중 · 재시도</td><td colspan="2">상태 줄 바로 위 한 줄</td><td><a href="s7.html#s7-p393-2">S7-2</a>, <a href="s7.html#s7-p393-9">S7-9·10</a></td></tr>
+<tr><td>7</td><td>불러오는 중 / 불러오기 실패 / 지도 로드 실패(다시 시도+리스트)</td><td colspan="2">칩 줄 · 카드 자리</td><td><a href="s1.html">S1-1·4·5</a></td></tr>
+<tr><td>7</td><td>0곳 / 필터 결과 0곳(초기화)</td><td colspan="2">카드 자리</td><td><a href="s1.html#s1-p393-3">S1-3</a>, <a href="s6.html#s6-p393-6">S6-6</a></td></tr>
+<tr><td>7</td><td>미리보기 + 확인 대기 + 알림 동시</td><td>칩 줄 / 그 아래 알림 / 아래 카드</td><td>지도 위 칩 / 지도 아래 알림 / 왼쪽 카드</td><td><a href="s5.html#s5-p393-3">S5-3</a> (6개 크기)</td></tr>
+<tr><td>7</td><td>키보드 열린 상세(메모)</td><td colspan="2">키보드 위 편집 화면</td><td><a href="s7.html#s7-p393-4">S7-4</a>, <a href="s3.html#s3-p393-5">S3-5</a></td></tr>
+<tr><td>7</td><td>아주 긴 이름 · 긴 메모</td><td colspan="2">“성수 우드앤브릭 베이커리 앤 브런치 카페 서울숲 본점”</td><td><a href="s2.html#s2-p393-5">S2-5·6</a></td></tr>
+<tr><td>7</td><td>많은 지역(성수 12) · 흩어진 지역(부산)</td><td colspan="2">묶음 단계 전체</td><td><a href="clusters.html">묶음 단계</a></td></tr>
+<tr><td>1·5</td><td>상대가 저장한 새 장소 확인</td><td colspan="2">결과 카드 + “새 장소 n” 칩 + NEW 꼬리표</td><td><a href="s5.html">S5</a></td></tr>
+</table>
+
+<h2>사용한 지침 (UI/UX Pro Max)</h2>
+<ul>
+  <li><b>touch-target-size</b>, <b>touch-spacing</b>: 모든 버튼·칩·목록 행 44px 이상, 8px 이상 간격 — 페이지마다 자동 검사.</li>
+  <li><b>safe-area-awareness</b>, <b>Safe-area compliance</b>, <b>System bar clearance</b>, <b>Adaptive gutters by breakpoint</b>: 노치·홈 표시줄 안쪽 배치, 가로 좌우 여백.</li>
+  <li><b>orientation-support</b>, <b>fixed-element-offset</b>, “Fixed Positioning — Account for safe areas and other fixed elements / Don't stack multiple fixed elements carelessly”: 고정 요소를 영역별로 쌓는 구조와 지도 범위 계산.</li>
+  <li><b>primary-action</b>: ＋ 장소 추가 하나만 주요 버튼(0곳 안내도 새 버튼을 만들지 않음).</li>
+  <li><b>gesture-alternative</b>, <b>gesture-conflicts</b>, <b>standard-gestures</b>: 카드 밀기에는 이전/다음 버튼, 지도 기본 제스처는 바꾸지 않음.</li>
+  <li><b>sheet-dismiss-confirm</b>, <b>confirmation-dialogs</b>, <b>destructive-emphasis</b>: 저장 안 한 메모 확인, 삭제 확인(점선으로 분리).</li>
+  <li><b>toast-accessibility</b>, <b>toast-dismiss</b>, <b>success-feedback</b>, <b>error-recovery</b>, <b>empty-states</b>, <b>undo-support</b>: 알림은 포커스를 뺏지 않고 4초, 결과는 그 자리 한 줄, 실패엔 다시 시도, 필터 해제엔 되돌리기.</li>
+  <li><b>color-not-only</b>, <b>truncation-strategy</b>, <b>nav-label-icon</b>, <b>aria-labels</b>: 상태는 모양+글자, 줄인 이름은 상세에서 전체, 아이콘 버튼에 글자·접근성 이름.</li>
+  <li>지침에 없는 지도 표시물 묶음·펼치기·이름표 우선순위는 지도 UX 일반 지식으로 설계했습니다.</li>
+</ul>
+
+<h2>못 한 것 · 알려진 한계</h2>
+<ul>
+  <li><b>568×320 가로</b>: 왼쪽 열(236px)과 오른쪽 열을 빼면 카드가 열렸을 때 지도 띠가 약 120px 폭입니다. 미리보기 중에는 지도를 동네 단계 아래로 줄이지 않는 규칙으로 보완했지만 좁습니다. 칩이 2개 이상이면 2줄로 쌓이고, 선택한 장소 이름표가 7자로 줄거나 빠질 수 있습니다(번호 표시는 목록 번호로 짝을 맞춤).</li>
+  <li><b>320×568 세로</b>: 카드가 열려 있는 동안 아래 이동 줄(지도/리스트·＋)을 숨깁니다. 카드를 닫으면 돌아옵니다. 다른 크기에서는 늘 보입니다.</li>
+  <li><b>지도 표시물의 터치 간격</b>: 동네 단계에서 기호 사이가 30px 안팎이라 44px 터치 영역끼리는 겹칠 수 있습니다(화면 버튼은 모두 검사 통과). 손가락 근처에 표시물이 둘 이상이면 그 자리 목록을 띄우는 규칙을 가정했지만 프레임으로 그리지는 않았습니다.</li>
+  <li>지도 표시물·이름표는 카드·버튼 아래로 지나갈 수 있습니다(일반 지도 동작). 범위 맞춤과 이름표 위치는 가려지지 않는 사각형 안으로 계산합니다.</li>
+  <li>그리지 않은 것: 검색 화면, 설정, 리스트 탭 내부(진입점만), 등록 화면(범위 밖 자리 표시), 위치 권한 거부 상태, 지운 장소 복구 화면.</li>
+  <li>키보드 높이는 근사값(세로 336·253, 가로 160~216). 실제 iPhone·PWA·카카오 지도 타일로는 확인하지 않았습니다. 검사는 헤드리스 Chrome의 system-ui 글꼴 기준입니다.</li>
+</ul>
+</main>
+<script src="lab.js"></script>
+<script>
+document.getElementById('nav').innerHTML = LAB.navHTML('index');
+const lg = document.getElementById('legend');
+const ST = LAB.ST, g = LAB.glyph;
+lg.innerHTML = ['want', 'visited', 'again', 'meh'].map((s) => `<span>${g(s, 22)} ${ST[s]}</span>`).join('') +
+  `<span><span class="mkdemo" style="width:132px"><span class="mk pill" style="width:100px"><b>성수동<em>12</em></b><small>가고 싶음 7</small><i class="newtag">NEW 1</i></span></span> 묶음 이름표</span>` +
+  `<span><span class="mkdemo" style="width:70px"><span class="mk dot"><span class="bub">${g('want', 20)}</span><i class="nb">N</i></span></span> 1곳(24시간 안 NEW)</span>` +
+  `<span><span class="mkdemo" style="width:70px"><span class="mk dot sel"><span class="bub">${g('want', 26)}</span></span></span> 선택한 장소</span>` +
+  `<span><span class="mkdemo" style="width:70px"><span class="mk dot num"><span class="bub">2</span></span></span> 방금 저장(링크 속 순서)</span>` +
+  `<span><span class="mkdemo" style="width:110px;background:#e3e3e3"><span class="mk pill dim" style="width:86px"><b>용산구<em>3</em></b><small>모두 다녀옴</small></span></span> 집중 표시 중 나머지</span>`;
+const an = document.getElementById('anatomy');
+const sc = { view: { fit: 'seongsu', focusOn: 3, min: 120 }, sel: 3, newChip: 2, pending: 1, card: { type: 'preview', id: 3, list: 'seongsuOrder', ctxLabel: '성수동 12곳' } };
+LAB.embed(an, sc, 'p393', { title: '세로 393×852', note: '위: ①검색·필터·설정 → ②칩 줄 + 내 위치·전체. 아래: ③카드 → ④지도/리스트 · ＋ 장소 추가.' });
+LAB.embed(an, sc, 'l844', { title: '가로 844×390', note: '왼쪽 열: ①검색·필터·설정 + ③카드(아래 정렬). 지도 위 가운데: ②칩. 오른쪽 열: ④지도/리스트(위) · 내 위치 · 전체 · ＋(아래). 알림은 지도 아래 가운데.' });
+</script>
+</body>
+</html>

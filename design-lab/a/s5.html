@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S5 상대가 저장한 새 장소</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const IDS = [12, 16];
+const tray = { type: 'trayN', ids: IDS, title: '지수님이 새로 저장한 2곳', sub: '알림에서 열었어요 · 오늘' };
+LAB.sequence({
+  id: 's5',
+  title: 'S5 상대가 저장한 새 장소 확인 — 알림 → 새 장소 → 미리보기',
+  lead: '알림으로 열면 S4와 같은 <b>결과 카드 + 집중 표시</b>를 씁니다. 지도는 상대가 새로 넣은 곳 전부가 들어오게 맞추고, 그 장소들은 묶이지 않습니다. 알림 없이 열었을 때도 위쪽 ‘새 장소 n’ 칩 한 번으로 같은 화면에 옵니다. 3번 프레임은 미리보기 · 확인 대기 칩 · 실시간 알림이 동시에 있는 상태입니다.',
+  sizes: ['p393', 'l844', 'p320', 'l568', 'l667', 'l932'],
+  frames: [
+    { t: '잠금 화면 알림', sc: { kind: 'lock', lock: { title: '지수님이 새 장소 2곳을 저장했어요', body: '카페 소금빵 외 1곳' }, tap: 'k:notif' },
+      note: '시스템 화면입니다.' },
+    { t: '앱 열림 → 새 장소 2곳에 맞춤', sc: { view: { fit: IDS }, focus: IDS, newChip: 2, card: tray, tap: 'p:12' },
+      note: '성수동처럼 촘촘한 곳 안의 새 장소도 따로 보입니다. 나머지 장소는 흐리게 남아 위치 감각을 줍니다.' },
+    { t: '미리보기 + 확인 대기 + 알림 동시', sc: { view: { fit: IDS, focusOn: 12, min: 70 }, focus: IDS, sel: 12, newChip: 2, pending: 1, toast: { text: '지수님이 1곳을 더 저장했어요', action: '보기' }, card: { type: 'preview', id: 12, list: IDS, ctxLabel: '지수님이 저장한 2곳' } },
+      note: '알림은 위쪽 칩 줄 아래(세로) / 지도 위 가운데(가로), 미리보기는 카드 자리, 확인 대기는 칩 줄에 있어 셋이 겹치지 않습니다. 알림은 4초 뒤 사라지고 포커스를 뺏지 않습니다.' },
+    { t: '알림 없이 열었을 때', state: true, sc: { view: { fit: 'all' }, newChip: 2, tap: 'k:newchip' }, tapTo: 2,
+      note: '‘NEW 새 장소 2’ 칩을 누르면 2번 프레임과 같은 화면으로 갑니다. 축소된 지도에서도 서울 이름표의 ‘NEW 2’ 꼬리표로 새 장소가 있다는 걸 알 수 있습니다.' },
+  ],
+});
+</script>
+</body>
+</html>

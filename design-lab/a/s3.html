@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · S3 등록 후 돌아오기 (1곳)</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const B = LAB.EXTRA.bagel;
+const base = { extra: [B], view: { center: 26, s: 260 }, sel: 26, focus: [26], newChip: 3, pending: 2 };
+const M = '토요일 아침에 베이글 사러 오기. 지수는 바질 크림치즈';
+LAB.sequence({
+  id: 's3',
+  title: 'S3 등록 후 돌아오기 (1곳) — 저장 결과 카드에서 바로 고치기',
+  lead: '저장이 끝나면 따로 사라지는 알림 대신 <b>‘저장 결과 카드’</b>가 카드 자리에 남습니다. 카드 자체가 “저장했어요” 알림이고, 그 안에서 상태 4종과 메모를 바로 고칩니다. 지도는 새 장소를 동네 단계로 가운데 두고 나머지 장소를 흐리게 해서(집중 표시) 어디에 들어갔는지 바로 보입니다.',
+  sizes: ['p393', 'l844'],
+  frames: [
+    { t: '지도에서 ＋ 장소 추가', sc: { view: { fit: 'seoul' }, pending: 2, newChip: 2, tap: 'k:add' },
+      note: '＋는 세로에서 엄지가 닿는 오른쪽 아래, 가로에서 오른손 엄지 자리. ‘확인 대기 2’ 칩은 확인이 필요한 링크가 있을 때만 생기고, 누르면 등록 화면의 확인 단계로 이어집니다.' },
+    { t: '등록 화면 (범위 밖)', sc: { kind: 'register', reg: { summary: '카카오 검색 · ‘한남 베이글 하우스’ 선택', button: '이 장소 저장' }, tap: 'k:regsave' },
+      note: '등록 화면 설계는 별도 과제라 자리만 표시합니다.' },
+    { t: '저장 완료 → 지도로 돌아옴', sc: Object.assign({ card: { type: 'tray1', id: 26 }, tap: 'k:st-visited' }, base),
+      note: '새 장소가 선택 상태로 가운데. 다른 장소는 흐리게(지우지 않음). 확인 대기 칩·새 장소 칩·결과 카드가 각자 자리에 있어 서로 가리지 않습니다.' },
+    { t: '상태 바로 바꾸기', sc: Object.assign({ patch: { 26: { st: 'visited' } }, card: { type: 'tray1', id: 26, note: '다녀옴으로 바꿨어요' }, tap: 'k:memo' }, base),
+      note: '누르는 즉시 저장되고, 결과는 카드 제목 줄이 그 자리에서 알려 줍니다(따로 뜨는 알림 없음).' },
+    { t: '메모 쓰기 (키보드)', sc: Object.assign({ patch: { 26: { st: 'visited' } }, card: { type: 'tray1', id: 26, note: '다녀옴으로 바꿨어요' }, editor: { id: 26, text: M, dirty: true }, tap: 'k:edsave' }, base),
+      note: '메모는 키보드 위 전용 편집 화면에서 씁니다. 저장·닫기는 맨 위, 글자 수는 키보드 바로 위에 있어 키보드에 가리지 않습니다.' },
+    { t: '메모 저장됨', sc: Object.assign({ patch: { 26: { st: 'visited', memo: M } }, card: { type: 'tray1', id: 26, note: '메모를 저장했어요' } }, base),
+      note: '카드를 닫으면 집중 표시가 풀리고 평소 지도로 돌아갑니다. 새 장소는 24시간 동안 NEW로 표시됩니다.' },
+  ],
+});
+</script>
+</body>
+</html>

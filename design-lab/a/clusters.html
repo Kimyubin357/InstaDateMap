@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · 묶음 단계</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="lab.js"></script>
+<script>
+const st = (o) => Object.assign({ newChip: 2 }, o);
+LAB.sequence({
+  id: 'clusters',
+  title: '묶음 표시 — 같은 25곳을 넓은 지역 → 구 → 동네 → 가게로',
+  lead: '표본: 성수동 12곳(촘촘), 서울 다른 구 12곳(흩어짐), 부산 1곳, 이 중 24시간 안에 저장한 NEW 2곳(카페 소금빵·망원 한강 피크닉 스팟). ' +
+    '<b>규칙</b> ① 1곳은 절대 숫자로 바꾸지 않습니다(상태 기호 + 여유 있으면 이름). ② 묶음은 <b>지역 이름 + 곳 수 + “가고 싶음 n”</b> 이름표이고, 이름은 묶인 장소들이 공유하는 가장 작은 행정구역(동 → 구 → 시)입니다. 두 구가 섞이면 “종로·중구”, 셋 이상이면 “종로 일대”, 행정구역 조회가 늦으면 “이 근처”. ③ 넓은 지역·구 단계에서만, 표시물의 터치 영역(44px)이 8px 안으로 붙을 때만 묶습니다. ④ 동네·가게 단계는 묶지 않고 모든 장소를 기호로 두며, 기호끼리 겹치면 둘레로 펼쳐 실제 위치를 점선으로 가리킵니다. 이름표는 겹치지 않는 것만 우선순위대로. ⑤ NEW는 꼬리표 “NEW n”, 선택·방금 저장한 장소는 어떤 단계에서도 묶이지 않습니다(5~8번). 다녀온 비율 진행 링은 의미가 드러나지 않아 없앴습니다. 이름표를 누르면 다음 단계로 이동합니다.',
+  sizes: ['p393', 'l844', 'p320', 'l568', 'l667', 'l932'],
+  frames: [
+    { t: '넓은 지역 (전국 · 전체 보기)', sc: st({ view: { fit: 'all' }, tap: 'gp:3' }),
+      note: '서울 24곳이 이름표 하나. 부산 1곳은 숫자 없이 기호 + 이름.' },
+    { t: '구 (서울)', sc: st({ view: { fit: 'seoul' }, tap: ['g:성수동', 'gp:3'] }),
+      note: '서울 이름표가 구·동 이름표로 갈라집니다. 1곳짜리(석촌호수 등)는 기호로. NEW는 망원·성수 이름표 꼬리표.' },
+    { t: '동네 (성수동)', sc: st({ view: { fit: 'seongsu' }, tap: 'p:3' }),
+      note: '묶지 않습니다. 12개 기호가 모두 보이고, 붙어 있는 것은 펼쳐서 점선으로 원래 자리. 이름표는 NEW → 가고 싶음 → … 순으로 자리 있는 만큼.' },
+    { t: '가게 (서울숲2길 부근)', sc: st({ view: { center: 3, s: 1400 } }),
+      note: '골목 단위. 주변 장소 이름이 모두 붙습니다(긴 이름은 14자에서 줄임, 전체 이름은 미리보기·상세).' },
+    { t: '같은 장소 따라가기 — 넓은 지역', state: true, sc: st({ view: { fit: 'all' }, sel: 3 }),
+      note: '‘성수 우드앤브릭…’을 선택한 채 축소: 선택한 장소는 서울 이름표에서 빠져 따로 보이고, 이름표는 겹치지 않게 비켜서 점선으로 원래 자리를 가리킵니다.' },
+    { t: '따라가기 — 구', state: true, sc: st({ view: { fit: 'seoul' }, sel: 3 }), note: '성수동 이름표는 11곳, 선택한 곳은 바로 옆.' },
+    { t: '따라가기 — 동네', state: true, sc: st({ view: { fit: 'seongsu' }, sel: 3 }), note: '' },
+    { t: '따라가기 — 가게', state: true, sc: st({ view: { center: 3, s: 1400 }, sel: 3 }), note: '' },
+  ],
+});
+</script>
+</body>
+</html>
