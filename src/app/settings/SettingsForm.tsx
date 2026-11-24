@@ -5,13 +5,14 @@ import PageHeader from "@/components/PageHeader";
 import PinInput from "@/components/PinInput";
 import Icon from "@/components/Icon";
 import { requestJson } from "@/lib/client-request";
-import { useBoardSync } from "@/components/BoardProvider";
+import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
 import IdentityOption from "@/components/IdentityOption";
 export default function SettingsForm({ who, names, account = false, onPinChanged }: { who: string; names: string[]; account?: boolean; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
+  const folderName = useBoardState().snapshot?.board ?? "";
   const [name, setName] = useState(who); const [currentPin, setCurrent] = useState(""); const [newPin, setNew] = useState(""); const [confirmPin, setConfirm] = useState("");
   const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [locking, setLocking] = useState(false); const [choosing, setChoosing] = useState(false);
@@ -54,6 +55,9 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
   }
   return <main className="form-page settings-page"><ClientReady><PageHeader title="우리 설정" />
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
+    {account && <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">폴더</h2>
+      <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>폴더 바꾸기·관리</span><small>새 폴더 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
+    </section>}
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
       {account ? <div className="settings-row settings-static"><Icon name="user" /><span className="settings-copy"><span>내 이름</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span></div>
       : <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>}

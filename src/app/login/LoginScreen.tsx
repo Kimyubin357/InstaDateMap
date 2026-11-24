@@ -24,7 +24,8 @@ function GoogleSymbol() {
   </svg>;
 }
 
-export default function LoginScreen({ next, error = "", disabled = false }: { next: string; error?: string; disabled?: boolean }) {
+/** 카카오·구글 시작 버튼. 로그인 화면과 초대 화면이 함께 씁니다. */
+export function ProviderButtons({ next, disabled = false }: { next: string; disabled?: boolean }) {
   const [busy, setBusy] = useState<Provider | null>(null);
   // 뒤로 가기로 이 화면이 다시 보이면(bfcache) 버튼을 다시 쓸 수 있게 합니다.
   useEffect(() => {
@@ -39,6 +40,10 @@ export default function LoginScreen({ next, error = "", disabled = false }: { ne
     if (locked) return <span className={className} role="link" aria-disabled="true" aria-busy={busy === provider}>{provider === "kakao" ? <KakaoSymbol /> : <GoogleSymbol />}<span>{label}</span></span>;
     return <a className={className} href={`/api/auth/${provider}?next=${encodeURIComponent(next)}`} onClick={() => setBusy(provider)}>{provider === "kakao" ? <KakaoSymbol /> : <GoogleSymbol />}<span>{label}</span></a>;
   };
+  return <>{button("kakao")}{button("google")}</>;
+}
+
+export default function LoginScreen({ next, error = "", disabled = false }: { next: string; error?: string; disabled?: boolean }) {
   return <main className={styles.page}>
     <section className={styles.hero}>
       <div className={styles.art}><Image src={pinCouple} alt="서로를 안고 있는 두 캐릭터" sizes="(max-height: 500px) 150px, 260px" priority /></div>
@@ -47,8 +52,7 @@ export default function LoginScreen({ next, error = "", disabled = false }: { ne
     </section>
     <section className={styles.actions} aria-label="로그인 방법">
       {error && <p className={styles.error} role="alert">{error}</p>}
-      {button("kakao")}
-      {button("google")}
+      <ProviderButtons next={next} disabled={disabled} />
     </section>
   </main>;
 }

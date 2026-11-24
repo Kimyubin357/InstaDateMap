@@ -1,0 +1,146 @@
+/* 폴더: 설정과 같은 열린 행·점선 구분선. 표지 색은 모음과 같은 잉크 네 가지입니다. */
+.page {
+  --folder-red: var(--accent);
+  --folder-forest: var(--forest);
+  --folder-gold: #8b692d;
+  --folder-blue: #466b79;
+  color: var(--ink);
+}
+.cover {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--folder-color) var(--grain);
+  color: var(--cream);
+  box-shadow: var(--print-shadow);
+}
+.message { margin: 12px 0 0; }
+.empty { margin: 4px 0 12px; font-size: 18px; line-height: 1.5; color: var(--ink-soft); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list > li { display: flex; align-items: stretch; border-bottom: 1px dashed var(--line); }
+.openRow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.rowCopy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rowCopy strong { font-size: 19px; font-weight: 400; line-height: 1.35; overflow-wrap: anywhere; }
+.rowCopy small { font-size: 14px; line-height: 1.4; color: var(--ink-soft); }
+.current .rowCopy strong { color: var(--forest); }
+.badge {
+  flex: none;
+  padding: 2px 9px;
+  border: 1px dashed var(--forest);
+  border-radius: 99px;
+  color: var(--forest);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.manage {
+  flex: none;
+  width: 48px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+}
+.openRow:focus-visible, .manage:focus-visible { outline: 3px solid var(--forest); outline-offset: -3px; border-radius: 8px; }
+.create > svg:first-child { color: var(--forest); }
+
+.editor { display: grid; gap: 16px; padding: 14px 0 18px; border-bottom: 1px dashed var(--line); }
+.editor > label { display: block; font-size: 17px; }
+.editor input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  min-height: 48px;
+  font: inherit;
+  font-size: 19px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+}
+.editor fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.editor legend { font-size: 17px; margin-bottom: 8px; padding: 0; }
+.swatches, .icons { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatches button, .icons button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+}
+.swatches button { background: var(--folder-color); color: var(--cream); }
+.swatches button[aria-pressed="true"] { outline: 2px solid var(--folder-color); outline-offset: 3px; }
+.icons button[aria-pressed="true"] { border-color: var(--forest); color: var(--forest); background: #244b3710; }
+.editorActions { display: flex; gap: 10px; flex-wrap: wrap; }
+.editorActions > :global(.btn) { flex: 1 1 140px; min-height: 48px; font-size: 18px; }
+
+.detail { display: flex; flex-direction: column; }
+.aboutRow { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.aboutRow > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aboutRow strong { font-size: 19px; font-weight: 400; overflow-wrap: anywhere; }
+.aboutRow small { font-size: 14px; color: var(--ink-soft); }
+
+.members { list-style: none; margin: 0; padding: 0; }
+.members > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 60px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.memberName { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 18px; }
+.memberName > svg { flex: none; color: var(--forest); }
+.memberName small { color: var(--ink-soft); font-size: 14px; }
+.memberActions { display: flex; gap: 14px; margin-left: auto; }
+.memberActions :global(.text-btn) { min-height: 44px; font-size: 15px; font-weight: 400; color: var(--forest); padding: 0 2px; }
+.memberActions :global(.text-btn):last-child { color: var(--accent-ink); }
+
+.invite { display: flex; flex-direction: column; }
+.inviteBox { display: grid; gap: 12px; padding: 14px 0; border-bottom: 1px dashed var(--line); }
+.inviteBox label { font-size: 16px; color: var(--ink-soft); }
+.inviteBox input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--cream) var(--weave);
+}
+.inviteBox :global(.hint) { margin: 0; font-size: 14px; }
+.danger :global(.settings-row) > svg:first-child { color: var(--accent-ink); }
+.danger :global(.settings-row) :global(.settings-copy) > span:first-child { color: var(--accent-ink); }
+
+/* 짧은 가로: 행 높이를 조금 줄이고 좌우 안전영역은 설정 화면 규칙을 따릅니다. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .openRow { min-height: 60px; padding: 8px 0; }
+  .members > li { min-height: 52px; }
+  .editor { grid-template-columns: 1fr 1fr; align-items: start; }
+  .editor > label, .editorActions { grid-column: 1 / -1; }
+}

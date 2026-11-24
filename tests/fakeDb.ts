@@ -4,7 +4,7 @@ export const tables: Record<string, Row[]> = {};
 let seq = 0;
 const failures: { table: string; op: string; message: string }[] = [];
 export function failNext(table: string, op: string, message = "테스트 DB 오류") { failures.push({ table, op, message }); }
-const uniq: Record<string, string[]> = { sources: ["board_id", "url"], places: ["board_id", "kakao_place_id"], source_places: ["source_id", "place_id", "added_by"], place_saves: ["place_id", "added_by"], access_sessions: ["token_hash"] };
+const uniq: Record<string, string[]> = { sources: ["board_id", "url"], places: ["board_id", "kakao_place_id"], source_places: ["source_id", "place_id", "added_by"], place_saves: ["place_id", "added_by"], access_sessions: ["token_hash"], place_details: ["kakao_place_id"] };
 class Q {
   private filters: ((r: Row) => boolean)[] = []; private op = "select"; private patch: Row = {}; private result: Row[] | null = null;
   private failure: { message: string } | null = null; private selection = ""; private max = Infinity; private offset = 0; private sortKey = ""; private ascending = true;
@@ -161,18 +161,16 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
         const user = { id: `u${++seq}`, display_name: display, avatar_url: p.p_avatar, last_board_id: null };
         tables.app_users.push(user); identity = { provider: p.p_provider, subject: p.p_subject, user_id: user.id, email: p.p_email };
         tables.user_identities.push(identity); created = true;
+        // 012: 첫 로그인만 "내 장소"를 만듭니다.
+        const board = { id: `b${++seq}`, name: "내 장소", owner_id: user.id, is_personal: true, member_names: [user.display_name], auth_version: 0, pin_hash: null, color: "red", icon: "heart" };
+        tables.boards.push(board); tables.board_members.push({ board_id: board.id, user_id: user.id, role: "owner", member_name: user.display_name, joined_at: new Date(Date.now() + seq).toISOString() });
       }
       const user = tables.app_users.find((u) => u.id === identity!.user_id)!;
       const mine = tables.board_members.filter((m) => m.user_id === user.id);
-      let member = mine.find((m) => m.board_id === user.last_board_id) ?? mine[0];
-      if (!member) {
-        const board = { id: `b${++seq}`, name: "내 장소", owner_id: user.id, is_personal: true, member_names: [user.display_name], auth_version: 0, pin_hash: null };
-        tables.boards.push(board); member = { board_id: board.id, user_id: user.id, role: "owner", member_name: user.display_name, joined_at: new Date().toISOString() };
-        tables.board_members.push(member);
-      }
-      user.last_board_id = member.board_id;
-      const board = tables.boards.find((b) => b.id === member!.board_id)!;
-      return { data: { user_id: user.id, board_id: board.id, member_name: member.member_name, auth_version: board.auth_version, created }, error: null };
+      const member = mine.find((m) => m.board_id === user.last_board_id) ?? mine[0];
+      user.last_board_id = member?.board_id ?? null;
+      const board = member && tables.boards.find((b) => b.id === member.board_id)!;
+      return { data: { user_id: user.id, board_id: board?.id ?? null, member_name: member?.member_name ?? null, auth_version: board?.auth_version ?? 0, created }, error: null };
     }
     if (name === "dm_link_member") {
       tables.board_members ??= [];

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { db } from "./db";
-import { AccessError, boardFromRequest, cookieValue, safeNext, SESSION_COOKIE, SETUP_COOKIE } from "./auth";
+import { AccessError, accountFromRequest, boardFromRequest, cookieValue, safeNext, SESSION_COOKIE, SETUP_COOKIE } from "./auth";
 import { newToken, tokenHash } from "./pin";
 
 export const sessionExpiry = (remember: boolean) => new Date(Date.now() + (remember ? 90 * 86400 : 12 * 3600) * 1000).toISOString();
@@ -26,7 +26,7 @@ export async function setupSession(req: Request) {
   if (!data || data.purpose !== "setup" || new Date(data.expires_at).getTime() <= Date.now()) throw new AccessError("설정 시간이 만료됐어요. 처음 받은 주소로 다시 열어 주세요.", 401);
   return data;
 }
-export async function createSession(boardId: string, version: number, remember: boolean, purpose = "member", account?: { userId: string; memberName: string }) {
+export async function createSession(boardId: string | null, version: number, remember: boolean, purpose = "member", account?: { userId: string; memberName: string | null }) {
   const token = newToken();
   const { error } = await db().from("access_sessions").insert({ token_hash: tokenHash(token), board_id: boardId, purpose,
     auth_version: version, remember, expires_at: purpose === "setup" ? new Date(Date.now() + 600000).toISOString() : sessionExpiry(remember),
@@ -43,8 +43,13 @@ export async function pageRequest() {
   return new Request("http://localhost/", { headers: { cookie: (await cookies()).toString() } });
 }
 export async function requirePageBoard(next = "/", identity = true) {
-  const board = await boardFromRequest(await pageRequest());
-  if (!board) redirect(`/login?next=${encodeURIComponent(safeNext(next))}`);
+  const request = await pageRequest();
+  const board = await boardFromRequest(request);
+  if (!board) {
+    // 로그인했지만 열 폴더가 없으면(0개) 폴더 화면에서 새로 만들거나 초대를 받습니다.
+    if (await accountFromRequest(request)) redirect("/folders");
+    redirect(`/login?next=${encodeURIComponent(safeNext(next))}`);
+  }
   if (identity && !board.who) redirect(`/choose?next=${encodeURIComponent(safeNext(next))}`);
   return board;
 }

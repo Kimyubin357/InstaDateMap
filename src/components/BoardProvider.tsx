@@ -13,6 +13,7 @@ import LoginScreen from "@/app/login/LoginScreen";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
 import LinkForm from "@/app/settings/link/LinkForm";
+import FoldersPanel from "@/app/folders/FoldersPanel";
 import TrashPlaces from "./TrashPlaces";
 import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
@@ -140,6 +141,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
       {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} account={state.access.account === true} onPinChanged={notify} /></div>}
       {pathname === "/settings/link" && <div className="shell-page" key="link"><LinkForm /></div>}
+      {pathname === "/folders" && <div className="shell-page" key="folders"><FoldersPanel /></div>}
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       {accessError && pathname !== "/settings" && <ActionDialog title="입장 정보를 다시 확인해 주세요" message={accessError} tone="error" confirmLabel="입장 정보 다시 확인" onClose={() => { void resetAccess(false); }} />}
