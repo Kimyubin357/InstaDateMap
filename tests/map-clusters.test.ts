@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { regionCards, regionTier, shortRegionName, stackCards, zoomInLevel, type ScreenPoint } from "@/lib/map-clusters";
 import type { MapRegion } from "@/lib/map-regions";
 import type { PlaceStatus } from "@/lib/types";
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 
 const seongsu: MapRegion = { province: "서울특별시", city: "서울특별시", district: "서울특별시 성동구", local: "서울특별시 성동구 성수1가1동" };
 const oksu: MapRegion = { province: "서울특별시", city: "서울특별시", district: "서울특별시 성동구", local: "서울특별시 성동구 옥수동" };
@@ -32,11 +33,15 @@ describe("지역 집계 카드", () => {
     expect(["서울특별시", "부산광역시", "세종특별자치시", "경기도", "충청북도", "전북특별자치도", "제주특별자치도", "경기도 수원시", "경기도 수원시 장안구", "서울특별시 성동구 성수1가1동"].map(shortRegionName))
       .toEqual(["서울", "부산", "세종", "경기", "충북", "전북", "제주", "수원시", "장안구", "성수1가1동"]);
   });
-  it("숫자는 가고 싶음만 세고 또 갈래만 있으면 0", () => {
+  it.runIf(PLACE_STATUS_ENABLED)("숫자는 가고 싶음만 세고 또 갈래만 있으면 0", () => {
     const [mixed] = cards([place("a", seongsu), place("b", seongsu, "again"), place("c", seongsu)], 5);
     expect(mixed.wish).toBe(2);
     const [againOnly] = cards([place("a", oksu, "again")], 5);
     expect(againOnly.wish).toBe(0); expect(againOnly.places).toHaveLength(1);
+  });
+  it.runIf(!PLACE_STATUS_ENABLED)("상태를 화면에서 뺀 동안에는 숫자가 지도에 보이는 그 지역 장소 수", () => {
+    const [mixed] = cards([place("a", seongsu), place("b", seongsu, "again"), place("c", seongsu, "meh")], 5);
+    expect(mixed.wish).toBe(3);
   });
   it("진행 바는 필터에 가려진 장소까지 그 지역 전체 기준으로 셈", () => {
     const shown = [place("a", seongsu), place("b", seongsu, "again")];

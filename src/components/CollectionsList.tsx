@@ -8,6 +8,7 @@ import { collectionUndo } from "@/lib/collection-undo";
 import { distanceM, placeMeta, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
 import { STATUS_LABEL } from "@/lib/types";
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import { useBoardState, useBoardSync } from "./BoardProvider";
 import Icon from "./Icon";
 import Modal from "./Modal";
@@ -190,7 +191,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         <strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge">NEW</span>}</strong>
         <span className={styles.metaLine}>
           <span className="row-meta">{placeMeta(p)}{distanceOrigin ? ` · ${(distanceM(distanceOrigin, p) / 1000).toFixed(1)}km` : ""}</span>
-          <span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>
+          {PLACE_STATUS_ENABLED && <span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>}
         </span>
         <span className={styles.attribution}>
           <small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>
@@ -219,14 +220,14 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     <div className={current ? styles.detailLayout : undefined}>
     {current && <header className={styles.detail} style={{ "--collection-color": `var(--collection-${current.color})` } as CSSProperties}>
       <div className={styles.detailNav}><button className="text-btn" onClick={() => onNavigate("collections")}><Icon name="back" width={18} />모음</button><button className="text-btn" onClick={() => beginEditor(current)}>편집</button></div>
-      <div className={styles.detailTitle}><span className={styles.tile} aria-hidden="true"><Icon name={current.icon} width={24} /></span><div><h2>{current.name}</h2><p className={styles.count}>{current.place_ids.length}곳 · 가고 싶은 곳 {wishCounts.get(current.id) ?? 0}</p></div></div>{current.description && <p className={styles.description}>{current.description}</p>}
+      <div className={styles.detailTitle}><span className={styles.tile} aria-hidden="true"><Icon name={current.icon} width={24} /></span><div><h2>{current.name}</h2><p className={styles.count}>{current.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(current.id) ?? 0}`}</p></div></div>{current.description && <p className={styles.description}>{current.description}</p>}
       <div className={styles.detailActions}><button className={`btn ${styles.mapButton}`} disabled={!current.place_ids.length} onClick={() => onMap(current.id)}><Icon name="map" width={18} />지도에서 보기</button><button className="btn" disabled={selecting} onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}><Icon name="plus" width={18} />장소 담기</button></div>
     </header>}
     <div className={styles.content}>
     {showCollections ? <>
       <div className={styles.heading}><h2>우리 모음 <small>{collections.length}개</small></h2></div>
       {collections.length > 4 && <label className={styles.search}><Icon name="search" width={18} /><input aria-label="모음 이름 검색" placeholder="모음 이름으로 찾기" value={query} maxLength={40} onChange={(e) => setQuery(e.target.value)} /></label>}
-      <div className={styles.grid}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.card} key={c.id} style={{ "--collection-color": `var(--collection-${c.color})` } as CSSProperties} onClick={() => onNavigate("collections", c.id)}><Icon name={c.icon} width={30} /><strong>{c.name}</strong><span>{c.place_ids.length}곳 · 가고 싶은 곳 {wishCounts.get(c.id) ?? 0}</span></button>)}{loaded && collections.length > 0 && <button className={`${styles.card} ${styles.addCard}`} onClick={() => beginEditor()}><Icon name="plus" width={26} /><span>새 모음</span></button>}</div>
+      <div className={styles.grid}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.card} key={c.id} style={{ "--collection-color": `var(--collection-${c.color})` } as CSSProperties} onClick={() => onNavigate("collections", c.id)}><Icon name={c.icon} width={30} /><strong>{c.name}</strong><span>{c.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(c.id) ?? 0}`}</span></button>)}{loaded && collections.length > 0 && <button className={`${styles.card} ${styles.addCard}`} onClick={() => beginEditor()}><Icon name="plus" width={26} /><span>새 모음</span></button>}</div>
       {loaded && !collections.length && <div className={styles.empty}><Icon name="heart" width={36} /><h3>함께 갈 곳을 모아봐요</h3><p>‘부산 주말’, ‘비 오는 날’처럼<br />다시 찾고 싶은 이름을 붙여보세요.</p><button className="btn primary" onClick={() => beginEditor()}>첫 모음 만들기</button></div>}
       {query && !collections.some((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) && <p className={styles.empty}>이 이름의 모음은 없어요.</p>}
     </> : <>

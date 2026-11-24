@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoMaps } from "@/lib/map-sdk";
 import "@/app/map-recovery.css";
 import { STATUS_LABEL } from "@/lib/types";
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
 import { CLUSTER_MIN_LEVEL, regionCards, stackCards, zoomInLevel, type RegionCard } from "@/lib/map-clusters";
@@ -26,7 +27,8 @@ function regionCardButton(card: RegionCard<PlaceView>) {
   const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}`;
   const single = card.places.length === 1;
   const where = card.label || "이 지역";
-  button.setAttribute("aria-label", `${where} 가고 싶음 ${card.wish}곳, 지도에 ${card.places.length}곳, 지역 전체 ${card.total}곳 중 ${card.visited}곳 다녀옴${card.fresh ? `, 새 장소 ${card.fresh}곳` : ""}. ${single ? "장소 카드 보기" : card.tier === "local" ? "장소 목록 보기" : "지도 확대"}`);
+  const counts = PLACE_STATUS_ENABLED ? `가고 싶음 ${card.wish}곳, 지도에 ${card.places.length}곳, 지역 전체 ${card.total}곳 중 ${card.visited}곳 다녀옴` : `장소 ${card.wish}곳`;
+  button.setAttribute("aria-label", `${where} ${counts}${card.fresh ? `, 새 장소 ${card.fresh}곳` : ""}. ${single ? "장소 카드 보기" : card.tier === "local" ? "장소 목록 보기" : "지도 확대"}`);
   if (card.label) { const name = document.createElement("span"); name.className = "region-card-name"; name.textContent = card.label; button.append(name); }
   const count = document.createElement("strong"); count.className = "region-card-count"; count.textContent = card.wish.toLocaleString("ko-KR"); button.append(count);
   if (card.fresh) {
@@ -34,23 +36,26 @@ function regionCardButton(card: RegionCard<PlaceView>) {
     const word = document.createElement("b"); word.textContent = "NEW";
     badge.append(word, document.createTextNode(` ${card.fresh}`)); button.append(badge);
   }
-  const track = document.createElement("span"); track.className = "region-card-progress";
-  const fill = document.createElement("i"); fill.style.width = `${card.total ? Math.round(card.visited / card.total * 100) : 0}%`;
-  track.append(fill); button.append(track);
+  if (PLACE_STATUS_ENABLED) {
+    const track = document.createElement("span"); track.className = "region-card-progress";
+    const fill = document.createElement("i"); fill.style.width = `${card.total ? Math.round(card.visited / card.total * 100) : 0}%`;
+    track.append(fill); button.append(track);
+  }
   for (const node of button.children) node.setAttribute("aria-hidden", "true");
   return button;
 }
 
 function placeButton(p: PlaceView, interactive: boolean, isNew = false) {
-  const button = document.createElement("button"); button.type = "button"; button.className = `pin ${p.status}`;
-  button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}`);
+  const button = document.createElement("button"); button.type = "button"; button.className = PLACE_STATUS_ENABLED ? `pin ${p.status}` : "pin";
+  const status = PLACE_STATUS_ENABLED ? `, ${STATUS_LABEL[p.status]}` : "";
+  button.setAttribute("aria-label", `${p.name}${status}`);
   button.id = `${interactive ? "map" : "preview"}-place-${p.id}`;
   const dot = document.createElement("i"); dot.className = "mark";
   const label = document.createElement("span"); label.textContent = p.name; button.append(dot, label);
   if (isNew) {
     const badge = document.createElement("span"); badge.className = "new-place-badge"; badge.textContent = "NEW";
     badge.setAttribute("aria-hidden", "true"); button.append(badge);
-    button.setAttribute("aria-label", `${p.name}, ${STATUS_LABEL[p.status]}, 새로 등록한 장소`);
+    button.setAttribute("aria-label", `${p.name}${status}, 새로 등록한 장소`);
   }
   if (!interactive) { button.tabIndex = -1; button.setAttribute("aria-hidden", "true"); }
   return button;
