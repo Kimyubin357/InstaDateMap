@@ -5,6 +5,7 @@ import ClientReady from "@/components/ClientReady";
 import Icon from "@/components/Icon";
 import ShellLink from "@/components/ShellLink";
 import ActionDialog from "@/components/ActionDialog";
+import Avatar from "@/components/Avatar";
 import { useBoardSync } from "@/components/BoardProvider";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
 import { FOLDER_COLORS, FOLDER_COLOR_LABEL, FOLDER_ICONS, FOLDER_ICON_LABEL, INVITE_DAYS, type FolderColor, type FolderDetail, type FolderIcon, type FolderMember, type FolderSummary, type FoldersResponse } from "@/lib/folders";
@@ -163,7 +164,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
         </section>
         <section className="settings-group" aria-labelledby="folder-members"><h2 id="folder-members" className="settings-label">멤버 {detail.members.length}/{detail.folder.member_limit}명</h2>
           <ul className={styles.members}>{detail.members.map((m) => <li key={m.user_id}>
-            <span className={styles.memberName}><Icon name="user" /><span>{m.name}{m.me && <small> (나)</small>}</span>{m.role === "owner" && <span className={styles.badge}>방장</span>}</span>
+            <span className={styles.memberName}><Avatar src={m.avatar} size={32} /><span>{m.name}{m.me && <small> (나)</small>}</span>{m.role === "owner" && <span className={styles.badge}>방장</span>}</span>
             {owner && !m.me && <span className={styles.memberActions}><button type="button" className="text-btn" disabled={busy} onClick={() => setConfirm({ kind: "owner", member: m })}>방장 넘기기</button><button type="button" className="text-btn" disabled={busy} onClick={() => setConfirm({ kind: "kick", member: m })}>내보내기</button></span>}
           </li>)}</ul>
         </section>

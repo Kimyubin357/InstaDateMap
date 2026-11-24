@@ -10,6 +10,7 @@ import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
 import IdentityOption from "@/components/IdentityOption";
+import Avatar from "@/components/Avatar";
 export default function SettingsForm({ who, names, account = false, onPinChanged }: { who: string; names: string[]; account?: boolean; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
   const folderName = useBoardState().snapshot?.board ?? "";
@@ -20,6 +21,14 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
   const accessRetry = useRef<HTMLButtonElement>(null);
   const identityToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { setName(who); }, [who]);
+  const [avatar, setAvatar] = useState<string | null>(null);
+  useEffect(() => {
+    if (!account) return;
+    let alive = true;
+    requestJson<{ avatar: string | null }>("/api/profile", { cache: "no-store", notifyBoardChange: false })
+      .then((p) => { if (alive) setAvatar(p.avatar); }).catch(() => {});
+    return () => { alive = false; };
+  }, [account, who]);
   // 계정 세션: 연결할 수 있는 기존 PIN 지도가 있을 때만 "기존 지도 연결"을 보여줍니다.
   const [linkable, setLinkable] = useState(false);
   useEffect(() => {
@@ -59,7 +68,7 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
       <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>폴더 바꾸기·관리</span><small>새 폴더 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
     </section>}
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
-      {account ? <div className="settings-row settings-static"><Icon name="user" /><span className="settings-copy"><span>내 이름</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span></div>
+      {account ? <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></ShellLink>
       : <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>}
       {!account && choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); } }} />)}</div></div>}
       <PushSettings />

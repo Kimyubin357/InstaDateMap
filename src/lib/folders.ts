@@ -10,7 +10,7 @@ export const FOLDER_ICON_LABEL: Record<FolderIcon, string> = { heart: "하트", 
 export const INVITE_DAYS = 7;
 
 export interface FolderSummary { id: string; name: string; color: FolderColor; icon: FolderIcon; role: "owner" | "member"; member_name: string; member_count: number; member_limit: number; place_count: number }
-export interface FolderMember { user_id: string; name: string; role: "owner" | "member"; me: boolean }
+export interface FolderMember { user_id: string; name: string; role: "owner" | "member"; me: boolean; avatar?: string | null }
 export interface FolderDetail { folder: FolderSummary; members: FolderMember[]; active_invites: number }
 export interface FoldersResponse { folders: FolderSummary[]; current: string | null }
 export interface InvitePreview { code: "OK" | "ALREADY_MEMBER" | "FOLDER_FULL" | "INVITE_INVALID"; board_id?: string; name?: string; color?: FolderColor; icon?: FolderIcon; owner?: string | null; member_count?: number; member_limit?: number; expires_at?: string }

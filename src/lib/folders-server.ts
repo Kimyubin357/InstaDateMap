@@ -32,8 +32,7 @@ export function folderId(value: string) {
 export async function folderDetail(account: Account, id: string): Promise<FolderDetail> {
   const folder = (await listFolders(account.userId)).find((f) => f.id === id);
   if (!folder) throw new AccessError("폴더를 찾을 수 없어요.", 404);
-  const { data: members, error } = await db().from("board_members").select("user_id, member_name, role, joined_at").eq("board_id", id).order("joined_at");
-  if (error) { console.error("folderDetail: members failed", error.code, error.message); throw new Error("폴더 멤버를 불러오지 못했어요."); }
+  const members = await folderRpc<{ user_id: string; member_name: string; role: "owner" | "member"; avatar: string | null }[]>("dm_folder_members", { p_board: id }, "폴더 멤버를 불러오지 못했어요.");
   let active = 0;
   if (folder.role === "owner") {
     const { data: invites, error: inviteError } = await db().from("folder_invites").select("id, expires_at, revoked_at").eq("board_id", id);
@@ -41,7 +40,7 @@ export async function folderDetail(account: Account, id: string): Promise<Folder
     active = (invites ?? []).filter((i) => !i.revoked_at && new Date(i.expires_at).getTime() > Date.now()).length;
   }
   return { folder, active_invites: active,
-    members: (members ?? []).map((m) => ({ user_id: m.user_id, name: m.member_name, role: m.role, me: m.user_id === account.userId })) };
+    members: (members ?? []).map((m) => ({ user_id: m.user_id, name: m.member_name, role: m.role, me: m.user_id === account.userId, avatar: m.avatar ?? null })) };
 }
 
 /** 이 기기를 그 폴더로 옮깁니다(세션·알림 구독). */
