@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { AccessError, cookieValue, SESSION_COOKIE } from "@/lib/auth";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { consentPath, termsPending } from "@/lib/terms-server";
 import { createSession, setSessionCookie } from "@/lib/access";
 import { callbackUrl, exchangeProfile, isProvider, OAUTH_COOKIE, providerConfig, readOAuthCookie } from "@/lib/oauth";
@@ -38,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
     const { data, error } = await db().rpc("dm_login", { p_provider: provider, p_subject: profile.subject, p_email: profile.email, p_name: profile.name, p_avatar: profile.avatar });
     if (error || !data?.user_id) { console.error("dm_login failed", error?.code, error?.message); throw new Error("login failed"); }
     const login = data as LoginResult;
-    const token = await createSession(login.board_id, login.auth_version, true, "member", { userId: login.user_id, memberName: login.member_name });
+    const token = await createSession(login.board_id, login.auth_version, true, { userId: login.user_id, memberName: login.member_name });
     // 이 기기에 남아 있던 예전 세션(PIN 등)은 새 로그인 세션으로 대체합니다.
     const previous = cookieValue(req, SESSION_COOKIE);
     if (/^[0-9a-f]{64}$/.test(previous)) await db().from("access_sessions").delete().eq("token_hash", tokenHash(previous));

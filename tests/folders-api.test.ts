@@ -3,7 +3,7 @@ import { fakeDb, reset, tables } from "./fakeDb";
 // 폴더 규칙 자체는 folders-sql 테스트가 실제 SQL로 검증합니다. 여기서는 API의 인증·입력·응답만 봅니다.
 const rpc = vi.fn();
 vi.mock("@/lib/db", () => ({ db: () => ({ from: fakeDb.from, rpc }) }));
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { GET as list, POST as create } from "@/app/api/folders/route";
 import { DELETE as remove, PATCH as update } from "@/app/api/folders/[id]/route";
 import { POST as open } from "@/app/api/folders/[id]/open/route";
@@ -22,7 +22,7 @@ beforeEach(() => {
   reset(); rpc.mockReset();
   tables.access_sessions = [
     { token_hash: tokenHash(account), board_id: folder, purpose: "member", member_name: "유빈", remember: true, auth_version: 0, expires_at: "2030-01-01T00:00:00Z", user_id: user },
-    { token_hash: tokenHash(legacy), board_id: "legacy", purpose: "member", member_name: "유빈", remember: true, auth_version: 0, expires_at: "2030-01-01T00:00:00Z" },
+    { token_hash: tokenHash(legacy), board_id: "legacy", purpose: "member", member_name: "유빈", remember: true, auth_version: 0, expires_at: "2030-01-01T00:00:00Z", user_id: null },
   ];
 });
 

@@ -339,3 +339,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .link-page .lead{font-size:17px;color:var(--ink-soft)}
 .link-names{border:0;margin:0;padding:0;min-width:0}
 .link-names>legend{font-size:18px;margin-bottom:12px;padding:0}
+/* 회원 탈퇴: 설정 맨 아래의 작은 글자 버튼(주요 실행처럼 보이지 않게), 확인 창 안의 안내 */
+.settings-leave{align-self:center;display:block;min-height:44px;margin:18px auto 0;padding:0 16px;font-size:15px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px}
+.settings-leave-detail{text-align:left}.settings-leave-detail p{margin:0 0 8px}

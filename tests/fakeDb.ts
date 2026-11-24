@@ -5,10 +5,31 @@ let seq = 0;
 const failures: { table: string; op: string; message: string }[] = [];
 export function failNext(table: string, op: string, message = "테스트 DB 오류") { failures.push({ table, op, message }); }
 const uniq: Record<string, string[]> = { sources: ["board_id", "url"], places: ["board_id", "kakao_place_id"], source_places: ["source_id", "place_id", "added_by"], place_saves: ["place_id", "added_by"], access_sessions: ["token_hash"], place_details: ["kakao_place_id"] };
+/**
+ * 예전 형식 세션 픽스처(user_id 없이 member_name만 있음)를 계정 세션으로 읽습니다.
+ * 2026-11-24 PIN 입장을 없애 실제 코드는 계정 세션만 엽니다. API 테스트의 픽스처는 이름으로 보드를 고르던 형식이 많아서,
+ * user_id = "u:" + member_name 으로 보고, 그런 세션이 있는 보드의 member_names를 board_members로 보여 줍니다.
+ * 이름이 없는(이름을 고르지 않은) 예전 세션은 user_id가 없어 열리지 않습니다.
+ */
+const LEGACY = new WeakSet<Row>();
+const AUTO = new WeakSet<Row>();
+function legacyAccounts() {
+  const sessions = tables.access_sessions ?? [];
+  const boards = new Set<string>();
+  for (const row of sessions) {
+    if (!("user_id" in row) || LEGACY.has(row)) { LEGACY.add(row); row.user_id = row.member_name ? `u:${row.member_name}` : null; if (row.board_id) boards.add(row.board_id); }
+  }
+  if (!boards.size && !(tables.board_members ?? []).some((m) => AUTO.has(m))) return;
+  const real = (tables.board_members ?? []).filter((m) => !AUTO.has(m));
+  const auto = [...boards].flatMap((id) => (tables.boards?.find((b) => b.id === id)?.member_names ?? [])
+    .filter((name: string) => !real.some((m) => m.board_id === id && m.member_name === name))
+    .map((name: string, i: number) => { const row = { board_id: id, user_id: `u:${name}`, member_name: name, role: i === 0 ? "owner" : "member", joined_at: `2026-01-0${i + 1}` }; AUTO.add(row); return row; }));
+  tables.board_members = [...real, ...auto];
+}
 class Q {
   private filters: ((r: Row) => boolean)[] = []; private op = "select"; private patch: Row = {}; private result: Row[] | null = null;
   private failure: { message: string } | null = null; private selection = ""; private max = Infinity; private offset = 0; private sortKey = ""; private ascending = true;
-  constructor(private t: string) { tables[t] ??= []; }
+  constructor(private t: string) { tables[t] ??= []; if (t === "access_sessions" || t === "board_members") legacyAccounts(); }
   private failed(op: string) { const i = failures.findIndex((f) => f.table === this.t && f.op === op); if (i >= 0) this.failure = { message: failures.splice(i, 1)[0].message }; return !!this.failure; }
   select(value = "") { this.selection = value; return this; }
   eq(k: string, v: any) { this.filters.push((r) => k.split(".").reduce((a, key) => a?.[key], r) === v); return this; }
@@ -139,14 +160,6 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       if (p.p_source) check(await new Q("source_places").upsert({ source_id: p.p_source, place_id: result.data.id, extraction_id: p.p_extraction, added_by: p.p_added_by }, { ignoreDuplicates: true }));
       return { data: result.data.id, error: null };
     }
-    if (name === "dm_configure_access") {
-      const b = tables.boards.find((b) => b.id === p.p_board); const s = tables.access_sessions?.find((s) => s.token_hash === p.p_session);
-      if (!b || !s || s.auth_version !== b.auth_version || new Date(s.expires_at).getTime() <= Date.now()) throw Error("expired");
-      if (p.p_expected_hash === null ? !!b.pin_hash || s.purpose !== "setup" : b.pin_hash !== p.p_expected_hash || s.purpose !== "member") throw Error("invalid");
-      b.pin_hash = p.p_pin_hash; b.member_names = p.p_names; b.auth_version++; b.token = "revoked";
-      tables.access_sessions = [{ token_hash: p.p_new_session, board_id: b.id, purpose: "member", member_name: s.member_name, auth_version: b.auth_version, remember: p.p_remember, expires_at: p.p_expires }];
-      return { data: null, error: null };
-    }
     if (name === "dm_push_board_ids") {
       const open = new Set((tables.push_deliveries ?? []).filter((d) => d.state !== "sent").map((d) => d.event_id));
       return { data: [...new Set((tables.place_push_events ?? []).filter((e) => open.has(e.id)).map((e) => e.board_id))], error: null };
@@ -183,10 +196,10 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       const user = tables.app_users?.find((u) => u.id === p.p_user); if (user) user.last_board_id = b.id;
       return { data: { board_id: b.id, member_name: p.p_name, auth_version: b.auth_version }, error: null };
     }
-    if (name === "dm_reserve_attempt") return { data: 0, error: null };
-    if (name === "dm_clear_attempt") return { data: null, error: null };
     throw Error("unknown RPC");
   } catch (e) { for (const k of Object.keys(tables)) delete tables[k]; Object.assign(tables, snapshot); return { data: null, error: { message: e instanceof Error ? e.message : "error" } }; }
 }
 export const fakeDb = { from: (t: string) => new Q(t), rpc };
+/** 예전 형식 세션 픽스처를 미리 계정 세션으로 바꿉니다(테이블 전체를 비교하는 테스트가 비교 전에 부릅니다). */
+export function normalizeSessions() { legacyAccounts(); }
 export function reset() { seq = 0; failures.length = 0; for (const k of Object.keys(tables)) delete tables[k]; }

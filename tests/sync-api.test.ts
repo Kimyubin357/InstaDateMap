@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables, failNext } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 import { GET } from "@/app/api/places/route";
 import { GET as context } from "@/app/api/access/context/route";

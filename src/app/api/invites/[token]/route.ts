@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AccessError, accessError, accountFromRequest } from "@/lib/auth";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { isInviteToken } from "@/lib/folders";
 import { folderRpc, invitePreview, noStore, openFolder, requireAccount } from "@/lib/folders-server";
 export const runtime = "nodejs";

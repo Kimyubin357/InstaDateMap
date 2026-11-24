@@ -132,6 +132,6 @@ export default function PushSettings() {
       <Icon name="bell" /><span className="settings-copy"><span>우리 지도 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
     <span className="sr-only" role="status">{status}</span>
     {hint && !checking && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
-    {!checking && available && !subscribed && <p className="hint settings-hint">기기를 잠그거나 PIN을 바꾸면 알림도 멈춰요. 다시 입장한 뒤 여기에서 켜 주세요.</p>}
+    {!checking && available && !subscribed && <p className="hint settings-hint">로그아웃하면 이 기기의 알림도 멈춰요. 다시 로그인한 뒤 여기에서 켜 주세요.</p>}
   </div>;
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, failNext, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("@/lib/push-server", () => ({ schedulePlacePushes: vi.fn() }));
@@ -70,7 +70,7 @@ describe("장소 수정 결과 확인", () => {
     expect((await PATCH(request({ status: "visited" }, false), params())).status).toBe(401);
     expect((await PATCH(request({ status: "visited" }, true, "https://elsewhere.example"), params())).status).toBe(403);
     tables.access_sessions[0].member_name = null;
-    expect((await PATCH(request({ status: "visited" }), params())).status).toBe(409);
+    expect((await PATCH(request({ status: "visited" }), params())).status).toBe(401);
     expect(tables.places[0].status).toBe("wish");
   });
 });
@@ -96,7 +96,7 @@ describe("응답 유실 뒤 장소 최신 내용 확인", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("cache-control")).toBe("no-store");
     tables.access_sessions[0].member_name = null;
-    expect((await GET(readRequest(), params())).status).toBe(409);
+    expect((await GET(readRequest(), params())).status).toBe(401);
   });
 
   it("DB 조회 장애는 삭제로 판단하지 않음", async () => {

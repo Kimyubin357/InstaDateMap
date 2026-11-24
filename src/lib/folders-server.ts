@@ -1,9 +1,9 @@
 import { db } from "./db";
 import { AccessError, accountFromRequest, dbUserError, type Account } from "./auth";
 import { isInviteToken, isUuid, type FolderDetail, type FolderSummary, type InvitePreview } from "./folders";
-import { tokenHash } from "./pin";
+import { tokenHash } from "./token";
 
-/** 폴더 API는 카카오·구글 계정 세션만 씁니다. 기존 PIN 세션은 계정으로 옮긴 뒤 사용합니다. */
+/** 폴더 API는 카카오·구글 계정 세션만 씁니다. */
 export async function requireAccount(req: Request): Promise<Account> {
   const account = await accountFromRequest(req);
   if (!account) throw new AccessError("다시 로그인해 주세요.", 401);

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 import { POST, GET } from "@/app/api/collections/route";
 import { GET as snapshot } from "@/app/api/places/route";
@@ -14,7 +14,7 @@ it("requires authentication, same origin and a valid identity before any write",
  const rpc=vi.spyOn(fakeDb,"rpc");
  expect((await POST(req(undefined,"http://localhost",false))).status).toBe(401);
  expect((await POST(req(undefined,"https://foreign.example"))).status).toBe(403);
- tables.access_sessions[0].member_name="";expect((await POST(req())).status).toBe(409);expect(rpc).not.toHaveBeenCalled();
+ tables.access_sessions[0].member_name="";expect((await POST(req())).status).toBe(401);expect(rpc).not.toHaveBeenCalled();
 });
 it("rejects oversized and malformed selection, uses the authenticated board and maps conflicts",async()=>{
  const rpc=vi.spyOn(fakeDb,"rpc").mockResolvedValue({data:{code:"COLLECTION_CONFLICT"},error:null});

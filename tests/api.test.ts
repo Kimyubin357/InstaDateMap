@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, failNext, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("@/lib/instagram", async (orig) => ({ ...await orig<typeof import("@/lib/instagram")>(), fetchCaption: vi.fn(async () => ({ caption: "도나스데이 수원본점", method: "og", locationTag: "경기도 수원" })) }));
@@ -110,7 +110,7 @@ describe("직접 저장과 세션 저장자", () => {
     failNext("place_saves", "upsert"); const res = await saveDirect(request(body)); expect(res.status).toBe(500); expect(tables.places ?? []).toHaveLength(0);
   });
   it("이름을 선택하지 않은 기기는 저장할 수 없음", async () => {
-    tables.access_sessions[0].member_name = null; expect((await saveDirect(request(body))).status).toBe(409); expect(tables.places ?? []).toHaveLength(0);
+    tables.access_sessions[0].member_name = null; expect((await saveDirect(request(body))).status).toBe(401); expect(tables.places ?? []).toHaveLength(0);
   });
   it("진행 상태는 실제 처리 순서와 완료 결과를 스트리밍", async () => {
     const res = await POST(request({ url: "https://www.instagram.com/reel/Deo7JHEpCXN/", stream: true }));

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import webpush from "web-push";
 import { after } from "next/server";
 import { fakeDb, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("next/server", async (original) => ({ ...await original<typeof import("next/server")>(), after: vi.fn() }));
 import { GET, POST, DELETE } from "@/app/api/push/route";

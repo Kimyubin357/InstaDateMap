@@ -1,7 +1,7 @@
 import { withRequestDeadline } from "./client-request";
 import type { SyncAccess } from "./sync-types";
 
-/** A PIN rotation has already committed. Recovery only reads the current session. */
+/** Re-reads the current session (after a rename, folder switch or access-version change). */
 export function refreshAccess(signal?: AbortSignal): Promise<SyncAccess | null> {
   return withRequestDeadline(async (requestSignal) => {
     const response = await fetch("/api/access/context", { cache: "no-store", credentials: "same-origin", signal: requestSignal });

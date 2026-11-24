@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
 const rpc = vi.fn();
 vi.mock("@/lib/db", () => ({ db: () => ({ from: fakeDb.from, rpc }) }));
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { GET, PATCH, POST } from "@/app/api/terms/route";
 import { termsPending } from "@/lib/terms-server";
 import { TERMS, TERMS_ORDER, TERMS_VERSION } from "@/lib/terms";

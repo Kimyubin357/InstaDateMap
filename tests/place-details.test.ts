@@ -3,7 +3,7 @@ import { fakeDb, reset, tables } from "./fakeDb";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 import { apolloObjects, parseMenuPage, parsePlaceHome, parseSearch, pickCandidate, searchQuery, similarName } from "@/lib/naver-place";
 import { isFresh, placeDetails } from "@/lib/place-details";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { GET as detailsRoute } from "@/app/api/places/[id]/details/route";
 
 // 실제 네이버 모바일 페이지와 같은 구조를 줄인 표본입니다.

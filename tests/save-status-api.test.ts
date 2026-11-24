@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeDb, failNext, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { fakeDb, failNext, normalizeSessions, reset, tables } from "./fakeDb";
+import { tokenHash } from "@/lib/token";
 
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 import { GET } from "@/app/api/save-status/route";
@@ -27,11 +27,11 @@ describe("응답을 놓친 저장 결과 읽기", () => {
     const denied = await GET(req("kakao_place_id=123", false));
     expect(denied.status).toBe(401); expect(denied.headers.get("cache-control")).toBe("no-store");
     tables.access_sessions[0].member_name = null;
-    expect((await GET(req("kakao_place_id=123"))).status).toBe(409);
+    expect((await GET(req("kakao_place_id=123"))).status).toBe(401);
   });
   it("정규화한 링크의 완료 상태와 내 선택 연결을 읽으며 저장·알림 기록은 바꾸지 않음", async () => {
     seed(); tables.push_deliveries = []; tables.place_push_events = [];
-    const before = structuredClone(tables);
+    normalizeSessions(); const before = structuredClone(tables);
     const res = await GET(req(`url=${encodeURIComponent("공유 https://www.instagram.com/reel/ABC/?igsh=tracking")}`));
     expect(res.status).toBe(200); expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toMatchObject({ result: { status: "saved", source_id: sourceId, place_url: "/?place=p1", saved_place: { place: { id: "p1" } } },

@@ -1,9 +1,9 @@
 /**
  * 약관 문서(초안). 내용을 바꾸면 TERMS_VERSION을 올려 기존 사용자에게 다시 동의를 받습니다.
- * ⚠️ 공개 전: OPERATOR의 운영자 정보와 문의처를 채우고, 법률 검토를 받아야 합니다.
+ * ⚠️ 공개 전: 법률 검토를 받아야 합니다.
  */
 export const TERMS_VERSION = "2026-11-24";
-export const OPERATOR = { name: "(운영자 이름 입력 필요)", email: "(문의 이메일 입력 필요)" };
+export const OPERATOR = { name: "김유빈", email: "kimyubin357@gmail.com" };
 
 export type TermsKey = "service" | "privacy" | "location" | "marketing";
 export interface TermsDoc { key: TermsKey; title: string; required: boolean; sections: { heading: string; body: string[] }[] }

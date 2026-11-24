@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("@/lib/kakao", () => ({ keywordSearch: vi.fn(async () => [{ kakao_place_id: "manual", name: "서버가 찾은 식당", address: "실제 주소", lat: 37, lng: 127, category: "식당", kakao_url: "" }]), keywordSearchPage: vi.fn(async (_query: string, page: number) => ({ page, is_end: true, total_count: 9, places: [{ kakao_place_id: "page-two", name: "서버의 두 번째 페이지 식당", address: "진짜 주소", lat: 37, lng: 127, category: "식당", kakao_url: "" }] })) }));
 import { keywordSearch, keywordSearchPage } from "@/lib/kakao";
