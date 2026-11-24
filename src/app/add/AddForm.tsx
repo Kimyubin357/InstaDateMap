@@ -50,7 +50,7 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
     try {
       const data = await write.run(() => { retryAfter = Date.now() + 65000; return requestShare({ url: value.trim(), retry, stream: true, work_id: workId() }, setStage); }, () => verifySharedLink(value.trim(), retryAfter), () => setChecking(true)); complete(data);
     } catch (e) {
-      if (e instanceof RequestError && e.status === 401) { window.location.replace(`/enter?next=${encodeURIComponent(`/add?url=${encodeURIComponent(value)}`)}`); return; }
+      if (e instanceof RequestError && e.status === 401) { window.location.replace(`/login?next=${encodeURIComponent(`/add?url=${encodeURIComponent(value)}`)}`); return; }
       setResult({ status: "error", message: e instanceof TypeError ? "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요." : e instanceof Error ? e.message : "연결하지 못했어요. 다시 시도해 주세요." });
     } finally { setBusy(false); setChecking(false); }
   }

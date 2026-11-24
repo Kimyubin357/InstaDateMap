@@ -147,6 +147,44 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       tables.access_sessions = [{ token_hash: p.p_new_session, board_id: b.id, purpose: "member", member_name: s.member_name, auth_version: b.auth_version, remember: p.p_remember, expires_at: p.p_expires }];
       return { data: null, error: null };
     }
+    if (name === "dm_push_board_ids") {
+      const open = new Set((tables.push_deliveries ?? []).filter((d) => d.state !== "sent").map((d) => d.event_id));
+      return { data: [...new Set((tables.place_push_events ?? []).filter((e) => open.has(e.id)).map((e) => e.board_id))], error: null };
+    }
+    // 계정 로그인: 011_accounts.sql의 dm_login과 같은 규칙(실제 SQL은 accounts-sql 테스트에서 검증)
+    if (name === "dm_login") {
+      for (const t of ["app_users", "user_identities", "board_members", "boards"]) tables[t] ??= [];
+      const display = (String(p.p_name ?? "").trim().replace(/\s+/g, " ") || "나").slice(0, 20);
+      let identity = tables.user_identities.find((i) => i.provider === p.p_provider && i.subject === p.p_subject);
+      let created = false;
+      if (!identity) {
+        const user = { id: `u${++seq}`, display_name: display, avatar_url: p.p_avatar, last_board_id: null };
+        tables.app_users.push(user); identity = { provider: p.p_provider, subject: p.p_subject, user_id: user.id, email: p.p_email };
+        tables.user_identities.push(identity); created = true;
+      }
+      const user = tables.app_users.find((u) => u.id === identity!.user_id)!;
+      const mine = tables.board_members.filter((m) => m.user_id === user.id);
+      let member = mine.find((m) => m.board_id === user.last_board_id) ?? mine[0];
+      if (!member) {
+        const board = { id: `b${++seq}`, name: "내 장소", owner_id: user.id, is_personal: true, member_names: [user.display_name], auth_version: 0, pin_hash: null };
+        tables.boards.push(board); member = { board_id: board.id, user_id: user.id, role: "owner", member_name: user.display_name, joined_at: new Date().toISOString() };
+        tables.board_members.push(member);
+      }
+      user.last_board_id = member.board_id;
+      const board = tables.boards.find((b) => b.id === member!.board_id)!;
+      return { data: { user_id: user.id, board_id: board.id, member_name: member.member_name, auth_version: board.auth_version, created }, error: null };
+    }
+    if (name === "dm_link_member") {
+      tables.board_members ??= [];
+      const b = tables.boards.find((x) => x.id === p.p_board);
+      if (!b?.pin_hash) return { data: null, error: { message: "연결할 수 있는 지도가 아니에요.", code: "P0001" } as any };
+      if (!b.member_names.includes(p.p_name)) return { data: null, error: { message: "이 지도의 이름 중에서 골라 주세요.", code: "P0001" } as any };
+      const taken = tables.board_members.find((m) => m.board_id === b.id && m.member_name === p.p_name && m.user_id !== p.p_user);
+      if (taken) return { data: null, error: { message: "이 이름은 이미 다른 계정에 연결되어 있어요.", code: "P0001" } as any };
+      if (!tables.board_members.some((m) => m.board_id === b.id && m.user_id === p.p_user)) tables.board_members.push({ board_id: b.id, user_id: p.p_user, role: "member", member_name: p.p_name, joined_at: new Date().toISOString() });
+      const user = tables.app_users?.find((u) => u.id === p.p_user); if (user) user.last_board_id = b.id;
+      return { data: { board_id: b.id, member_name: p.p_name, auth_version: b.auth_version }, error: null };
+    }
     if (name === "dm_reserve_attempt") return { data: 0, error: null };
     if (name === "dm_clear_attempt") return { data: null, error: null };
     throw Error("unknown RPC");

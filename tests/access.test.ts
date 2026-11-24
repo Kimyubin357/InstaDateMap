@@ -33,7 +33,7 @@ describe("둘만의 PIN", () => {
   });
   it("설정 이후 예전 토큰 주소와 헤더로 입장할 수 없음", async () => {
     expect(await boardFromRequest(new Request("http://localhost/?t=old-token", { headers: { "x-board-token": "old-token" } }))).toBeNull();
-    const res = await bootstrap(req("bootstrap?t=old-token")); expect(res.headers.get("location")).toContain("/enter"); expect(res.headers.get("set-cookie")).toBeNull();
+    const res = await bootstrap(req("bootstrap?t=old-token")); expect(res.headers.get("location")).toContain("/login"); expect(res.headers.get("set-cookie")).toBeNull();
   });
   it("만료·다른 버전·설정 전용 세션을 거절", async () => {
     expect((await boardFromRequest(req("")))?.who).toBe("민지");

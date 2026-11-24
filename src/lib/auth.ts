@@ -4,7 +4,8 @@ import { AnalysisError } from "./analysis-issue";
 
 export const SESSION_COOKIE = "datemap_session";
 export const SETUP_COOKIE = "datemap_setup";
-export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[]; authVersion: number; expiresAt: string }
+/** userId가 있으면 계정 로그인 세션, 없으면 기존 PIN 세션입니다. */
+export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[]; authVersion: number; expiresAt: string; userId?: string }
 export function cookieValue(req: Request, name: string) {
   return req.headers.get("cookie")?.split(";").map((s) => s.trim()).find((s) => s.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
 }
@@ -40,18 +41,28 @@ export async function boardFromRequest(req: Request): Promise<Board | null> {
   const { data: board, error: boardError } = await db().from("boards").select("id, name, member_names, auth_version").eq("id", session.board_id).maybeSingle();
   if (boardError) { console.error("boardFromRequest: board query failed", boardError.code, boardError.message); throw new Error("지도에 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
   if (!board || board.auth_version !== session.auth_version) return null;
+  if (session.user_id) {
+    // 계정 세션은 폴더 멤버일 때만 열립니다. 이름은 멤버 기록의 이름을 사용합니다.
+    const { data: members, error: memberError } = await db().from("board_members").select("user_id, member_name, joined_at").eq("board_id", board.id).order("joined_at");
+    if (memberError) { console.error("boardFromRequest: member query failed", memberError.code, memberError.message); throw new Error("지도에 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
+    const me = members?.find((m) => m.user_id === session.user_id);
+    if (!me) return null;
+    const memberNames = [...new Set([...(board.member_names ?? []), ...(members ?? []).map((m) => m.member_name as string)])];
+    return { id: board.id, name: board.name, who: me.member_name, sessionHash: session.token_hash, remember: session.remember,
+      memberNames, authVersion: board.auth_version, expiresAt: session.expires_at, userId: session.user_id };
+  }
   return { id: board.id, name: board.name, who: board.member_names.includes(session.member_name) ? session.member_name : "",
     sessionHash: session.token_hash, remember: session.remember, memberNames: board.member_names, authVersion: board.auth_version, expiresAt: session.expires_at };
 }
 export function requireIdentity(board: Board) {
   if (!board.who) throw new AccessError("이 기기에서 사용할 이름을 먼저 골라 주세요.", 409);
 }
-export function unauthorized() { return Response.json({ status: "error", message: "PIN으로 우리 지도를 다시 열어 주세요." }, { status: 401 }); }
+export function unauthorized() { return Response.json({ status: "error", message: "다시 로그인해 주세요." }, { status: 401 }); }
 export function safeNext(value?: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   try {
     const url = new URL(value, "https://datemap.local");
-    if (!["/", "/add", "/settings", "/settings/trash", "/search"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname)) return "/";
+    if (!["/", "/add", "/settings", "/settings/trash", "/settings/link", "/search"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname)) return "/";
     for (const key of ["t", "who", "next"]) url.searchParams.delete(key);
     return url.pathname + url.search;
   } catch { return "/"; }
