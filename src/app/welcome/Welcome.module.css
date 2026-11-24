@@ -1,8 +1,0 @@
-.page { justify-content: center; }
-.hero { flex: 0 0 auto; margin-bottom: 24px; }
-.form { width: 100%; max-width: 440px; margin: 0 auto; }
-@media (orientation: landscape) and (max-height: 560px) {
-  .page { align-items: center; }
-  .hero { flex: 0 1 240px; margin: 0; }
-  .form { flex: 1 1 0; max-width: 560px; }
-}
