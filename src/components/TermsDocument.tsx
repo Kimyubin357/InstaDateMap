@@ -5,6 +5,6 @@ import styles from "./Terms.module.css";
 export default function TermsDocument({ doc, headingId }: { doc: TermsKey; headingId?: string }) {
   const t = TERMS[doc];
   return <article className={styles.document} aria-labelledby={headingId}>
-    {t.sections.map((s) => <section key={s.heading}><h3>{s.heading}</h3>{s.body.map((p, i) => <p key={i}>{p}</p>)}</section>)}
+    {t.sections.map((s, i) => <section key={i}>{s.heading && <h3>{s.heading}</h3>}{s.body.map((p, i) => <p key={i}>{p}</p>)}</section>)}
   </article>;
 }

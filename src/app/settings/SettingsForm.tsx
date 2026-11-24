@@ -10,6 +10,7 @@ import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
 import Avatar from "@/components/Avatar";
 import type { FoldersResponse } from "@/lib/folders";
+import { marketingResultNotice } from "@/lib/terms";
 
 /** 탈퇴하면 사라지는 것: 혼자 쓰는 폴더는 삭제, 함께 쓰는 폴더는 나가기(방장이면 다음 멤버에게 넘김) */
 function leaveSummary(data: FoldersResponse) {
@@ -47,7 +48,12 @@ export default function SettingsForm({ who }: { who: string }) {
   async function toggleMarketing() {
     if (marketing === null || marketingBusy) return;
     setMarketingBusy(true); setError("");
-    try { const r = await requestJson<{ marketing: boolean }>("/api/terms", { method: "PATCH", notifyBoardChange: false, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ marketing: !marketing }) }); setMarketing(r.marketing); }
+    try {
+      const r = await requestJson<{ marketing: boolean; updated_at?: string }>("/api/terms", { method: "PATCH", notifyBoardChange: false, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ marketing: !marketing }) });
+      setMarketing(r.marketing);
+      // 동의·철회 결과(전송자·처리 날짜·결과)를 바로 알립니다(정보통신망법 제50조 제7항).
+      sync.notify(marketingResultNotice(r.marketing, r.updated_at ? new Date(r.updated_at) : new Date()), "info");
+    }
     catch (e) { setError(e instanceof Error ? e.message : "수신 동의를 바꾸지 못했어요."); }
     finally { setMarketingBusy(false); }
   }
