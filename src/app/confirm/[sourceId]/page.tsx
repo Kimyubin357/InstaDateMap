@@ -1,12 +1,12 @@
 import { recoverSources } from "@/lib/source-work";
 import { db } from "@/lib/db";
-import { legacyRedirect, requirePageBoard } from "@/lib/access";
+import { requirePageBoard } from "@/lib/access";
 import type { KakaoPlace } from "@/lib/types";
 import ConfirmForm, { type ExtractionView } from "./ConfirmForm";
 export const dynamic = "force-dynamic";
 export default async function ConfirmPage({ params: route, searchParams: query }: { params: Promise<{ sourceId: string }>; searchParams: Promise<{ t?: string }> }) {
   const [params, searchParams] = await Promise.all([route, query]);
-  const next = `/confirm/${params.sourceId}`; legacyRedirect(searchParams.t, next);
+  const next = `/confirm/${params.sourceId}`;
   const board = await requirePageBoard(next);
   await recoverSources(board.id);
   const { data: source, error } = await db().from("sources").select("id, url, status, caption, shared_by, analysis_version, recovery_reason").eq("id", params.sourceId).eq("board_id", board.id).maybeSingle();

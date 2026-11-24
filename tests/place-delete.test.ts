@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, failNext, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 import { GET as listTrash } from "@/app/api/trash/route";
 import { POST as restore, DELETE as purge } from "@/app/api/trash/[id]/route";
@@ -36,7 +36,7 @@ describe("장소 삭제와 서버 확인", () => {
     expect((await DELETE(request(false), { params: Promise.resolve({ id: "p1" }) })).status).toBe(401);
     expect((await DELETE(request(true, "https://elsewhere.example"), { params: Promise.resolve({ id: "p1" }) })).status).toBe(403);
     tables.access_sessions[0].member_name = null;
-    expect((await DELETE(request(), { params: Promise.resolve({ id: "p1" }) })).status).toBe(409); expect(tables.places).toHaveLength(2);
+    expect((await DELETE(request(), { params: Promise.resolve({ id: "p1" }) })).status).toBe(401); expect(tables.places).toHaveLength(2);
   });
 });
 

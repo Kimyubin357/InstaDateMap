@@ -3,7 +3,7 @@ import { fakeDb, reset, tables } from "./fakeDb";
 // 이름 변경의 기록 갱신·사진 규칙은 profiles-sql 테스트가 실제 SQL로 검증합니다.
 const rpc = vi.fn();
 vi.mock("@/lib/db", () => ({ db: () => ({ from: fakeDb.from, rpc }) }));
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { isAvatarData, profileInput } from "@/lib/profile";
 import { GET, PATCH } from "@/app/api/profile/route";
 

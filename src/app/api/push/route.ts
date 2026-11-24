@@ -1,6 +1,6 @@
 import { boardFromRequest, requireIdentity, unauthorized, accessError, AccessError } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 import { parsePushSubscription, validPushEndpoint } from "@/lib/push-subscription";
 import { pushConfiguration, schedulePlacePushes } from "@/lib/push-server";
 export const runtime = "nodejs";

@@ -12,7 +12,6 @@
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "pin:reset": "node scripts/reset-pin.mjs",
     "push:keys": "node scripts/push-keys.mjs"
   },
   "dependencies": {

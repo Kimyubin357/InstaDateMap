@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { accessError } from "@/lib/auth";
-import { newToken, tokenHash } from "@/lib/pin";
+import { newToken, tokenHash } from "@/lib/token";
 import { folderId, folderRpc, noStore, requireAccount } from "@/lib/folders-server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

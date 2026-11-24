@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 const transport = vi.hoisted(() => {
   const channel = { on: vi.fn(), subscribe: vi.fn() };
   const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => {}), realtime: { disconnect: vi.fn() } };

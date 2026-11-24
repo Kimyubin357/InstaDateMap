@@ -2,42 +2,48 @@
 import ClientReady from "@/components/ClientReady";
 import { useEffect, useRef, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import PinInput from "@/components/PinInput";
 import Icon from "@/components/Icon";
-import { requestJson } from "@/lib/client-request";
+import { friendlyMessage, requestJson } from "@/lib/client-request";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
-import IdentityOption from "@/components/IdentityOption";
 import Avatar from "@/components/Avatar";
-export default function SettingsForm({ who, names, account = false, onPinChanged }: { who: string; names: string[]; account?: boolean; onPinChanged: (message: string) => void }) {
+import type { FoldersResponse } from "@/lib/folders";
+
+/** 탈퇴하면 사라지는 것: 혼자 쓰는 폴더는 삭제, 함께 쓰는 폴더는 나가기(방장이면 다음 멤버에게 넘김) */
+function leaveSummary(data: FoldersResponse) {
+  const solo = data.folders.filter((f) => f.member_count <= 1);
+  const shared = data.folders.filter((f) => f.member_count > 1);
+  const lines: string[] = [];
+  if (solo.length) lines.push(`혼자 쓰는 폴더 ${solo.length}개(${solo.map((f) => f.name).join(", ")})는 장소·메모와 함께 삭제돼요.`);
+  if (shared.length) lines.push(`함께 쓰는 폴더 ${shared.length}개(${shared.map((f) => f.name).join(", ")})에서는 나가요. 남긴 장소·메모는 그 폴더에 남아요.`);
+  return lines;
+}
+
+export default function SettingsForm({ who }: { who: string }) {
   const sync = useBoardSync();
   const folderName = useBoardState().snapshot?.board ?? "";
-  const [name, setName] = useState(who); const [currentPin, setCurrent] = useState(""); const [newPin, setNew] = useState(""); const [confirmPin, setConfirm] = useState("");
-  const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [locking, setLocking] = useState(false); const [choosing, setChoosing] = useState(false);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [locking, setLocking] = useState(false);
+  const [leaving, setLeaving] = useState<string[] | null>(null);
   const acting = useRef(false);
   const accessRetry = useRef<HTMLButtonElement>(null);
-  const identityToggle = useRef<HTMLButtonElement>(null);
-  useEffect(() => { setName(who); }, [who]);
   const [avatar, setAvatar] = useState<string | null>(null);
   useEffect(() => {
-    if (!account) return;
     let alive = true;
     requestJson<{ avatar: string | null }>("/api/profile", { cache: "no-store", notifyBoardChange: false })
       .then((p) => { if (alive) setAvatar(p.avatar); }).catch(() => {});
     return () => { alive = false; };
-  }, [account, who]);
-  // 광고성 정보 수신(선택 동의): 계정 세션에서만 켜고 끕니다.
+  }, [who]);
+  // 광고성 정보 수신(선택 동의)
   const [marketing, setMarketing] = useState<boolean | null>(null);
   const [marketingBusy, setMarketingBusy] = useState(false);
   useEffect(() => {
-    if (!account) return;
     let alive = true;
     requestJson<{ marketing: boolean }>("/api/terms", { cache: "no-store", notifyBoardChange: false }).then((t) => { if (alive) setMarketing(t.marketing); }).catch(() => {});
     return () => { alive = false; };
-  }, [account]);
+  }, []);
   async function toggleMarketing() {
     if (marketing === null || marketingBusy) return;
     setMarketingBusy(true); setError("");
@@ -48,53 +54,55 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
   useEffect(() => {
     if (sync.accessError) { accessRetry.current?.focus({ preventScroll: true }); accessRetry.current?.scrollIntoView({ block: "center" }); }
   }, [sync.accessError]);
-  async function action(path: string, body: unknown) {
-    if (acting.current) return null;
-    acting.current = true;
-    setBusy(true); setError("");
-    const rotates = path.endsWith("/pin") || path.endsWith("/lock");
+  /** 로그아웃·탈퇴: 서버 세션을 지운 뒤 이 기기의 지도 상태도 비우고 로그인 화면으로 갑니다. */
+  async function signOut(path: string, method: "POST" | "DELETE") {
+    if (acting.current) return;
+    acting.current = true; setBusy(true); setError("");
     const resumeOnFailure = !sync.store.isSuspended();
-    if (rotates) sync.suspend();
+    sync.suspend();
     try {
-      const data = await requestJson<{ next?: string; message?: string }>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (path.endsWith("/lock")) await sync.lock();
-      else if (path.endsWith("/pin")) {
-        // The write succeeded: discard the PINs before the separate, retryable context read.
-        setCurrent(""); setNew(""); setConfirm(""); setEditing(false);
-        await sync.resetAccess(); onPinChanged("PIN을 바꿨어요.");
-      }
-      else if (path.endsWith("/identity")) { const access = sync.store.getSnapshot().access; if (access) await sync.store.authorize({ ...access, who: (body as { name: string }).name }); }
-      return data;
-    }
-    catch (e) { if (rotates && resumeOnFailure) sync.resume(); setError(e instanceof Error ? e.message : "저장하지 못했어요."); return null; } finally { acting.current = false; setBusy(false); }
+      await requestJson(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      await sync.lock();
+    } catch (e) {
+      if (resumeOnFailure) sync.resume();
+      setError(friendlyMessage(e, method === "DELETE" ? "탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요." : "로그아웃하지 못했어요. 다시 시도해 주세요."));
+    } finally { acting.current = false; setBusy(false); }
+  }
+  async function openLeave() {
+    if (busy) return;
+    setError(""); setBusy(true);
+    try { setLeaving(leaveSummary(await requestJson<FoldersResponse>("/api/folders", { cache: "no-store", notifyBoardChange: false }))); }
+    catch (e) { setError(friendlyMessage(e, "탈퇴 정보를 불러오지 못했어요. 다시 시도해 주세요.")); }
+    finally { setBusy(false); }
   }
   return <main className="form-page settings-page"><ClientReady><PageHeader title="우리 설정" />
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
-    {account && <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">폴더</h2>
+    <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">폴더</h2>
       <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>폴더 바꾸기·관리</span><small>새 폴더 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
-    </section>}
+    </section>
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
-      {account ? <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></ShellLink>
-      : <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>}
-      {!account && choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); } }} />)}</div></div>}
+      <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{who}</span><Icon name="chevron" width="18" /></ShellLink>
       <PushSettings />
     </section>
-    {account ? <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
+    <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
-    </section> : <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>
-      <a className="settings-row settings-link" href={`/login?next=${encodeURIComponent("/settings/link")}`}><Icon name="user" /><span className="settings-copy"><span>카카오·구글 계정으로 옮기기</span><small>로그인한 뒤 이 지도를 계정에 연결해요</small></span><Icon name="chevron" width="18" /></a>
-      <button className="settings-row" disabled={busy || sync.suspended} onClick={() => setEditing(!editing)} aria-expanded={editing} aria-controls="pin-change-form"><Icon name="lock" /><span className="settings-copy"><span>둘만의 PIN 바꾸기</span><small>다른 기기는 새 PIN으로 다시 열어요</small></span><Icon name="chevron" width="18" /></button>
-      {editing && <form id="pin-change-form" className="stack settings-expand" aria-busy={busy} onSubmit={async (e) => { e.preventDefault(); const res = await action("/api/access/pin", { currentPin, newPin, confirmPin }); if (res) { setCurrent(""); setNew(""); setConfirm(""); setEditing(false); } }}><PinInput label="현재 PIN" value={currentPin} onChange={setCurrent} /><PinInput label="새 PIN" value={newPin} onChange={setNew} /><PinInput label="새 PIN 한 번 더" value={confirmPin} onChange={setConfirm} /><button className="btn primary" disabled={busy || sync.suspended || currentPin.length !== 6 || newPin.length !== 6 || newPin !== confirmPin}>{busy ? "바꾸는 중…" : "새 PIN으로 바꾸기"}</button></form>}
-      <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>이 기기 잠그기</span><small>다음에 열 때 PIN을 다시 입력해요</small></span><Icon name="chevron" width="18" /></button>
-    </section>}
+    </section>
     <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
-      {account && <button type="button" className="settings-row" role="switch" aria-checked={marketing === true} disabled={marketing === null || marketingBusy} onClick={() => { void toggleMarketing(); }}><Icon name="bell" /><span className="settings-copy"><span>광고성 정보 수신 (선택)</span><small>{marketing === null ? "동의 상태를 확인하고 있어요…" : marketing ? "새 기능·이벤트 소식을 받아요" : "받지 않아요. 서비스 알림은 그대로 와요"}</small></span><span className="settings-switch" aria-hidden="true" /></button>}
+      <button type="button" className="settings-row" role="switch" aria-checked={marketing === true} disabled={marketing === null || marketingBusy} onClick={() => { void toggleMarketing(); }}><Icon name="bell" /><span className="settings-copy"><span>광고성 정보 수신 (선택)</span><small>{marketing === null ? "동의 상태를 확인하고 있어요…" : marketing ? "새 기능·이벤트 소식을 받아요" : "받지 않아요. 서비스 알림은 그대로 와요"}</small></span><span className="settings-switch" aria-hidden="true" /></button>
       <a className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></a>
     </section>
     <section className="settings-group" aria-labelledby="settings-places"><h2 id="settings-places" className="settings-label">장소</h2>
       <ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span className="settings-copy"><span>삭제한 장소</span><small>복구하거나 영구 삭제해요</small></span><Icon name="chevron" width="18" /></ShellLink>
     </section>
-    {error && !locking && <p role="alert" className="error">{error}</p>}
-    {locking && <ActionDialog title={account ? "로그아웃할까요?" : "이 기기를 잠글까요?"} message={account ? "다음에 지도를 열 때 카카오·구글로 다시 로그인해요." : "다음에 지도를 열 때 PIN을 다시 입력해야 해요."} tone="info" cancelLabel="취소" confirmLabel={account ? "로그아웃" : "잠그기"} busy={busy} busyLabel={account ? "로그아웃하는 중…" : "잠그는 중…"} onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => action("/api/access/lock", {}).then(() => undefined)}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
+    <button type="button" className="text-btn settings-leave" disabled={busy} onClick={() => { void openLeave(); }}>회원 탈퇴</button>
+    {error && !locking && !leaving && <p role="alert" className="error">{error}</p>}
+    {locking && <ActionDialog title="로그아웃할까요?" message="다음에 지도를 열 때 카카오·구글로 다시 로그인해요." tone="info" cancelLabel="취소" confirmLabel="로그아웃" busy={busy} busyLabel="로그아웃하는 중…" onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => signOut("/api/access/lock", "POST")}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
+    {leaving && <ActionDialog title="정말 탈퇴할까요?" destructive cancelLabel="취소" confirmLabel="탈퇴하기" busy={busy} busyLabel="탈퇴하는 중…" onClose={() => { if (!busy) { setLeaving(null); setError(""); } }} onConfirm={() => signOut("/api/account", "DELETE")}>
+      <div className="settings-leave-detail">
+        {leaving.map((line) => <p key={line}>{line}</p>)}
+        <p>프로필·로그인 연결·알림 설정이 지워지고 되돌릴 수 없어요.</p>
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+    </ActionDialog>}
     </ClientReady></main>;
 }

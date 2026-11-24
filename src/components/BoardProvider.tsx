@@ -12,7 +12,6 @@ import useKeyboardViewport from "./useKeyboardViewport";
 import LoginScreen from "@/app/login/LoginScreen";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
-import LinkForm from "@/app/settings/link/LinkForm";
 import FoldersPanel from "@/app/folders/FoldersPanel";
 import ProfilePanel from "@/app/settings/profile/ProfilePanel";
 import TrashPlaces from "./TrashPlaces";
@@ -116,7 +115,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state.access, store]);
   useEffect(() => {
-    if (["/enter", "/login", "/setup"].includes(pathname)) {
+    if (["/enter", "/login"].includes(pathname)) {
       accessRequest.current?.abort(); accessRequest.current = null; accessFlight.current = null;
       setAccessError(""); setCheckingAccess(false); void store.forget();
     }
@@ -140,8 +139,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
       <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
-      {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} account={state.access.account === true} onPinChanged={notify} /></div>}
-      {pathname === "/settings/link" && <div className="shell-page" key="link"><LinkForm /></div>}
+      {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} /></div>}
       {pathname === "/folders" && <div className="shell-page" key="folders"><FoldersPanel /></div>}
       {pathname === "/settings/profile" && <div className="shell-page" key="profile"><ProfilePanel /></div>}
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}

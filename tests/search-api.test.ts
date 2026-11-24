@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
-import { tokenHash } from "@/lib/pin";
+import { tokenHash } from "@/lib/token";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
 vi.mock("@/lib/kakao", () => ({ keywordSearchPage: vi.fn(async (_query: string, page = 1) => ({ places: Array.from({ length: 8 }, (_, i) => ({ kakao_place_id: String(i), name: "식당" })), page, is_end: page >= 2, total_count: 12 })) }));
 import { keywordSearchPage } from "@/lib/kakao";
