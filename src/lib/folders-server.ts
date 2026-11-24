@@ -43,7 +43,7 @@ export async function folderDetail(account: Account, id: string): Promise<Folder
     members: (members ?? []).map((m) => ({ user_id: m.user_id, name: m.member_name, role: m.role, me: m.user_id === account.userId, avatar: m.avatar ?? null })) };
 }
 
-/** 이 기기를 그 폴더로 옮깁니다(세션·알림 구독). */
+/** 이 기기가 그 폴더를 열게 합니다(알림 구독은 폴더별이라 그대로, 017). */
 export async function openFolder(account: Account, id: string) {
   await folderRpc("dm_switch_folder", { p_user: account.userId, p_session: account.sessionHash, p_board: id }, "폴더를 열지 못했어요. 잠시 후 다시 시도해 주세요.");
 }

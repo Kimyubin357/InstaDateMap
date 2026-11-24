@@ -52,7 +52,7 @@ function DeletePlace({ place, onClose, onDeleted }: Props) {
   return <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel={pending ? "닫기" : "취소"} confirmLabel={pending ? "삭제 확인·재시도" : "삭제하기"} busy={busy} busyLabel="삭제 확인 중…" onClose={dismiss} onConfirm={remove}>
     <strong className="delete-dialog-name">{place.name}</strong>
     {place.address && <p className="delete-dialog-address">{place.address}</p>}
-    <p>두 사람의 지도에서 삭제돼요.<br />설정의 ‘삭제한 장소’에서 메모와 저장 기록까지 복구할 수 있어요.</p>
+    <p>이 폴더에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 메모와 원본 링크까지 되돌릴 수 있어요.</p>
     {error && <p className="error" role="alert">{error}</p>}
   </ActionDialog>;
 }

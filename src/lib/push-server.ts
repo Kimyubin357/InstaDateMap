@@ -9,11 +9,13 @@ export function pushConfiguration() {
   if (!publicKey || !privateKey || !subject) return null;
   try { webpush.setVapidDetails(subject, publicKey, privateKey); return { publicKey, privateKey, subject }; } catch { return null; }
 }
-interface Delivery { event_id: string; subscription_id: string; lease: string; endpoint: string; p256dh: string; auth: string; added_by: string; place_id: string; place_name: string; event_kind?: "place_added" | "memo_added" | "memo_updated" }
-export function placeNotification(job: Pick<Delivery, "event_id" | "added_by" | "place_id" | "place_name" | "event_kind">) {
+interface Delivery { event_id: string; subscription_id: string; lease: string; endpoint: string; p256dh: string; auth: string; added_by: string; place_id: string; place_name: string; event_kind?: "place_added" | "memo_added" | "memo_updated"; folder_id?: string; folder_name?: string }
+/** 폴더별 알림(017): 어느 폴더의 소식인지 제목에 붙이고, 누르면 그 폴더를 열어 장소로 갑니다. */
+export function placeNotification(job: Pick<Delivery, "event_id" | "added_by" | "place_id" | "place_name" | "event_kind" | "folder_id" | "folder_name">) {
   const action = job.event_kind === "memo_added" ? "메모를 남겼어요" : job.event_kind === "memo_updated" ? "메모를 바꿨어요" : "새 장소를 담았어요";
-  return { title: `${job.added_by}님이 ${action}`, body: job.place_name.slice(0, 160), tag: `place-${job.place_id}`,
-    url: `/?place=${encodeURIComponent(job.place_id)}`, icon: "/icons/canvas-heart-192.png" };
+  const folder = job.folder_name ? `[${job.folder_name.slice(0, 30)}] ` : "";
+  const url = `/?place=${encodeURIComponent(job.place_id)}${job.folder_id ? `&folder=${encodeURIComponent(job.folder_id)}` : ""}`;
+  return { title: `${folder}${job.added_by}님이 ${action}`, body: job.place_name.slice(0, 160), tag: `place-${job.place_id}`, url, icon: "/icons/canvas-heart-192.png" };
 }
 async function sendDelivery(job: Delivery, config: NonNullable<ReturnType<typeof pushConfiguration>>) {
   let success = false, permanent = !validPushEndpoint(job.endpoint), expired = false;

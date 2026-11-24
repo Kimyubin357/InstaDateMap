@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { friendlyMessage, requestJson, withRequestDeadline } from "@/lib/client-request";
 import { useBoardSync, useBoardState } from "./BoardProvider";
-type Config = { configured: boolean; publicKey?: string; subscribed: boolean };
+type FolderPush = { id: string; name: string; on: boolean };
+type Config = { configured: boolean; publicKey?: string; subscribed: boolean; folders?: FolderPush[] };
 function serverKey(value: string) {
   const raw = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
@@ -14,6 +15,7 @@ export default function PushSettings() {
   const [config, setConfig] = useState<Config>(); const [registration, setRegistration] = useState<ServiceWorkerRegistration>();
   const [subscribed, setSubscribed] = useState(false); const [busy, setBusy] = useState(false); const [checking, setChecking] = useState(true);
   const [hint, setHint] = useState("");
+  const [folders, setFolders] = useState<FolderPush[]>([]);
   const version = useRef(0), writing = useRef(false), queuedCheck = useRef(false), mounted = useRef(false);
   const recheck = useRef<() => void>(() => {}), cancelCheck = useRef<() => void>(() => {});
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -52,7 +54,7 @@ export default function PushSettings() {
         if (!alive || current !== version.current) return;
         setConfig(value);
         if (!value.configured) { setSubscribed(false); setRegistration(undefined); setHint("알림 기능을 준비 중이에요. 준비되면 여기에서 켤 수 있어요."); return; }
-        setRegistration(ready); setSubscribed(!!subscription && value.subscribed && Notification.permission === "granted");
+        setRegistration(ready); setFolders(value.folders ?? []); setSubscribed(!!subscription && value.subscribed && Notification.permission === "granted");
         if (Notification.permission === "denied") setHint("기기 설정에서 데이트맵 알림을 허용한 뒤 다시 확인해 주세요.");
       } catch (e) { if (alive && current === version.current) { setSubscribed(false); setHint(friendlyMessage(e, "알림 설정을 확인하지 못했어요. 다시 확인해 주세요.")); } }
       finally {
@@ -103,8 +105,10 @@ export default function PushSettings() {
       }
       if (!subscription) { subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: serverKey(config.publicKey) }); created = subscription; }
       if (current !== version.current) { await created?.unsubscribe().catch(() => {}); return; }
-      await requestJson("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(subscription.toJSON()), signal: AbortSignal.timeout(12000) });
+      // 처음 켤 때는 참여한 모든 폴더의 알림을 켭니다. 아래에서 폴더별로 끌 수 있어요.
+      const saved = await requestJson<{ folders?: FolderPush[] }>("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: subscription.toJSON() }), signal: AbortSignal.timeout(12000) });
       if (current !== version.current) return;
+      setFolders(saved.folders ?? []);
       const granted = Notification.permission === "granted";
       setSubscribed(granted); setHint(granted ? "" : "기기 설정에서 데이트맵 알림을 허용한 뒤 다시 확인해 주세요.");
     } catch (e) { await created?.unsubscribe().catch(() => {}); if (current === version.current) notify(e instanceof DOMException && e.name === "NotAllowedError" ? "기기 설정에서 데이트맵 알림을 허용해 주세요." : friendlyMessage(e, "알림을 켜지 못했어요. 다시 시도해 주세요."), "error"); }
@@ -125,11 +129,32 @@ export default function PushSettings() {
     } catch (e) { if (current === version.current) notify(friendlyMessage(e, "알림을 끄지 못했어요. 다시 시도해 주세요."), "error"); }
     finally { endChange(); }
   }
+  /** 폴더 하나의 알림을 켜고 끕니다(이 기기 기준). */
+  async function toggleFolder(id: string) {
+    if (writing.current || suspended || !registration) return;
+    const next = folders.map((f) => f.id === id ? { ...f, on: !f.on } : f);
+    const current = beginChange();
+    try {
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) { setSubscribed(false); return; }
+      const saved = await requestJson<{ subscribed: boolean; folders?: FolderPush[] }>("/api/push", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: subscription.toJSON(), folders: next.filter((f) => f.on).map((f) => f.id) }), signal: AbortSignal.timeout(12000) });
+      if (current !== version.current) return;
+      setFolders(saved.folders ?? next);
+      if (!saved.subscribed) { await subscription.unsubscribe().catch(() => {}); setSubscribed(false); }
+    } catch (e) { if (current === version.current) notify(friendlyMessage(e, "알림 설정을 바꾸지 못했어요. 다시 시도해 주세요."), "error"); }
+    finally { endChange(); }
+  }
   const available = !!registration && !!config?.configured;
-  const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? "이 기기에서 알림을 받고 있어요." : "상대방이 장소를 담거나 메모를 바꾸면 알려드려요.");
+  const onCount = folders.filter((f) => f.on).length;
+  const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? (folders.length > 1 ? `폴더 ${onCount}곳의 알림을 이 기기에서 받고 있어요.` : "이 기기에서 알림을 받고 있어요.") : "멤버가 장소를 담거나 메모를 바꾸면 알려드려요.");
   return <div className="push-settings" aria-busy={busy || checking}>
-    <button type="button" className="settings-row" role="switch" aria-label="우리 지도 알림" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
-      <Icon name="bell" /><span className="settings-copy"><span>우리 지도 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
+    <button type="button" className="settings-row" role="switch" aria-label="새 장소·메모 알림" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
+      <Icon name="bell" /><span className="settings-copy"><span>새 장소·메모 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
+    {subscribed && !checking && folders.length > 1 && <div className="push-folders" role="group" aria-label="폴더별 알림">
+      {folders.map((f) => <button key={f.id} type="button" className="settings-row push-folder-row" role="switch" aria-checked={f.on} disabled={busy || suspended} onClick={() => void toggleFolder(f.id)}>
+        <Icon name="map" width={18} /><span className="settings-copy"><span>{f.name}</span></span><span className="settings-switch" aria-hidden="true" /></button>)}
+    </div>}
     <span className="sr-only" role="status">{status}</span>
     {hint && !checking && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
     {!checking && available && !subscribed && <p className="hint settings-hint">로그아웃하면 이 기기의 알림도 멈춰요. 다시 로그인한 뒤 여기에서 켜 주세요.</p>}

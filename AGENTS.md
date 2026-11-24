@@ -54,6 +54,7 @@
 - 진행 기록: 2026-11-24 회원 탈퇴(설정 맨 아래, `DELETE /api/account`)를 추가하고, 두 계정 모두 기존 지도에 연결된 것을 확인한 뒤 **PIN 입장 방식을 모두 지웠습니다**(API·화면·스크립트, `016_account_delete_pin_cleanup.sql`). 약관 운영자 정보(김유빈·kimyubin357@gmail.com)를 넣었습니다. **016을 운영 DB에 적용해야 탈퇴가 동작합니다.** 세부는 [계획 문서](docs/launch-plan.md)를 봅니다.
 - 진행 기록: 2026-11-24 약관 4종을 법령 기준으로 보완한 2판(`TERMS_VERSION` 2026-11-24.2)을 적용했습니다. 점검은 [약관 점검](docs/terms-review.md)에 있습니다. **광고·유료·리워드·사진 공개 기능을 만들 때는 [나중에 약관에 넣을 항목](docs/terms-future.md)을 먼저 확인하세요.**
 - 진행 기록: 2026-11-24 사용자 결정으로 Supabase(시드니)·Vercel 함수(미국 동부)를 서울로 옮깁니다. `vercel.json` icn1, [이전 절차](docs/supabase-seoul-move.md), `scripts/move-supabase.sh`(사용자 터미널에서 실행, 접속 주소는 숨김 입력). **2026-11-24 이전 완료**(행 수 일치, 함수 `icn1::icn1`, 운영 앱이 새 DB 사용 확인). 남은 일은 [이전 절차](docs/supabase-seoul-move.md) 맨 위 기록을 봅니다.
+- 진행 기록: 2026-11-25 폴더 사이 담기(옮기기 없음), 처음 등록한 사람만 삭제·나만 보는 삭제 기록, 저장 화면의 "저장할 폴더", 폴더별 알림을 추가했습니다(`017_folder_transfer_push.sql`, **머지 전 운영 DB 적용 필요**). 사용자 결정과 세부는 [계획 문서](docs/launch-plan.md)에 있습니다. 지도 홈 폴더 바꾸기는 디자인 승인 대기입니다.
 
 ## UI 작업 전 필수 기준
 
