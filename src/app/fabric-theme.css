@@ -333,3 +333,9 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
   .settings-page .settings-hint.hint{margin:8px 16px 4px;font-size:13px}
   .settings-page .settings-recheck{margin-left:16px;font-size:15px}
 }
+
+/* 계정 로그인: 고정된 내 이름 행, 기존 지도 연결 화면 */
+.settings-page .settings-static{cursor:default}
+.link-page .lead{font-size:17px;color:var(--ink-soft)}
+.link-names{border:0;margin:0;padding:0;min-width:0}
+.link-names>legend{font-size:18px;margin-bottom:12px;padding:0}

@@ -15,11 +15,10 @@ export async function POST(req: Request) {
   }
   try {
     if (!pushConfiguration()) throw new Error("Push configuration unavailable");
-    // This application is a dedicated couple board, as with PIN entry.
-    const query = db().from("boards").select("id");
-    const { data, error } = process.env.APP_BOARD_ID ? await query.eq("id", process.env.APP_BOARD_ID) : await query.limit(2);
-    if (error || data?.length !== 1) throw new Error("Configure APP_BOARD_ID for the scheduled board");
-    await deliverPlacePushes(data[0].id);
+    // Account folders: retry every folder that still has unsent notifications.
+    const { data, error } = await db().rpc("dm_push_board_ids");
+    if (error || !Array.isArray(data)) throw new Error("Push board lookup failed");
+    for (const boardId of data as string[]) await deliverPlacePushes(boardId);
     return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     console.error("예약 알림 재시도 실패: 서버 설정과 DB 연결을 확인해 주세요.");

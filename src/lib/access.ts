@@ -6,8 +6,9 @@ import { AccessError, boardFromRequest, cookieValue, safeNext, SESSION_COOKIE, S
 import { newToken, tokenHash } from "./pin";
 
 export const sessionExpiry = (remember: boolean) => new Date(Date.now() + (remember ? 90 * 86400 : 12 * 3600) * 1000).toISOString();
+/** 계정 로그인 이전의 PIN 보드. 계정 폴더(내 장소 등)는 PIN이 없어 제외됩니다. */
 export async function defaultBoard() {
-  let query = db().from("boards").select("id, name, pin_hash, member_names, auth_version");
+  let query = db().from("boards").select("id, name, pin_hash, member_names, auth_version").not("pin_hash", "is", null);
   if (process.env.APP_BOARD_ID) query = query.eq("id", process.env.APP_BOARD_ID);
   const { data, error } = await query.order("created_at").limit(2);
   if (error) { console.error("defaultBoard: board query failed", error.code, error.message); throw new Error("지도 정보를 읽지 못했어요. 잠시 후 다시 시도해 주세요."); }
@@ -25,10 +26,11 @@ export async function setupSession(req: Request) {
   if (!data || data.purpose !== "setup" || new Date(data.expires_at).getTime() <= Date.now()) throw new AccessError("설정 시간이 만료됐어요. 처음 받은 주소로 다시 열어 주세요.", 401);
   return data;
 }
-export async function createSession(boardId: string, version: number, remember: boolean, purpose = "member") {
+export async function createSession(boardId: string, version: number, remember: boolean, purpose = "member", account?: { userId: string; memberName: string }) {
   const token = newToken();
   const { error } = await db().from("access_sessions").insert({ token_hash: tokenHash(token), board_id: boardId, purpose,
-    auth_version: version, remember, expires_at: purpose === "setup" ? new Date(Date.now() + 600000).toISOString() : sessionExpiry(remember) });
+    auth_version: version, remember, expires_at: purpose === "setup" ? new Date(Date.now() + 600000).toISOString() : sessionExpiry(remember),
+    ...(account ? { user_id: account.userId, member_name: account.memberName } : {}) });
   if (error) throw new Error("이 기기에 입장 상태를 저장하지 못했어요.");
   return token;
 }
@@ -42,7 +44,7 @@ export async function pageRequest() {
 }
 export async function requirePageBoard(next = "/", identity = true) {
   const board = await boardFromRequest(await pageRequest());
-  if (!board) redirect(`/enter?next=${encodeURIComponent(safeNext(next))}`);
+  if (!board) redirect(`/login?next=${encodeURIComponent(safeNext(next))}`);
   if (identity && !board.who) redirect(`/choose?next=${encodeURIComponent(safeNext(next))}`);
   return board;
 }

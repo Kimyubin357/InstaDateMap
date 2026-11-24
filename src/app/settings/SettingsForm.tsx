@@ -10,7 +10,7 @@ import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
 import IdentityOption from "@/components/IdentityOption";
-export default function SettingsForm({ who, names, onPinChanged }: { who: string; names: string[]; onPinChanged: (message: string) => void }) {
+export default function SettingsForm({ who, names, account = false, onPinChanged }: { who: string; names: string[]; account?: boolean; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
   const [name, setName] = useState(who); const [currentPin, setCurrent] = useState(""); const [newPin, setNew] = useState(""); const [confirmPin, setConfirm] = useState("");
   const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -19,6 +19,16 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
   const accessRetry = useRef<HTMLButtonElement>(null);
   const identityToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { setName(who); }, [who]);
+  // 계정 세션: 연결할 수 있는 기존 PIN 지도가 있을 때만 "기존 지도 연결"을 보여줍니다.
+  const [linkable, setLinkable] = useState(false);
+  useEffect(() => {
+    if (!account) return;
+    let alive = true;
+    requestJson<{ available: boolean; linked: string | null; names: string[] }>("/api/auth/link", { cache: "no-store", notifyBoardChange: false })
+      .then((data) => { if (alive) setLinkable(data.available && (data.linked !== null || data.names.length > 0)); })
+      .catch(() => { if (alive) setLinkable(false); });
+    return () => { alive = false; };
+  }, [account]);
   useEffect(() => {
     if (sync.accessError) { accessRetry.current?.focus({ preventScroll: true }); accessRetry.current?.scrollIntoView({ block: "center" }); }
   }, [sync.accessError]);
@@ -45,19 +55,24 @@ export default function SettingsForm({ who, names, onPinChanged }: { who: string
   return <main className="form-page settings-page"><ClientReady><PageHeader title="우리 설정" />
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
-      <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>
-      {choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); } }} />)}</div></div>}
+      {account ? <div className="settings-row settings-static"><Icon name="user" /><span className="settings-copy"><span>내 이름</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span></div>
+      : <button ref={identityToggle} className="settings-row" disabled={busy || sync.suspended} onClick={() => setChoosing(!choosing)} aria-expanded={choosing} aria-controls="settings-identity"><Icon name="user" /><span className="settings-copy"><span>쓰는 사람</span><small>장소를 저장할 때 이 이름으로 남겨요</small></span><span className="settings-value">{name}</span><Icon name="chevron" width="18" /></button>}
+      {!account && choosing && <div id="settings-identity" className="settings-expand"><div className="identity-options settings-identity-options" role="group" aria-label="이 기기를 쓰는 사람">{names.map((n) => <IdentityOption key={n} name={n} selected={name === n} disabled={busy || sync.suspended} onChoose={async () => { const res = await action("/api/access/identity", { name: n }); if (res) { setName(n); setChoosing(false); identityToggle.current?.focus({ preventScroll: true }); } }} />)}</div></div>}
       <PushSettings />
     </section>
-    <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>
+    {account ? <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
+      {linkable && <ShellLink className="settings-row settings-link" href="/settings/link"><Icon name="map" /><span className="settings-copy"><span>기존 지도 연결</span><small>둘만의 PIN으로 쓰던 지도를 이 계정에서 열어요</small></span><Icon name="chevron" width="18" /></ShellLink>}
+      <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
+    </section> : <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>
+      <a className="settings-row settings-link" href={`/login?next=${encodeURIComponent("/settings/link")}`}><Icon name="user" /><span className="settings-copy"><span>카카오·구글 계정으로 옮기기</span><small>로그인한 뒤 이 지도를 계정에 연결해요</small></span><Icon name="chevron" width="18" /></a>
       <button className="settings-row" disabled={busy || sync.suspended} onClick={() => setEditing(!editing)} aria-expanded={editing} aria-controls="pin-change-form"><Icon name="lock" /><span className="settings-copy"><span>둘만의 PIN 바꾸기</span><small>다른 기기는 새 PIN으로 다시 열어요</small></span><Icon name="chevron" width="18" /></button>
       {editing && <form id="pin-change-form" className="stack settings-expand" aria-busy={busy} onSubmit={async (e) => { e.preventDefault(); const res = await action("/api/access/pin", { currentPin, newPin, confirmPin }); if (res) { setCurrent(""); setNew(""); setConfirm(""); setEditing(false); } }}><PinInput label="현재 PIN" value={currentPin} onChange={setCurrent} /><PinInput label="새 PIN" value={newPin} onChange={setNew} /><PinInput label="새 PIN 한 번 더" value={confirmPin} onChange={setConfirm} /><button className="btn primary" disabled={busy || sync.suspended || currentPin.length !== 6 || newPin.length !== 6 || newPin !== confirmPin}>{busy ? "바꾸는 중…" : "새 PIN으로 바꾸기"}</button></form>}
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>이 기기 잠그기</span><small>다음에 열 때 PIN을 다시 입력해요</small></span><Icon name="chevron" width="18" /></button>
-    </section>
+    </section>}
     <section className="settings-group" aria-labelledby="settings-places"><h2 id="settings-places" className="settings-label">장소</h2>
       <ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span className="settings-copy"><span>삭제한 장소</span><small>복구하거나 영구 삭제해요</small></span><Icon name="chevron" width="18" /></ShellLink>
     </section>
     {error && !locking && <p role="alert" className="error">{error}</p>}
-    {locking && <ActionDialog title="이 기기를 잠글까요?" message="다음에 지도를 열 때 PIN을 다시 입력해야 해요." tone="info" cancelLabel="취소" confirmLabel="잠그기" busy={busy} busyLabel="잠그는 중…" onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => action("/api/access/lock", {}).then(() => undefined)}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
+    {locking && <ActionDialog title={account ? "로그아웃할까요?" : "이 기기를 잠글까요?"} message={account ? "다음에 지도를 열 때 카카오·구글로 다시 로그인해요." : "다음에 지도를 열 때 PIN을 다시 입력해야 해요."} tone="info" cancelLabel="취소" confirmLabel={account ? "로그아웃" : "잠그기"} busy={busy} busyLabel={account ? "로그아웃하는 중…" : "잠그는 중…"} onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => action("/api/access/lock", {}).then(() => undefined)}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
     </ClientReady></main>;
 }

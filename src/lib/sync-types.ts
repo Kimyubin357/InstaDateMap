@@ -1,6 +1,7 @@
 import { isCollection, type CollectionView } from "./collections";
 import type { PlaceView } from "./place-view";
-export interface SyncAccess { boardId: string; authVersion: number; who: string; memberNames: string[]; kakaoKey: string; expiresAt: string }
+/** account: 카카오·구글 계정 세션(이름이 고정됨). 기존 PIN 세션은 false입니다. */
+export interface SyncAccess { boardId: string; authVersion: number; who: string; memberNames: string[]; kakaoKey: string; expiresAt: string; account?: boolean }
 export interface PendingSource { id: string; url: string; status: string; shared_by: string; shared_at?: string; place_names?: string[]; analysis_version?: string; recovery_reason?: string | null }
 export interface BoardSnapshot { boardId: string; authVersion: number; revision: string; board: string; places: PlaceView[]; pending: PendingSource[]; collections?: CollectionView[] }
 export const cacheScope = (access: Pick<SyncAccess, "boardId" | "authVersion">) => `${access.boardId}:${access.authVersion}`;

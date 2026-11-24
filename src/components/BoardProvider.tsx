@@ -9,9 +9,10 @@ import { refreshAccess } from "@/lib/access-refresh";
 import MapApp from "@/app/MapApp";
 import SearchApp from "./SearchApp";
 import useKeyboardViewport from "./useKeyboardViewport";
-import EnterForm from "@/app/enter/EnterForm";
+import LoginScreen from "@/app/login/LoginScreen";
 import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
+import LinkForm from "@/app/settings/link/LinkForm";
 import TrashPlaces from "./TrashPlaces";
 import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
@@ -37,7 +38,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   const accessFlight = useRef<Promise<boolean> | null>(null);
   useEffect(() => () => { accessRequest.current?.abort(); }, []);
   useEffect(() => {
-    if (pathname === "/enter") { setLockScreen(null); locking.current = false; setSuspended(false); }
+    if (pathname === "/enter" || pathname === "/login") { setLockScreen(null); locking.current = false; setSuspended(false); }
   }, [pathname]);
   const viewport = useKeyboardViewport();
   const onMap = pathname === "/" || pathname === "/search";
@@ -67,13 +68,13 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     locking.current = true;
     accessRequest.current?.abort(); accessRequest.current = null; accessFlight.current = null;
     setAccessError(""); setCheckingAccess(false);
-    const next = window.location.pathname === "/enter" ? "/" : window.location.pathname + window.location.search;
+    const next = ["/enter", "/login"].includes(window.location.pathname) ? "/" : window.location.pathname + window.location.search;
     // Cover the old route before clearing access, so its MapEntry cannot flash during navigation.
     setLockScreen(next); setNotice(null); setToast(null); suspend();
     const forgotten = store.forget();
     try { sessionStorage.removeItem("datemap-view"); } catch {}
     if (broadcast) announceAccess("locked");
-    router.replace(`/enter?next=${encodeURIComponent(next)}`);
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
     await forgotten;
   };
   const resetAccess = (broadcast = true): Promise<boolean> => {
@@ -113,7 +114,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state.access, store]);
   useEffect(() => {
-    if (["/enter", "/setup"].includes(pathname)) {
+    if (["/enter", "/login", "/setup"].includes(pathname)) {
       accessRequest.current?.abort(); accessRequest.current = null; accessFlight.current = null;
       setAccessError(""); setCheckingAccess(false); void store.forget();
     }
@@ -124,7 +125,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     const receive = (event: { type?: AccessMessage; nonce?: number; sender?: string }) => {
       if (event?.sender === accessSender || typeof event?.nonce !== "number" || seen.has(event.nonce)) return;
       seen.add(event.nonce); if (seen.size > 20) seen.delete(seen.values().next().value!);
-      if (event.type === "locked") { if (window.location.pathname !== "/enter") void lock(false); } else if (event.type === "changed") void resetAccess(false);
+      if (event.type === "locked") { if (!["/enter", "/login"].includes(window.location.pathname)) void lock(false); } else if (event.type === "changed") void resetAccess(false);
     };
     let channel: BroadcastChannel | undefined;
     try { channel = new BroadcastChannel("datemap-access"); channel.onmessage = (e) => receive(e.data); } catch {}
@@ -133,11 +134,12 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
   }, [store]);
   return <Context.Provider value={{ store, homeHref, suspended, accessError, checkingAccess, suspend, resume, resetAccess, lock, notify }}>
-    {lockScreen !== null ? <EnterForm configured next={lockScreen} disabled /> : <>
+    {lockScreen !== null ? <LoginScreen next={lockScreen} disabled /> : <>
     {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
       <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>
       {pathname === "/add" && <div className="shell-page" key="add"><AddPanel /></div>}
-      {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} onPinChanged={notify} /></div>}
+      {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} names={state.access.memberNames} account={state.access.account === true} onPinChanged={notify} /></div>}
+      {pathname === "/settings/link" && <div className="shell-page" key="link"><LinkForm /></div>}
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       {accessError && pathname !== "/settings" && <ActionDialog title="입장 정보를 다시 확인해 주세요" message={accessError} tone="error" confirmLabel="입장 정보 다시 확인" onClose={() => { void resetAccess(false); }} />}
