@@ -9,6 +9,7 @@ import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite, UnconfirmedWriteError } from "@/lib/verified-write";
 import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave } from "@/lib/save-recovery";
 import MapCanvas from "./MapCanvas";
+import PlaceExtras from "./PlaceExtras";
 import ActionDialog from "./ActionDialog";
 import { useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
@@ -138,6 +139,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     {statusPending && <button className="text-btn" disabled={busy} onClick={retryStatus}>상태 저장 확인·재시도</button>}
     {activity && <p className="notice" role="status">{activity}</p>}
     {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
+    <PlaceExtras placeId={place.id} />
     <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "둘만의 메모"}</label><textarea id="place-memo" className="memo" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="다음에 같이 가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
     {savedEarlierMemo && memoDirty && <p id="memo-unsaved-hint" className="hint" role="status">새로 쓴 내용은 아직 저장되지 않았어요.</p>}
     <div className="place-source-actions">

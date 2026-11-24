@@ -31,13 +31,26 @@ export function accessError(e: unknown) {
   return Response.json({ status: "error", message: publicMessage(e) },
     { status: e instanceof AccessError ? e.status : 500, headers: { "Cache-Control": "no-store", ...(e instanceof AccessError && e.retryAfter ? { "Retry-After": String(e.retryAfter) } : {}) } });
 }
-export async function boardFromRequest(req: Request): Promise<Board | null> {
+/** 만료되지 않은 입장 세션 한 줄(계정·PIN 공통). 폴더가 없는 계정 세션은 board_id가 null입니다. */
+async function sessionFromRequest(req: Request) {
   checkOrigin(req);
   const token = cookieValue(req, SESSION_COOKIE);
   if (!/^[0-9a-f]{64}$/.test(token)) return null;
   const { data: session, error } = await db().from("access_sessions").select("*").eq("token_hash", tokenHash(token)).maybeSingle();
   if (error) { console.error("boardFromRequest: session query failed", error.code, error.message); throw new Error("입장 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요."); }
   if (!session || session.purpose !== "member" || new Date(session.expires_at).getTime() <= Date.now()) return null;
+  return session;
+}
+export interface Account { userId: string; sessionHash: string; boardId: string | null; remember: boolean; expiresAt: string }
+/** 카카오·구글 로그인 세션. 폴더가 0개여도 로그인 상태입니다. */
+export async function accountFromRequest(req: Request): Promise<Account | null> {
+  const session = await sessionFromRequest(req);
+  if (!session?.user_id) return null;
+  return { userId: session.user_id, sessionHash: session.token_hash, boardId: session.board_id ?? null, remember: session.remember, expiresAt: session.expires_at };
+}
+export async function boardFromRequest(req: Request): Promise<Board | null> {
+  const session = await sessionFromRequest(req);
+  if (!session?.board_id) return null;
   const { data: board, error: boardError } = await db().from("boards").select("id, name, member_names, auth_version").eq("id", session.board_id).maybeSingle();
   if (boardError) { console.error("boardFromRequest: board query failed", boardError.code, boardError.message); throw new Error("지도에 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
   if (!board || board.auth_version !== session.auth_version) return null;
@@ -62,7 +75,7 @@ export function safeNext(value?: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   try {
     const url = new URL(value, "https://datemap.local");
-    if (!["/", "/add", "/settings", "/settings/trash", "/settings/link", "/search"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname)) return "/";
+    if (!["/", "/add", "/settings", "/settings/trash", "/settings/link", "/search", "/folders"].includes(url.pathname) && !/^\/confirm\/[a-f0-9-]+$/.test(url.pathname) && !/^\/invite\/[0-9a-f]{64}$/.test(url.pathname)) return "/";
     for (const key of ["t", "who", "next"]) url.searchParams.delete(key);
     return url.pathname + url.search;
   } catch { return "/"; }

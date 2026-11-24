@@ -1,0 +1,21 @@
+.cover {
+  --folder-red: var(--accent);
+  --folder-forest: var(--forest);
+  --folder-gold: #8b692d;
+  --folder-blue: #466b79;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  background: var(--folder-color) var(--grain);
+  color: var(--cream);
+  box-shadow: var(--print-shadow);
+}
+.title { white-space: pre-line; overflow-wrap: anywhere; }
+.hint { margin: 0 0 2px; text-align: center; color: var(--ink-soft); font-size: 16px; }
+.join { width: 100%; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .cover { width: 76px; height: 76px; border-radius: 20px; margin-bottom: 12px; }
+}
