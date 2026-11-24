@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import TermsDocument from "@/components/TermsDocument";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import { TERMS, TERMS_ORDER, type TermsKey } from "@/lib/terms";
+import { marketingResultNotice, TERMS, TERMS_ORDER, type TermsKey } from "@/lib/terms";
 import styles from "@/components/Terms.module.css";
 
 /** 레퍼런스 구성: 안내 → 전체 동의 상자 → 필수 3개·선택 1개 → 동의하고 시작하기. ›를 누르면 본문을 전체 화면으로 봅니다. */
@@ -12,6 +12,7 @@ export default function ConsentScreen({ next }: { next: string }) {
   const [reading, setReading] = useState<TermsKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const reader = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
   const all = TERMS_ORDER.every((k) => checked[k]);
@@ -21,7 +22,12 @@ export default function ConsentScreen({ next }: { next: string }) {
   async function submit() {
     if (!required || busy) return;
     setBusy(true); setError("");
-    try { await requestJson("/api/terms", { method: "POST", notifyBoardChange: false, headers: { "Content-Type": "application/json" }, body: JSON.stringify(checked) }); window.location.assign(next); }
+    try {
+      await requestJson("/api/terms", { method: "POST", notifyBoardChange: false, headers: { "Content-Type": "application/json" }, body: JSON.stringify(checked) });
+      // 광고성 정보 수신에 동의했으면 처리 결과(전송자·날짜·결과)를 보여 준 뒤 이동합니다(정보통신망법 제50조 제7항).
+      if (checked.marketing) { setNotice(marketingResultNotice(true)); await new Promise((r) => setTimeout(r, 1800)); }
+      window.location.assign(next);
+    }
     catch (e) { setError(friendlyMessage(e, "동의를 저장하지 못했어요. 다시 시도해 주세요.")); setBusy(false); }
   }
   async function leave() {
@@ -42,6 +48,7 @@ export default function ConsentScreen({ next }: { next: string }) {
           </div>)}
         </div>
         {error && <p className="error" role="alert">{error}</p>}
+        {notice && <p className="hint" role="status">{notice}</p>}
         <button type="button" className={`btn primary large ${styles.submit}`} disabled={!required || busy} onClick={() => { void submit(); }}>{busy ? "시작하는 중…" : "동의하고 시작하기"}</button>
       </section>
     </div>
