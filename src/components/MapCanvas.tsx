@@ -19,6 +19,8 @@ declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: (
 
 /** A card holding the selected place stays above every stacked card. */
 const SELECTED_Z = 100000;
+/** 첫 화면에 꽉 채울 남한 땅(제주 남쪽 해안~휴전선, 태안~동해안) */
+const KOREA_LAND = { south: 33.2, west: 126.1, north: 38.3, east: 129.6 };
 
 function regionCardButton(card: RegionCard<PlaceView>) {
   const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}`;
@@ -130,14 +132,27 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     layoutSize.current = { width: el.current?.clientWidth || 0, height: el.current?.clientHeight || 0 };
     map.current.relayout(); map.current.setCenter(framedPlace.current && focused.current && !moving.current ? placeCenter(framedPlace.current) : center); rememberPosition();
   }
-  /** Fit every saved place; `closer` (the 전체 보기 button) then zooms one level in around the same centre. */
-  function showSaved(closer = false) {
+  /**
+   * Fit every saved place; `closer` (the 전체 보기 button) then zooms one level in around the same centre.
+   * `fillKorea` (first open only): when the place fit is wider than South Korea, frame South Korea to fill the screen (only if every place stays on screen)
+   * instead of a wider level that shows North Korea, Japan and Kakao's untiled sea.
+   */
+  function showSaved(closer = false, fillKorea = false) {
     if (!places.length) return;
     const k = window.kakao.maps;
     if (places.length === 1) { map.current.setLevel(4); map.current.setCenter(new k.LatLng(places[0].lat, places[0].lng)); }
     else {
       const bounds = new k.LatLngBounds(); places.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
       map.current.setBounds(bounds, 120, 90, 125, 90);
+      if (fillKorea) {
+        const level = map.current.getLevel(), insets = fitInsets.current?.();
+        // Let the land run under the chips and up to the tab bar so a phone gets one level closer than the place fit (or the same level, centred on the land).
+        const top = Math.min(insets?.top ?? 120, 120), bottom = Math.min(insets?.bottom ?? 125, 130);
+        map.current.setBounds(new k.LatLngBounds(new k.LatLng(KOREA_LAND.south, KOREA_LAND.west), new k.LatLng(KOREA_LAND.north, KOREA_LAND.east)), top, 8, bottom, 8);
+        // Keep the place fit when framing Korea would be wider, or when a place (울릉도, 해외) would fall off the screen.
+        const view = map.current.getBounds();
+        if (map.current.getLevel() > level || !places.every((p) => view.contain(new k.LatLng(p.lat, p.lng)))) map.current.setBounds(bounds, 120, 90, 125, 90);
+      }
     }
     if (closer && map.current.getLevel() > 1) map.current.setLevel(map.current.getLevel() - 1);
     rememberPosition();
@@ -288,7 +303,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   useEffect(() => {
     if (!ready) return;
     if (!fitted.current && places.length && active) {
-      showSaved();
+      showSaved(false, true);
       fitted.current = true;
     }
   }, [places, ready, active]);

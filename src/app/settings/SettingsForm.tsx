@@ -11,7 +11,6 @@ import ShellLink from "@/components/ShellLink";
 import PushSettings from "@/components/PushSettings";
 import IdentityOption from "@/components/IdentityOption";
 import Avatar from "@/components/Avatar";
-import { TERMS } from "@/lib/terms";
 export default function SettingsForm({ who, names, account = false, onPinChanged }: { who: string; names: string[]; account?: boolean; onPinChanged: (message: string) => void }) {
   const sync = useBoardSync();
   const folderName = useBoardState().snapshot?.board ?? "";
@@ -46,16 +45,6 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
     catch (e) { setError(e instanceof Error ? e.message : "수신 동의를 바꾸지 못했어요."); }
     finally { setMarketingBusy(false); }
   }
-  // 계정 세션: 연결할 수 있는 기존 PIN 지도가 있을 때만 "기존 지도 연결"을 보여줍니다.
-  const [linkable, setLinkable] = useState(false);
-  useEffect(() => {
-    if (!account) return;
-    let alive = true;
-    requestJson<{ available: boolean; linked: string | null; names: string[] }>("/api/auth/link", { cache: "no-store", notifyBoardChange: false })
-      .then((data) => { if (alive) setLinkable(data.available && (data.linked !== null || data.names.length > 0)); })
-      .catch(() => { if (alive) setLinkable(false); });
-    return () => { alive = false; };
-  }, [account]);
   useEffect(() => {
     if (sync.accessError) { accessRetry.current?.focus({ preventScroll: true }); accessRetry.current?.scrollIntoView({ block: "center" }); }
   }, [sync.accessError]);
@@ -91,7 +80,6 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
       <PushSettings />
     </section>
     {account ? <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
-      {linkable && <ShellLink className="settings-row settings-link" href="/settings/link"><Icon name="map" /><span className="settings-copy"><span>기존 지도 연결</span><small>둘만의 PIN으로 쓰던 지도를 이 계정에서 열어요</small></span><Icon name="chevron" width="18" /></ShellLink>}
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
     </section> : <section className="settings-group" aria-labelledby="settings-security"><h2 id="settings-security" className="settings-label">보안</h2>
       <a className="settings-row settings-link" href={`/login?next=${encodeURIComponent("/settings/link")}`}><Icon name="user" /><span className="settings-copy"><span>카카오·구글 계정으로 옮기기</span><small>로그인한 뒤 이 지도를 계정에 연결해요</small></span><Icon name="chevron" width="18" /></a>
@@ -99,10 +87,10 @@ export default function SettingsForm({ who, names, account = false, onPinChanged
       {editing && <form id="pin-change-form" className="stack settings-expand" aria-busy={busy} onSubmit={async (e) => { e.preventDefault(); const res = await action("/api/access/pin", { currentPin, newPin, confirmPin }); if (res) { setCurrent(""); setNew(""); setConfirm(""); setEditing(false); } }}><PinInput label="현재 PIN" value={currentPin} onChange={setCurrent} /><PinInput label="새 PIN" value={newPin} onChange={setNew} /><PinInput label="새 PIN 한 번 더" value={confirmPin} onChange={setConfirm} /><button className="btn primary" disabled={busy || sync.suspended || currentPin.length !== 6 || newPin.length !== 6 || newPin !== confirmPin}>{busy ? "바꾸는 중…" : "새 PIN으로 바꾸기"}</button></form>}
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>이 기기 잠그기</span><small>다음에 열 때 PIN을 다시 입력해요</small></span><Icon name="chevron" width="18" /></button>
     </section>}
-    {account && <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
-      <button type="button" className="settings-row" role="switch" aria-checked={marketing === true} disabled={marketing === null || marketingBusy} onClick={() => { void toggleMarketing(); }}><Icon name="bell" /><span className="settings-copy"><span>광고성 정보 수신 (선택)</span><small>{marketing === null ? "동의 상태를 확인하고 있어요…" : marketing ? "새 기능·이벤트 소식을 받아요" : "받지 않아요. 서비스 알림은 그대로 와요"}</small></span><span className="settings-switch" aria-hidden="true" /></button>
-      {(["service", "privacy", "location"] as const).map((k) => <a key={k} className="settings-row settings-link" href={`/terms/${k}`}><Icon name="list" /><span className="settings-copy"><span>{TERMS[k].title}</span></span><Icon name="chevron" width="18" /></a>)}
-    </section>}
+    <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
+      {account && <button type="button" className="settings-row" role="switch" aria-checked={marketing === true} disabled={marketing === null || marketingBusy} onClick={() => { void toggleMarketing(); }}><Icon name="bell" /><span className="settings-copy"><span>광고성 정보 수신 (선택)</span><small>{marketing === null ? "동의 상태를 확인하고 있어요…" : marketing ? "새 기능·이벤트 소식을 받아요" : "받지 않아요. 서비스 알림은 그대로 와요"}</small></span><span className="settings-switch" aria-hidden="true" /></button>}
+      <a className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></a>
+    </section>
     <section className="settings-group" aria-labelledby="settings-places"><h2 id="settings-places" className="settings-label">장소</h2>
       <ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span className="settings-copy"><span>삭제한 장소</span><small>복구하거나 영구 삭제해요</small></span><Icon name="chevron" width="18" /></ShellLink>
     </section>

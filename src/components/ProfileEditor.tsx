@@ -1,5 +1,6 @@
 "use client";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import Avatar from "./Avatar";
 import Icon from "./Icon";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
@@ -27,9 +28,26 @@ async function toAvatar(file: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
+/** 사진을 탭하면 여는 선택 창: 앨범에서 고르기 / 카카오·구글 사진 / 사진 없이 */
+function PhotoMenu({ providerLabel, hasProvider, hasPhoto, onPick, onClose }: {
+  providerLabel: string | null; hasProvider: boolean; hasPhoto: boolean; onPick: (choice: "upload" | "provider" | "none") => void; onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => { if (dialog?.open) dialog.close(); }; }, []);
+  return createPortal(<dialog ref={ref} className={styles.menu} aria-labelledby="profile-photo-menu"
+    onCancel={(e) => { e.preventDefault(); onClose(); }}
+    onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <h2 id="profile-photo-menu">프로필 사진</h2>
+    <button type="button" onClick={() => onPick("upload")}><Icon name="image" width="20" />앨범에서 선택</button>
+    {hasProvider && providerLabel && <button type="button" onClick={() => onPick("provider")}><Icon name="user" width="20" />{providerLabel} 사진으로</button>}
+    {hasPhoto && <button type="button" onClick={() => onPick("none")}><Icon name="close" width="20" />사진 없이</button>}
+    <button type="button" className={styles.menuCancel} onClick={onClose} autoFocus>취소</button>
+  </dialog>, document.body);
+}
+
 /**
- * 이름·사진 편집. 가입 직후 화면과 설정의 프로필 화면이 함께 씁니다.
- * 사진: 카카오·구글 사진 / 직접 올리기 / 사진 없이.
+ * 프로필 수정(레퍼런스: 가운데 큰 사진 + 카메라 표시, 닉네임 칸, 아래 저장 버튼).
+ * 사진을 탭하면 앨범·카카오/구글 사진·사진 없이 중에서 고릅니다. 짧은 가로 화면은 왼쪽 사진 / 오른쪽 이름·저장입니다.
  */
 export default function ProfileEditor({ initial, submitLabel, busyLabel = "저장하는 중…", onSaved, requireChange = false }: {
   initial: Profile; submitLabel: string; busyLabel?: string; onSaved: (profile: Profile) => void | Promise<void>; requireChange?: boolean;
@@ -37,14 +55,15 @@ export default function ProfileEditor({ initial, submitLabel, busyLabel = "저�
   const [name, setName] = useState(initial.name);
   const [mode, setMode] = useState<AvatarMode>("keep");
   const [custom, setCustom] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const file = useRef<HTMLInputElement>(null);
+  const photoButton = useRef<HTMLButtonElement>(null);
   const preview = mode === "keep" ? initial.avatar : mode === "provider" ? initial.provider_avatar : mode === "custom" ? custom : null;
   const trimmed = name.replace(/\s+/g, " ").trim();
   const unchanged = trimmed === initial.name && mode === "keep";
   const providerLabel = initial.provider ? PROVIDER_LABEL[initial.provider] : null;
-  const usingProvider = !!initial.provider_avatar && preview === initial.provider_avatar;
 
   async function pick(event: React.ChangeEvent<HTMLInputElement>) {
     const chosen = event.target.files?.[0];
@@ -53,6 +72,11 @@ export default function ProfileEditor({ initial, submitLabel, busyLabel = "저�
     setError("");
     try { setCustom(await toAvatar(chosen)); setMode("custom"); }
     catch (e) { setError(e instanceof Error ? e.message : "사진을 열지 못했어요."); }
+  }
+  function choose(choice: "upload" | "provider" | "none") {
+    setMenu(false);
+    if (choice === "upload") file.current?.click();
+    else { setMode(choice); photoButton.current?.focus({ preventScroll: true }); }
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -67,22 +91,25 @@ export default function ProfileEditor({ initial, submitLabel, busyLabel = "저�
     finally { setBusy(false); }
   }
 
-  return <div className={styles.wrap}><form className={styles.editor} onSubmit={submit} aria-busy={busy}>
+  return <form className={styles.editor} onSubmit={submit} aria-busy={busy}>
     <div className={styles.photo}>
-      <Avatar src={preview} size={104} label={preview ? "선택한 프로필 사진" : "프로필 사진 없음"} />
-      <div className={styles.photoActions} role="group" aria-label="프로필 사진">
-        {initial.provider_avatar && providerLabel && <button type="button" className={styles.choice} aria-pressed={usingProvider} disabled={busy} onClick={() => setMode("provider")}>{providerLabel} 사진</button>}
-        <button type="button" className={styles.choice} aria-pressed={mode === "custom"} disabled={busy} onClick={() => file.current?.click()}><Icon name="image" width="18" />사진 올리기</button>
-        <button type="button" className={styles.choice} aria-pressed={!preview} disabled={busy} onClick={() => setMode("none")}>사진 없이</button>
-        <input ref={file} type="file" accept="image/*" hidden onChange={pick} />
-      </div>
+      <button ref={photoButton} type="button" className={styles.photoButton} disabled={busy} onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={preview ? "프로필 사진 바꾸기" : "프로필 사진 넣기"}>
+        <Avatar src={preview} size={112} />
+        <span className={styles.cameraBadge} aria-hidden="true"><Icon name="camera" width="18" /></span>
+      </button>
+      <p className={styles.photoHint}>사진을 탭해서 변경</p>
+      <input ref={file} type="file" accept="image/*" hidden onChange={pick} />
     </div>
-    <label className={styles.name}>이름
-      <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 유빈" autoComplete="nickname" enterKeyHint="done" disabled={busy} />
-      <small>장소를 저장하거나 메모를 남기면 폴더 멤버에게 이 이름으로 보여요.{initial.provider_name && providerLabel && trimmed !== initial.provider_name ? ` ${providerLabel} 이름: ${initial.provider_name}` : ""}</small>
-    </label>
-    {initial.provider_name && providerLabel && trimmed !== initial.provider_name && <button type="button" className={`text-btn ${styles.useProviderName}`} disabled={busy} onClick={() => setName(initial.provider_name!.slice(0, 20))}>{providerLabel} 이름으로 바꾸기</button>}
-    {error && <p className="error" role="alert">{error}</p>}
-    <button className="btn primary large" disabled={busy || !trimmed || (requireChange && unchanged)}>{busy ? busyLabel : submitLabel}</button>
-  </form></div>;
+    <div className={styles.fields}>
+      <label className={styles.name}>닉네임
+        <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 유빈" autoComplete="nickname" enterKeyHint="done" disabled={busy} />
+        <small>장소를 저장하거나 메모를 남기면 폴더 멤버에게 이 이름으로 보여요.</small>
+      </label>
+      {initial.provider_name && providerLabel && trimmed !== initial.provider_name && <button type="button" className={`text-btn ${styles.useProviderName}`} disabled={busy} onClick={() => setName(initial.provider_name!.slice(0, 20))}>{providerLabel} 이름으로 바꾸기</button>}
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className={styles.saveBar}><button className="btn primary large" disabled={busy || !trimmed || (requireChange && unchanged)}>{busy ? busyLabel : submitLabel}</button></div>
+    </div>
+    {menu && <PhotoMenu providerLabel={providerLabel} hasProvider={!!initial.provider_avatar && preview !== initial.provider_avatar} hasPhoto={!!preview}
+      onPick={choose} onClose={() => { setMenu(false); photoButton.current?.focus({ preventScroll: true }); }} />}
+  </form>;
 }

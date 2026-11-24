@@ -17,17 +17,22 @@ async function linkState(userId: string) {
   return { legacy, linked: mine?.member_name as string | undefined, names: (legacy.member_names as string[]).filter((n) => !taken.has(n)) };
 }
 
+/** 연결할 수 있는지와 이미 연결된 이름만 알려줍니다. 기존 지도의 이름들은 PIN을 맞힌 뒤에만 보여줍니다. */
 export async function GET(req: Request) {
   try {
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     if (!board.userId) throw new AccessError("계정으로 로그인한 뒤 연결해 주세요.", 409);
     const state = await linkState(board.userId);
-    return NextResponse.json(state ? { available: true, linked: state.linked ?? null, names: state.names } : { available: false, linked: null, names: [] }, { headers: { "Cache-Control": "no-store" } });
+    const available = !!state && (!!state.linked || state.names.length > 0);
+    return NextResponse.json({ available, linked: state?.linked ?? null }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) { return accessError(e); }
 }
 
-/** 기존 PIN과 이름 하나로 이 계정을 기존 지도의 멤버로 연결하고, 이 기기를 그 지도로 옮깁니다. */
+/**
+ * 기존 PIN을 먼저 확인합니다. 이미 연결된 계정이거나 남은 이름이 하나면 바로 연결하고,
+ * 여럿이면 이름 목록({ choose })을 돌려줘 하나를 고르게 합니다. 연결하면 이 기기를 그 지도로 옮깁니다.
+ */
 export async function POST(req: Request) {
   try {
     const board = await boardFromRequest(req);
@@ -37,11 +42,14 @@ export async function POST(req: Request) {
     const name = typeof body?.name === "string" ? body.name : "";
     const state = await linkState(board.userId);
     if (!state) throw new AccessError("연결할 수 있는 기존 지도가 없어요.", 404);
-    if (!state.linked && !state.names.includes(name)) throw new AccessError("이 지도의 이름 중에서 골라 주세요.");
+    if (!state.linked && !state.names.length) throw new AccessError("이 지도의 이름이 모두 다른 계정에 연결되어 있어요.", 409);
     const ip = await reserveAttempt(state.legacy.id, req);
     if (!await verifyPin(body?.pin, state.legacy.pin_hash)) throw new AccessError("PIN이 맞지 않아요. 둘만의 여섯 자리를 다시 확인해 주세요.", 401);
     await clearAttempt(state.legacy.id, ip);
-    const { data, error } = await db().rpc("dm_link_member", { p_user: board.userId, p_board: state.legacy.id, p_name: state.linked ?? name });
+    const chosen = state.linked ?? (state.names.length === 1 ? state.names[0] : name || null);
+    if (!chosen) return NextResponse.json({ choose: state.names }, { headers: { "Cache-Control": "no-store" } });
+    if (!state.linked && !state.names.includes(chosen)) throw new AccessError("이 지도의 이름 중에서 골라 주세요.");
+    const { data, error } = await db().rpc("dm_link_member", { p_user: board.userId, p_board: state.legacy.id, p_name: chosen });
     const userError = dbUserError(error);
     if (userError) throw userError;
     if (error || !data) { console.error("dm_link_member failed", error?.code, error?.message); throw new Error("지도를 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
