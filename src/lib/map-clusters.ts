@@ -1,3 +1,4 @@
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import type { PlaceStatus } from "./types";
 import type { MapRegion } from "./map-regions";
 import { REGION_NAMES } from "./place-view";
@@ -22,7 +23,7 @@ export interface RegionCard<T extends ClusterPlace> extends ScreenPoint {
   /** Short display name (e.g. "성동구"); null shows the number alone. */
   label: string | null;
   places: T[];
-  /** The number on the card: only "가고 싶음" places. */
+  /** The number on the card: only "가고 싶음" places (every place on the map while PLACE_STATUS_ENABLED is off). */
   wish: number;
   /** NEW places among the card's places. */
   fresh: number;
@@ -83,7 +84,7 @@ export function regionCards<T extends ClusterPlace>(places: readonly T[], projec
       key, tier, area, label: area ? shortRegionName(area) : null, places: own,
       x: items.reduce((sum, { point }) => sum + point.x, 0) / items.length,
       y: items.reduce((sum, { point }) => sum + point.y, 0) / items.length,
-      wish: own.filter((p) => p.status === "wish").length,
+      wish: PLACE_STATUS_ENABLED ? own.filter((p) => p.status === "wish").length : own.length,
       fresh: own.filter(options.isNew).length,
       visited: stat.visited, total: stat.total,
     };

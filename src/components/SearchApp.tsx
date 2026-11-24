@@ -15,6 +15,7 @@ import type { ShareResult } from "@/lib/share-stream";
 import type { KakaoPlace } from "@/lib/types";
 import { navigateShell } from "@/lib/shell-navigation";
 import { SEARCH_TOOLS_ID } from "@/lib/search-tools";
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 
 export default function SearchApp({ active, backHref, viewport }: { active: boolean; backHref: string; viewport: { keyboard: boolean; height: number; top: number } }) {
   const { store, lock } = useBoardSync(); const { access, snapshot } = useBoardState();
@@ -119,6 +120,6 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
       </>}
     </div>
     </div>
-    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 확인 중…" : write.pending ? "저장 확인·재시도" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p><span className="status-tag wish">가고 싶음으로 저장</span>{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
+    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 확인 중…" : write.pending ? "저장 확인·재시도" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p>{PLACE_STATUS_ENABLED && <span className="status-tag wish">가고 싶음으로 저장</span>}{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
   </div>;
 }

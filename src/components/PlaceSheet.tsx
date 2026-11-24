@@ -14,6 +14,7 @@ import ActionDialog from "./ActionDialog";
 import { useBoardState, useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import ShellLink from "./ShellLink";
 import { navigateShell } from "@/lib/shell-navigation";
 import FolderTransferDialog from "./FolderTransferDialog";
@@ -128,15 +129,15 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
   const closeSheet = busy || deleting || leaving ? () => {} : () => requestLeave("close");
   const Layout = view === "map" ? MapPlaceSheet : ListPlaceSheet;
   return <><Layout title={place.name} onClose={closeSheet}
-    summary={<div className="detail-title"><h2>{place.name}</h2><span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span></div>}
+    summary={<div className="detail-title"><h2>{place.name}</h2>{PLACE_STATUS_ENABLED && <span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span>}</div>}
     closeAction={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}
     overview={<><p className="addr">{place.address}</p>
     <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>함께 가볼 곳</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] || "우리"}</strong><span>발견한 사람</span></div></div>
-    <div className="detail-section-heading"><span className="section-label">우리에게 어떤 곳인가요?</span></div>
-    <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div>
+    {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">우리에게 어떤 곳인가요?</span></div>
+    <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div></>}
     </>}
     preview={<div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
     details={<>

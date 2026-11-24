@@ -1,3 +1,4 @@
+import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import type { PlaceStatus } from "./types";
 export interface PlaceView {
   id: string; name: string; address: string | null; lat: number; lng: number; category: string | null;
@@ -12,8 +13,8 @@ export function canDeletePlace(place: Pick<PlaceView, "registrant">, who: string
   return !registrant || registrant === who || !memberNames.includes(registrant);
 }
 export const STATUS_ORDER: PlaceStatus[] = ["wish", "again", "visited", "meh"];
-/** Map and list open on the places still to visit; filter reset returns here. */
-export const DEFAULT_STATUSES: PlaceStatus[] = ["wish", "again"];
+/** Map and list open on the places still to visit; filter reset returns here. With statuses hidden, every place shows. */
+export const DEFAULT_STATUSES: PlaceStatus[] = PLACE_STATUS_ENABLED ? ["wish", "again"] : [...STATUS_ORDER];
 export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const rad = (n: number) => n * Math.PI / 180;
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
