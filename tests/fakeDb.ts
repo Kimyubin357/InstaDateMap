@@ -158,7 +158,7 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       let identity = tables.user_identities.find((i) => i.provider === p.p_provider && i.subject === p.p_subject);
       let created = false;
       if (!identity) {
-        const user = { id: `u${++seq}`, display_name: display, avatar_url: p.p_avatar, last_board_id: null };
+        const user = { id: `u${++seq}`, display_name: display, avatar_url: p.p_avatar, last_board_id: null, name_confirmed: false };
         tables.app_users.push(user); identity = { provider: p.p_provider, subject: p.p_subject, user_id: user.id, email: p.p_email };
         tables.user_identities.push(identity); created = true;
         // 012: 첫 로그인만 "내 장소"를 만듭니다.
@@ -170,7 +170,7 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       const member = mine.find((m) => m.board_id === user.last_board_id) ?? mine[0];
       user.last_board_id = member?.board_id ?? null;
       const board = member && tables.boards.find((b) => b.id === member.board_id)!;
-      return { data: { user_id: user.id, board_id: board?.id ?? null, member_name: member?.member_name ?? null, auth_version: board?.auth_version ?? 0, created }, error: null };
+      return { data: { user_id: user.id, board_id: board?.id ?? null, member_name: member?.member_name ?? null, auth_version: board?.auth_version ?? 0, created, name_confirmed: user.name_confirmed !== false }, error: null };
     }
     if (name === "dm_link_member") {
       tables.board_members ??= [];

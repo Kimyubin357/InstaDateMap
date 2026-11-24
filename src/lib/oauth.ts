@@ -56,7 +56,11 @@ async function readJson(res: Response, step: string) {
   return body as Record<string, any>;
 }
 const clean = (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : null;
-const httpsUrl = (value: unknown) => { const url = clean(value); return url && /^https:\/\//.test(url) ? url : null; };
+/** 카카오 프로필 사진은 http 주소로 오기도 해서 카카오 이미지 서버만 https로 바꿉니다. */
+const httpsUrl = (value: unknown) => {
+  const url = clean(value)?.replace(/^http:\/\/([a-z0-9-]+\.kakaocdn\.net\/)/i, "https://$1");
+  return url && /^https:\/\//.test(url) && url.length <= 1000 ? url : null;
+};
 
 /** 인가 코드를 토큰으로 바꾸고, 공급자의 사용자 정보에서 필요한 값만 남깁니다. */
 export async function exchangeProfile(provider: Provider, config: ProviderConfig, redirectUri: string, code: string, fetcher: Fetcher = fetch): Promise<ProviderProfile> {
