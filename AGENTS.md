@@ -53,7 +53,7 @@
 - 진행 기록: 2026-11-24 로그인 → 약관 동의(처음만, `/consent`, `015_terms.sql`) → 지도 흐름으로 바꾸고, 가입 시 이름 입력 화면은 없앴습니다(카카오·구글 프로필 그대로, 설정에서 변경). **약관은 초안이라 운영자 정보 입력과 법률 검토가 남아 있습니다.**
 - 진행 기록: 2026-11-24 회원 탈퇴(설정 맨 아래, `DELETE /api/account`)를 추가하고, 두 계정 모두 기존 지도에 연결된 것을 확인한 뒤 **PIN 입장 방식을 모두 지웠습니다**(API·화면·스크립트, `016_account_delete_pin_cleanup.sql`). 약관 운영자 정보(김유빈·kimyubin357@gmail.com)를 넣었습니다. **016을 운영 DB에 적용해야 탈퇴가 동작합니다.** 세부는 [계획 문서](docs/launch-plan.md)를 봅니다.
 - 진행 기록: 2026-11-24 약관 4종을 법령 기준으로 보완한 2판(`TERMS_VERSION` 2026-11-24.2)을 적용했습니다. 점검은 [약관 점검](docs/terms-review.md)에 있습니다. **광고·유료·리워드·사진 공개 기능을 만들 때는 [나중에 약관에 넣을 항목](docs/terms-future.md)을 먼저 확인하세요.**
-- 진행 기록: 2026-11-24 사용자 결정으로 Supabase(시드니)·Vercel 함수(미국 동부)를 서울로 옮깁니다. `vercel.json` icn1, [이전 절차](docs/supabase-seoul-move.md), `scripts/move-supabase.sh`(사용자 터미널에서 실행, 접속 주소는 숨김 입력). **처리방침은 서울 기준으로 고쳤으므로 이전을 마친 뒤 머지합니다.**
+- 진행 기록: 2026-11-24 사용자 결정으로 Supabase(시드니)·Vercel 함수(미국 동부)를 서울로 옮깁니다. `vercel.json` icn1, [이전 절차](docs/supabase-seoul-move.md), `scripts/move-supabase.sh`(사용자 터미널에서 실행, 접속 주소는 숨김 입력). **2026-11-24 이전 완료**(행 수 일치, 함수 `icn1::icn1`, 운영 앱이 새 DB 사용 확인). 남은 일은 [이전 절차](docs/supabase-seoul-move.md) 맨 위 기록을 봅니다.
 
 ## UI 작업 전 필수 기준
 
