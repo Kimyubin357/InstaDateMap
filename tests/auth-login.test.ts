@@ -5,6 +5,7 @@ import { hashPin, tokenHash } from "@/lib/pin";
 import { boardFromRequest } from "@/lib/auth";
 import { authorizeUrl, encodeOAuthCookie, exchangeProfile, loginError, readOAuthCookie } from "@/lib/oauth";
 import { GET as start } from "@/app/api/auth/[provider]/route";
+import { TERMS_VERSION } from "@/lib/terms";
 import { GET as callback } from "@/app/api/auth/[provider]/callback/route";
 import { GET as linkState, POST as link } from "@/app/api/auth/link/route";
 import { POST as lock } from "@/app/api/access/lock/route";
@@ -94,8 +95,8 @@ describe("로그인 완료", () => {
   it("계정과 내 장소를 만들고 90일 세션으로 원래 가려던 주소에 보내며, 예전 PIN 세션은 지운다", async () => {
     vi.stubGlobal("fetch", providerFetch(kakaoProfile).fetcher);
     const res = await callback(callbackRequest("kakao", `code=abc&state=${state}`, state, `; datemap_session=${legacyToken}`), params("kakao"));
-    // 처음 가입하면 이름·사진 확인 화면을 거쳐 원래 가려던 주소로 갑니다.
-    expect(res.headers.get("location")).toBe(`http://localhost:3000/welcome?next=${encodeURIComponent("/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F")}`);
+    // 처음 가입하면 약관 동의를 거쳐 원래 가려던 주소로 갑니다. 이름·사진은 카카오 프로필을 그대로 씁니다.
+    expect(res.headers.get("location")).toBe(`http://localhost:3000/consent?next=${encodeURIComponent("/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F")}`);
     expect(res.headers.get("set-cookie")).toMatch(/Max-Age=7776000/);
     expect(res.headers.get("set-cookie")).toMatch(/datemap_oauth=;/);
     const token = sessionCookie(res);
@@ -117,11 +118,12 @@ describe("로그인 완료", () => {
   });
 });
 
-describe("가입 후 이름 확인", () => {
-  it("이름을 확인한 계정은 다음 로그인부터 원래 가려던 주소로 바로 간다", async () => {
+describe("가입 후 약관 동의", () => {
+  it("약관에 동의한 계정은 다음 로그인부터 원래 가려던 주소로 바로 간다", async () => {
     vi.stubGlobal("fetch", providerFetch(kakaoProfile).fetcher);
     await callback(callbackRequest("kakao", `code=abc&state=${state}`), params("kakao"));
-    tables.app_users[0].name_confirmed = true;
+    expect(tables.app_users[0].display_name).toBe("유빈");
+    tables.app_users[0].terms_version = TERMS_VERSION;
     const again = await callback(callbackRequest("kakao", `code=def&state=${state}`), params("kakao"));
     expect(again.headers.get("location")).toBe("http://localhost:3000/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F");
   });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { AccessError, cookieValue, SESSION_COOKIE } from "@/lib/auth";
 import { tokenHash } from "@/lib/pin";
+import { consentPath, termsPending } from "@/lib/terms-server";
 import { createSession, setSessionCookie } from "@/lib/access";
 import { callbackUrl, exchangeProfile, isProvider, OAUTH_COOKIE, providerConfig, readOAuthCookie } from "@/lib/oauth";
 export const runtime = "nodejs";
@@ -42,8 +43,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
     const previous = cookieValue(req, SESSION_COOKIE);
     if (/^[0-9a-f]{64}$/.test(previous)) await db().from("access_sessions").delete().eq("token_hash", tokenHash(previous));
     const destination = login.board_id || next.startsWith("/invite/") ? next : "/folders";
-    // 처음 가입했거나 이름을 아직 확인하지 않았으면 이름·사진부터 정합니다.
-    const target = login.name_confirmed === false ? `/welcome?next=${encodeURIComponent(destination)}` : destination;
+    // 이름·사진은 카카오·구글 프로필을 그대로 씁니다(설정에서 변경). 약관은 처음(또는 약관이 바뀐 뒤) 한 번 동의를 받습니다.
+    const target = await termsPending(login.user_id) ? consentPath(destination) : destination;
     return finish(setSessionCookie(NextResponse.redirect(new URL(target, req.url)), token, true));
   } catch (e) {
     if (!(e instanceof AccessError)) console.error(`OAuth ${provider} callback failed`, e instanceof Error ? e.message : e);
