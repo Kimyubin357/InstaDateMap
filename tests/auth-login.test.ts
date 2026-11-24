@@ -148,22 +148,26 @@ describe("계정 세션과 기존 지도 연결", () => {
     tables.board_members = [];
     expect(await boardFromRequest(req("auth/link"))).toBeNull();
   });
-  it("PIN과 이름으로 기존 지도에 연결하면 이 기기가 기존 지도를 연다", async () => {
+  it("PIN을 맞힌 뒤에만 이름을 보여주고, 이름을 고르면 이 기기가 기존 지도를 연다", async () => {
     const req = await loggedIn();
-    expect(await (await linkState(req("auth/link"))).json()).toEqual({ available: true, linked: null, names: ["유빈", "수민"] });
-    const wrong = await link(req("auth/link", { name: "유빈", pin: "111111" }));
-    expect(wrong.status).toBe(401); expect((await wrong.json()).message).toMatch(/PIN이 맞지 않아요/);
+    expect(await (await linkState(req("auth/link"))).json()).toEqual({ available: true, linked: null });
+    const wrong = await link(req("auth/link", { pin: "111111" }));
+    expect(wrong.status).toBe(401); expect(await wrong.json()).not.toHaveProperty("choose");
+    const choose = await link(req("auth/link", { pin: "200102" }));
+    expect(await choose.json()).toEqual({ choose: ["유빈", "수민"] });
     const ok = await link(req("auth/link", { name: "유빈", pin: "200102" }));
     expect(ok.status).toBe(200);
     const board = await boardFromRequest(req("auth/link"));
     expect(board).toMatchObject({ id: "legacy", who: "유빈", memberNames: ["유빈", "수민"], authVersion: 2 });
-    expect(await (await linkState(req("auth/link"))).json()).toEqual({ available: true, linked: "유빈", names: ["유빈", "수민"] });
+    expect(await (await linkState(req("auth/link"))).json()).toEqual({ available: true, linked: "유빈" });
   });
-  it("다른 계정이 쓰는 이름은 고를 수 없고, PIN 세션은 연결 API를 쓸 수 없다", async () => {
+  it("남은 이름이 하나면 PIN만으로 그 이름에 연결되고, PIN 세션은 연결 API를 쓸 수 없다", async () => {
     tables.app_users = [{ id: "other" }]; tables.board_members = [{ board_id: "legacy", user_id: "other", role: "owner", member_name: "유빈", joined_at: "2026-01-01" }];
     const req = await loggedIn();
-    expect((await (await linkState(req("auth/link"))).json()).names).toEqual(["수민"]);
-    expect((await link(req("auth/link", { name: "유빈", pin: "200102" }))).status).toBe(400);
+    expect(await (await linkState(req("auth/link"))).json()).toEqual({ available: true, linked: null });
+    // 남은 이름이 하나면 PIN만으로 그 이름에 바로 연결합니다(다른 계정이 쓰는 이름은 고를 수 없음).
+    expect(await (await link(req("auth/link", { name: "유빈", pin: "200102" }))).json()).toEqual({ next: "/" });
+    expect(await boardFromRequest(req("auth/link"))).toMatchObject({ id: "legacy", who: "수민" });
     const pinSession = new Request("http://localhost/api/auth/link", { headers: { cookie: `datemap_session=${legacyToken}` } });
     expect((await linkState(pinSession)).status).toBe(409);
   });

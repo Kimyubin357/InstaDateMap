@@ -11,46 +11,116 @@
   box-shadow: var(--print-shadow);
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.editor { display: grid; gap: 18px; width: 100%; text-align: left; }
-.photo { display: flex; align-items: center; gap: 18px; }
-.photoActions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.choice {
-  min-height: 44px;
-  padding: 8px 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px dashed var(--line);
-  border-radius: 99px;
-  background: var(--cream);
-  color: var(--ink);
-  font-size: 16px;
+/* 프로필 수정(레퍼런스 배치): 가운데 큰 사진 + 카메라 표시 → 닉네임 → 화면 아래 저장. 원단·점선·잉크색은 앱 테마를 따릅니다. */
+/* 프로필 수정 페이지: 화면 높이를 채우는 세로 흐름. 편집 영역이 남은 높이를 채워 저장 버튼이 화면 아래에 놓입니다. */
+.page { display: flex; flex-direction: column; min-height: var(--app-height); padding-bottom: calc(var(--safe-b) + 16px); }
+.editor {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  padding-top: 28px;
+  text-align: left;
 }
-.choice[aria-pressed="true"] { border-color: var(--forest); color: var(--forest); background: #244b3712; }
-.choice:focus-visible { outline: 3px solid var(--forest); outline-offset: 2px; }
-.name { display: grid; gap: 8px; font-size: 17px; }
+.photo { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.photoButton {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.photoButton:focus-visible { outline: 3px solid var(--forest); outline-offset: 4px; }
+.photoButton:active .avatar { transform: scale(.98); }
+.cameraBadge {
+  position: absolute;
+  right: -2px;
+  bottom: 2px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  background: var(--forest) var(--grain);
+  color: var(--cream);
+  box-shadow: var(--print-shadow);
+}
+.photoHint { margin: 0; font-size: 16px; color: var(--ink-soft); }
+.fields { flex: 1 1 auto; display: flex; flex-direction: column; gap: 14px; }
+.name { display: grid; gap: 10px; font-size: 17px; color: var(--ink-soft); }
 .name input {
   width: 100%;
-  min-height: 52px;
-  padding: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
   font: inherit;
   font-size: 20px;
   color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--cream);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--cream) var(--weave);
 }
+.name input:focus-visible { outline: 3px solid var(--forest); outline-offset: 2px; }
 .name small { font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
-.useProviderName { justify-self: start; min-height: 44px; margin-top: -10px; font-size: 15px; color: var(--forest); }
-/* 좁거나 낮은 화면: 사진을 줄여 버튼까지 한 화면에 */
-@media (max-width: 360px), (max-height: 640px) {
-  .photo .avatar { width: 72px !important; height: 72px !important; }
-  .photo { gap: 14px; }
-  .editor { gap: 14px; }
+.useProviderName { align-self: flex-start; min-height: 44px; margin-top: -6px; font-size: 15px; color: var(--forest); }
+.saveBar {
+  position: sticky;
+  bottom: calc(var(--safe-b) + 12px);
+  margin-top: auto;
+  padding-top: 12px;
 }
-/* 편집 영역이 넓을 때만(설정의 짧은 가로 등) 사진 줄과 이름 칸을 두 칸으로. 화면이 아니라 영역 폭 기준입니다. */
-.wrap { container-type: inline-size; width: 100%; }
-@container (min-width: 560px) {
-  .editor { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; column-gap: 24px; }
-  .editor > :global(.btn), .editor > :global(.error), .useProviderName { grid-column: 1 / -1; }
+.saveBar :global(.btn) { width: 100%; }
+
+/* 사진 선택 창 */
+.menu {
+  position: fixed;
+  inset: auto 0 0;
+  width: min(100%, 480px);
+  max-width: none;
+  margin: auto auto 0;
+  padding: 18px 16px calc(var(--safe-b) + 16px);
+  border: 1px dashed var(--line);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--paper) var(--weave);
+  color: var(--ink);
+  box-shadow: 0 -8px 32px #382f2524;
+}
+.menu::backdrop { background: #2f1f1959; }
+.menu h2 { margin: 0 0 8px; text-align: center; font-size: 18px; font-weight: 400; color: var(--ink-soft); }
+.menu button {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  text-align: left;
+}
+.menu button:focus-visible { outline: 3px solid var(--forest); outline-offset: -3px; border-radius: 10px; }
+.menu .menuCancel { justify-content: center; margin-top: 8px; border: 1px dashed var(--line); border-radius: 14px; background: var(--cream); color: var(--ink-soft); }
+
+/* 낮은 세로 화면(320×568 등) */
+@media (orientation: portrait) and (max-height: 640px) {
+  .editor { gap: 20px; padding-top: 16px; }
+  .photo .avatar { width: 92px !important; height: 92px !important; }
+}
+/* 짧은 가로 화면: 왼쪽 사진 / 오른쪽 닉네임·저장. 저장 버튼은 아래에 붙이지 않고 칸 바로 아래에 둡니다. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .editor { flex: 0 0 auto; display: grid; grid-template-columns: minmax(160px, 34%) minmax(0, 1fr); align-items: center; column-gap: clamp(20px, 5vw, 48px); padding-top: 16px; }
+  .photo .avatar { width: 96px !important; height: 96px !important; }
+  .saveBar { position: static; margin-top: 4px; padding-top: 0; }
+}
+/* 넓은 화면: 가운데 한 줄 */
+@media (min-width: 760px) and (min-height: 561px) {
+  .editor { max-width: 480px; margin: 0 auto; }
 }
