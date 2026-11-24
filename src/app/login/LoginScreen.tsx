@@ -53,6 +53,7 @@ export default function LoginScreen({ next, error = "", disabled = false }: { ne
     <section className={styles.actions} aria-label="로그인 방법">
       {error && <p className={styles.error} role="alert">{error}</p>}
       <ProviderButtons next={next} disabled={disabled} />
+      <p className={styles.legal}><a href="/terms/service">이용약관</a><span aria-hidden="true">·</span><a href="/terms/privacy">개인정보 처리방침</a></p>
     </section>
   </main>;
 }

@@ -65,6 +65,8 @@
 .kakao { background: #fee500; border: 1px solid #fee500; color: rgb(0 0 0 / 85%); }
 .google { background: #fff; border: 1px solid #747775; color: #1f1f1f; }
 .symbol { width: 20px; height: 20px; flex: none; }
+.legal { margin: 2px 0 0; display: flex; justify-content: center; gap: 8px; font-size: 14px; color: var(--ink-soft); }
+.legal a { color: var(--ink-soft); min-height: 32px; display: inline-flex; align-items: center; padding: 0 4px; }
 
 @media (prefers-reduced-motion: reduce) { .provider { transition: none; } }
 

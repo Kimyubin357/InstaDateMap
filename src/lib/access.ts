@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "./db";
 import { AccessError, accountFromRequest, boardFromRequest, cookieValue, safeNext, SESSION_COOKIE, SETUP_COOKIE } from "./auth";
 import { newToken, tokenHash } from "./pin";
+import { consentPath, termsPending } from "./terms-server";
 
 export const sessionExpiry = (remember: boolean) => new Date(Date.now() + (remember ? 90 * 86400 : 12 * 3600) * 1000).toISOString();
 /** 계정 로그인 이전의 PIN 보드. 계정 폴더(내 장소 등)는 PIN이 없어 제외됩니다. */
@@ -51,6 +52,8 @@ export async function requirePageBoard(next = "/", identity = true) {
     redirect(`/login?next=${encodeURIComponent(safeNext(next))}`);
   }
   if (identity && !board.who) redirect(`/choose?next=${encodeURIComponent(safeNext(next))}`);
+  // 계정 세션은 약관 동의 전이면 동의 화면부터(동의 화면을 건너뛰고 주소로 들어와도 막습니다).
+  if (board.userId && await termsPending(board.userId)) redirect(consentPath(safeNext(next)));
   return board;
 }
 export function legacyRedirect(token: string | undefined, next: string) {
