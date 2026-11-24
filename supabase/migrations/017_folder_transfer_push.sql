@@ -186,6 +186,8 @@ where p.deleted_at is not null and coalesce(m.user_id, b.owner_id) is not null;
 delete from public.places where deleted_at is not null;
 -- 방끼리 공유하던 휴지통 함수는 더 쓰지 않습니다.
 drop function if exists public.dm_trash_place(uuid, uuid, text, text, timestamptz);
+-- 017 초안(2026-11-25 오전)의 옮기기 함수가 적용된 DB도 정리합니다(옮기기 기능 없음).
+drop function if exists public.dm_transfer_places(uuid, uuid, uuid, uuid[], text);
 
 -- (3) 폴더별 알림: 한 기기(endpoint)가 폴더마다 구독 한 줄을 가집니다.
 alter table public.push_subscriptions drop constraint if exists push_subscriptions_endpoint_hash_key;
