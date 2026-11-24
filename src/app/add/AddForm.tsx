@@ -17,6 +17,7 @@ import { shareDestination } from "@/lib/share-navigation";
 import { boardChanged } from "@/lib/board-events";
 import { navigateShell } from "@/lib/shell-navigation";
 import { useBoardSync } from "@/components/BoardProvider";
+import FolderChooser from "@/components/FolderChooser";
 const stages = ["caption", "extract", "search", "save"];
 const stageLabels = ["게시물 내용 가져오기", "장소 정보 읽기", "지도에서 위치 확인하기", "우리 지도에 저장하기"];
 export default function AddForm({ initialUrl }: { initialUrl: string }) {
@@ -57,6 +58,7 @@ export default function AddForm({ initialUrl }: { initialUrl: string }) {
   useEffect(() => { if (initialUrl && !started.current) { started.current = true; submit(initialUrl); } }, []);
   return <main className="form-page"><ClientReady><PageHeader title="장소 저장" />
     <div className="seg two save-tabs" role="group" aria-label="장소 등록 방법"><button disabled={busy || write.pending} aria-pressed={tab === "link"} onClick={() => setTab("link")}>인스타 주소</button><button disabled={busy || write.pending} aria-pressed={tab === "search"} onClick={() => setTab("search")}>직접 검색</button></div>
+    <FolderChooser disabled={busy || write.pending} />
     <section className="add-intro"><h2>{tab === "link" ? "발견한 곳, 여기 담아둘까요?" : "이미 아는 좋은 곳도 담아요"}</h2><p>{tab === "link" ? "인스타에서 복사한 링크를 넣으면 장소를 찾아드려요." : "가보고 싶은 장소를 검색하고 지점을 골라 주세요."}</p></section>
     {leaving ? <p className="notice" role="status">{stage === "save" ? "우리 지도를 여는 중…" : "다음 화면을 여는 중…"}</p> : tab === "search" ? <ManualPlaceSearch sourceId={result?.source_id} version={result?.source_version} sourceReady={sourceReady} onSaved={complete} /> : <>
       <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="search-row"><input className="field" aria-label="인스타그램 링크" inputMode="url" autoCapitalize="none" autoCorrect="off" value={text} onChange={(e) => { setText(e.target.value); setResult(null); }} placeholder="https://www.instagram.com/…" disabled={busy || write.pending} /><button className="btn primary" disabled={busy || !text.trim()} style={{ fontSize: 15 }}>{busy ? "확인 중…" : write.pending ? "확인·재시도" : "찾기"}</button></form>

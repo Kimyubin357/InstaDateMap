@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized, requireIdentity, accessError } from "@/lib/auth";
+import { boardFromRequest, unauthorized, requireIdentity, accessError, dbUserError } from "@/lib/auth";
 import { schedulePlacePushes } from "@/lib/push-server";
 import { db } from "@/lib/db";
 
@@ -54,15 +54,21 @@ export async function PATCH(req: Request, { params: route }: { params: Promise<{
   }
 }
 
+/**
+ * 장소 삭제: 처음 등록한 사람만(등록한 사람이 방에 없으면 멤버 누구나). 방에서 바로 빠지고 지운 사람의 개인 삭제 기록에 남습니다.
+ * 017_folder_transfer_push.sql의 dm_delete_place
+ */
 export async function DELETE(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
     const params = await route;
     const board = await boardFromRequest(req);
     if (!board) return unauthorized();
     requireIdentity(board);
-    const { data, error } = await db().rpc("dm_trash_place", { p_board: board.id, p_id: params.id, p_who: board.who, p_action: "trash" });
+    const { data, error } = await db().rpc("dm_delete_place", { p_user: board.userId, p_board: board.id, p_place: params.id });
+    const userError = dbUserError(error);
+    if (userError) throw userError;
     if (error || !data?.ok) return Response.json({ message: "장소를 삭제하지 못했어요. 연결을 확인하고 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
-    return Response.json(data, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, deleted_id: data.deleted_id, already_deleted: !!data.already_deleted }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

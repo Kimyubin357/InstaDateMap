@@ -4,22 +4,26 @@ import MapPlaceSheet from "./MapPlaceSheet";
 import ListPlaceSheet from "./ListPlaceSheet";
 import Icon from "./Icon";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
-import { STATUS_ORDER, type PlaceView, placeMeta } from "@/lib/place-view";
+import { STATUS_ORDER, type PlaceView, placeMeta, canDeletePlace } from "@/lib/place-view";
 import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite, UnconfirmedWriteError } from "@/lib/verified-write";
 import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave } from "@/lib/save-recovery";
 import MapCanvas from "./MapCanvas";
 import PlaceExtras from "./PlaceExtras";
 import ActionDialog from "./ActionDialog";
-import { useBoardSync } from "./BoardProvider";
+import { useBoardState, useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
 import ShellLink from "./ShellLink";
 import { navigateShell } from "@/lib/shell-navigation";
+import FolderTransferDialog from "./FolderTransferDialog";
 const ignore = () => {};
 /** Share mutations and draft protection; map/list components own their UI independently. */
 export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
   const { notify, store, lock } = useBoardSync();
+  const [transferring, setTransferring] = useState(false);
+  const access = useBoardState().access;
+  const deletable = canDeletePlace(place, access?.who ?? "", access?.memberNames ?? []);
   const copy = placeCopyContent(place);
   const organizeHref = `/?view=list&organize=${encodeURIComponent(place.id)}`;
   const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());
@@ -147,11 +151,16 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
         if (busy || status.pending) { event.preventDefault(); return; }
         if (memoDirty && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) { event.preventDefault(); setLeaving("organize"); }
       }}><Icon name="heart" width="20" />모음에 담기</ShellLink>
+      <button type="button" className="btn place-organize-btn" disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="map" width="20" />다른 폴더에 담기</button>
       {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
-      <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>
+      {deletable ? <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>
+        : <p className="hint place-delete-hint">삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
     </div>
     </>} />{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); leave(destination); }} />}
+    {transferring && <FolderTransferDialog ids={[place.id]} onClose={() => setTransferring(false)} onDone={(result) => {
+      setTransferring(false); notify(`‘${result.folder}’ 폴더에 담았어요.`);
+    }} />}
     {deleting && <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel="취소" confirmLabel="삭제하기" busy={busy} busyLabel="삭제 중…" onClose={dismissDelete} onConfirm={remove}>
-      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>두 사람의 지도에서 삭제돼요.<br />설정의 ‘삭제한 장소’에서 메모와 저장 기록까지 복구할 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
+      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>이 폴더에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 메모와 원본 링크까지 되돌릴 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
     </ActionDialog>}</>;
 }

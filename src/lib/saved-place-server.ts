@@ -12,11 +12,13 @@ export async function withSavedPlace<T extends { place_url?: string }>(board: Bo
     const revision = await boardRevision(board.id);
     const [place, links, saves] = await Promise.all([
       db().from("places").select("id, name, address, lat, lng, category, kakao_place_id, kakao_url, status, memo, memo_version, created_at").is("deleted_at", null).eq("board_id", board.id).eq("id", id).maybeSingle(),
-      db().from("source_places").select("added_by, sources!inner(id, url, media_type, board_id)").eq("place_id", id).eq("sources.board_id", board.id),
+      db().from("source_places").select("added_by, added_at, sources!inner(id, url, media_type, board_id)").eq("place_id", id).eq("sources.board_id", board.id),
       db().from("place_saves").select("added_by, added_at").eq("board_id", board.id).eq("place_id", id),
     ]);
     if (place.error || links.error || saves.error || !place.data) return result;
-    type Link = { added_by: string; sources: { id: string; url: string; media_type: string } };
+    type Link = { added_by: string; added_at?: string; sources: { id: string; url: string; media_type: string } };
+    let registrant: { by: string; at: string } | null = null;
+    for (const row of [...((links.data ?? []) as unknown as Link[]), ...(saves.data ?? [])]) if (row.added_at && (!registrant || row.added_at < registrant.at)) registrant = { by: row.added_by, at: row.added_at };
     const sharers = new Set<string>(); const sources = new Map<string, { url: string; media_type: string }>();
     let latest = place.data.created_at;
     for (const link of (links.data ?? []) as unknown as Link[]) {
@@ -24,7 +26,7 @@ export async function withSavedPlace<T extends { place_url?: string }>(board: Bo
     }
     for (const save of saves.data ?? []) { sharers.add(save.added_by); if (save.added_at > latest) latest = save.added_at; }
     return { ...result, saved_place: { boardId: board.id, authVersion: board.authVersion, revision,
-      place: { ...place.data, kakao_place_id: place.data.kakao_place_id ?? null, sharers: [...sharers], sources: [...sources.values()], last_saved_at: latest } } };
+      place: { ...place.data, kakao_place_id: place.data.kakao_place_id ?? null, sharers: [...sharers], registrant: registrant?.by ?? null, sources: [...sources.values()], last_saved_at: latest } } };
   } catch {
     // The transaction already committed. A preview read failure must not turn it into a failed save.
     return result;

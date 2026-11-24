@@ -23,9 +23,9 @@ describe("알림 구독 보안과 설정", () => {
   it("브라우저에는 공개키만 반환하고 설정 전에는 준비 상태를 알려줌", async () => {
     const res = await GET(request());
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({ configured: true, publicKey: keys.publicKey, subscribed: false });
+    expect(await res.json()).toEqual({ configured: true, publicKey: keys.publicKey, subscribed: false, folders: [{ id: "b1", name: "검증", on: false }] });
     delete process.env.VAPID_PRIVATE_KEY;
-    expect(await (await GET(request())).json()).toEqual({ configured: false, subscribed: false });
+    expect(await (await GET(request())).json()).toEqual({ configured: false, subscribed: false, folders: [] });
     expect(pushConfiguration()).toBeNull();
   });
   it("구독은 쿠키의 보드와 세션에 묶고 클라이언트의 이름은 무시함", async () => {
@@ -35,6 +35,18 @@ describe("알림 구독 보안과 설정", () => {
     expect((await POST(request("POST", sub))).status).toBe(200);
     expect(tables.push_subscriptions).toHaveLength(1);
   });
+  it("폴더별로 켜고 끄며, 참여하지 않은 폴더는 무시함", async () => {
+    const friends = "22222222-2222-4222-8222-222222222222";
+    tables.boards.push({ id: friends, name: "친구들", member_names: ["유빈"], auth_version: 1 });
+    tables.board_members = [{ board_id: friends, user_id: "u:유빈", role: "owner", member_name: "유빈", joined_at: "2026-01-03" }];
+    const all = await (await POST(request("POST", { subscription: sub }))).json();
+    expect(all.subscribed).toBe(true);
+    expect(tables.push_subscriptions.map((s) => s.board_id).sort()).toEqual(["b1", friends].sort());
+    const only = await (await POST(request("POST", { subscription: sub, folders: [friends, "33333333-3333-4333-8333-333333333333"] }))).json();
+    expect(only.folders).toEqual(expect.arrayContaining([{ id: friends, name: "친구들", on: true }, { id: "b1", name: "검증", on: false }]));
+    expect(tables.push_subscriptions.map((s) => s.board_id)).toEqual([friends]);
+    expect((await POST(request("POST", { subscription: sub, folders: ["not-a-folder"] }))).status).toBe(400);
+  });
   it("외부 Origin·미인증·만료된 세션을 거절함", async () => {
     expect((await POST(request("POST", sub, "https://evil.example"))).status).toBe(403);
     tables.access_sessions[0].expires_at = "2020-01-01";
@@ -43,7 +55,7 @@ describe("알림 구독 보안과 설정", () => {
   });
   it("이 기기의 구독만 삭제하고 다른 세션 구독은 지우지 않음", async () => {
     await POST(request("POST", sub));
-    tables.push_subscriptions.push({ id: "other", endpoint_hash: tokenHash(endpoint), board_id: "b1", session_hash: "other-session" });
+    tables.push_subscriptions.push({ id: "other", endpoint_hash: tokenHash(endpoint), board_id: "b2", session_hash: "other-session" });
     expect((await DELETE(request("DELETE", { endpoint }))).status).toBe(200);
     expect(tables.push_subscriptions).toHaveLength(1); expect(tables.push_subscriptions[0].id).toBe("other");
   });

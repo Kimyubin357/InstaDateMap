@@ -8,13 +8,15 @@ import { collectionUndo } from "@/lib/collection-undo";
 import { distanceM, placeMeta, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
 import { STATUS_LABEL } from "@/lib/types";
-import { useBoardSync } from "./BoardProvider";
+import { useBoardState, useBoardSync } from "./BoardProvider";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import ActionDialog from "./ActionDialog";
 import SwipeablePlaceRow from "./SwipeablePlaceRow";
 import PlaceDeleteDialog from "./PlaceDeleteDialog";
 import PlacesDeleteDialog from "./PlacesDeleteDialog";
+import FolderTransferDialog from "./FolderTransferDialog";
+import { canDeletePlace } from "@/lib/place-view";
 import SelectedPlacesBar from "./SelectedPlacesBar";
 import styles from "./CollectionsList.module.css";
 
@@ -30,11 +32,14 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   onMap: (id: string) => void; onReset: () => void; newPlaceIds: Set<string>;
 }) {
   const { store, notify, lock } = useBoardSync();
+  const access = useBoardState().access;
+  const deletable = (p: PlaceView) => canDeletePlace(p, access?.who ?? "", access?.memberNames ?? []);
   const navigation = useSearchParams().toString();
   const current = collections.find((c) => c.id === currentId);
   const [selecting, setSelecting] = useState(false), [selected, setSelected] = useState<string[]>([]);
   const [revealedId, setRevealedId] = useState<string | null>(null), [deletingPlace, setDeletingPlace] = useState<PlaceView | null>(null);
   const [deletingPlaces, setDeletingPlaces] = useState<PlaceView[] | null>(null);
+  const [transferIds, setTransferIds] = useState<string[] | null>(null);
   const workspace = useRef<HTMLElement>(null), selectionButton = useRef<HTMLButtonElement>(null);
   const [unfiled, setUnfiled] = useState(false), [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null), [editor, setEditor] = useState<Editor | null>(null);
@@ -198,13 +203,17 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     if (selection) return <button type="button" key={p.id} className={className} aria-pressed={chosen.includes(p.id)} disabled={modal && frozen} onClick={() => toggle(p.id, chosen, setSelected)}>{content}</button>;
     return <SwipeablePlaceRow key={p.id} placeId={p.id} name={p.name} className={className} open={revealedId === p.id}
       onReveal={(open) => setRevealedId((id) => open ? p.id : id === p.id ? null : id)}
-      onOpen={() => onOpen(p.id)} onDelete={() => setDeletingPlace(p)}>{content}</SwipeablePlaceRow>;
+      onOpen={() => onOpen(p.id)} onDelete={() => { if (deletable(p)) setDeletingPlace(p); else { setRevealedId(null); notify(`${p.registrant}님이 등록한 장소라 지울 수 없어요.`, "info"); } }}>{content}</SwipeablePlaceRow>;
   }
   const dialogError = error && <div className={styles.error} role="alert"><p>{error}</p>{conflict && dialog === "editor" && <button className="btn" onClick={reloadEditor}>최신 내용 불러오기</button>}{conflict && dialog !== "editor" && <button className="btn" onClick={finishClose}>목록에서 다시 고르기</button>}</div>;
   const closeButton = <button className="icon-btn sheet-close-btn" aria-label="모음 창 닫기" disabled={busy} onClick={dismiss}><Icon name="close" width={18} /></button>;
   const label = busy ? "처리 확인 중…" : write.pending ? "처리 확인·재시도" : "";
   return <section ref={workspace} data-selecting={selecting} className={`${styles.workspace}${showCollections ? ` ${styles.overview}` : ""}`} aria-label="저장한 장소와 모음">
     {deletingPlace && <PlaceDeleteDialog place={deletingPlace} onClose={() => closePlaceDeletion()} onDeleted={() => closePlaceDeletion(true)} />}
+    {transferIds && <FolderTransferDialog ids={transferIds} onClose={() => setTransferIds(null)} onDone={(result) => {
+      setTransferIds(null); setSelecting(false); setSelected([]);
+      notify(`${transferIds.length}곳을 ‘${result.folder}’ 폴더에 담았어요.`);
+    }} />}
     {deletingPlaces && <PlacesDeleteDialog places={deletingPlaces} onClose={closePlacesDeletion} onDeleted={() => closePlacesDeletion([], true)} />}
     <div className={styles.switch} aria-label="리스트 보기 방식"><button aria-pressed={mode === "all" && !currentId} onClick={() => onNavigate("all")}>전체 장소</button><button aria-pressed={mode === "collections" || !!currentId} onClick={() => onNavigate("collections")}>모음</button></div>
     <div className={current ? styles.detailLayout : undefined}>
@@ -229,7 +238,12 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {selecting && <div className={styles.selectionHint}><button className="text-btn" disabled={!rows.length} onClick={selectCurrentList}>{rows.length > 0 && rows.every((p) => chosen.includes(p.id)) ? "현재 목록 해제" : "현재 목록 선택"}{rows.length > 200 ? " (최대 200곳)" : ""}</button>{current && <button className="text-btn" disabled={!chosen.length} onClick={() => { resetWrite(); setDialog("remove"); }}>이 모음에서 빼기</button>}{chosen.some((id) => !rows.some((p) => p.id === id)) && <span>숨겨진 선택 {chosen.filter((id) => !rows.some((p) => p.id === id)).length}곳 포함</span>}</div>}
       {rows.map((p) => placeRow(p, selecting))}
       {loaded && !rows.length && <div className={styles.empty}><Icon name={current ? current.icon : "heart"} width={32} /><h3>{current && !current.place_ids.length ? "이 모음에 장소를 담아봐요" : unfiled ? "미분류 장소가 없어요" : places.length ? "조건에 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h3><p>{current && !current.place_ids.length ? "이미 저장한 장소에서 골라 담을 수 있어요." : "저장한 장소는 여기에서 함께 볼 수 있어요."}</p>{current && !current.place_ids.length ? <button className="btn" onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}>장소 담기</button> : places.length > 0 && <button className="text-btn" onClick={() => { setUnfiled(false); onReset(); }}>전체 장소 보기</button>}</div>}
-      {selecting && <SelectedPlacesBar workspace={workspace} count={chosen.length} onCollect={openPicker} onDelete={() => setDeletingPlaces(places.filter((p) => chosen.includes(p.id)))} />}
+      {selecting && <SelectedPlacesBar workspace={workspace} count={chosen.length} onCollect={openPicker} onTransfer={() => setTransferIds(chosen)} onDelete={() => {
+        const picked = places.filter((p) => chosen.includes(p.id)), mine = picked.filter(deletable);
+        if (!mine.length) { notify("내가 등록한 장소만 지울 수 있어요.", "info"); return; }
+        if (mine.length < picked.length) notify(`다른 사람이 등록한 ${picked.length - mine.length}곳은 빼고 지울게요.`, "info");
+        setDeletingPlaces(mine);
+      }} />}
     </>}
     </div></div>
     {!dialog && dialogError}

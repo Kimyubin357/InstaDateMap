@@ -4,7 +4,8 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 function placeUrl(value) {
   try {
     const url = new URL(value, self.location.origin);
-    if (url.origin === self.location.origin && url.pathname === "/" && /^[0-9a-f-]{36}$/i.test(url.searchParams.get("place") || "")) return `/?place=${encodeURIComponent(url.searchParams.get("place"))}`;
+    const uuid = /^[0-9a-f-]{36}$/i, place = url.searchParams.get("place") || "", folder = url.searchParams.get("folder") || "";
+    if (url.origin === self.location.origin && url.pathname === "/" && uuid.test(place)) return `/?place=${encodeURIComponent(place)}${uuid.test(folder) ? `&folder=${encodeURIComponent(folder)}` : ""}`;
   } catch {}
   return "/";
 }

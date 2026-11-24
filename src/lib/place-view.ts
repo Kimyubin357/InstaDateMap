@@ -2,7 +2,14 @@ import type { PlaceStatus } from "./types";
 export interface PlaceView {
   id: string; name: string; address: string | null; lat: number; lng: number; category: string | null;
   kakao_place_id: string | null; kakao_url: string | null; status: PlaceStatus; memo: string | null; memo_version?: number; sharers: string[];
+  /** 처음 등록한 사람 이름(삭제 권한: 이 사람만, 이 사람이 방에 없으면 멤버 누구나). 017 */
+  registrant?: string | null;
   sources: { url: string; media_type: string }[]; created_at: string; last_saved_at: string;
+}
+/** 삭제 권한(017): 처음 등록한 사람만. 등록한 사람이 방에 없으면(나갔거나 탈퇴) 멤버 누구나. 서버(dm_delete_place)도 같은 기준으로 막습니다. */
+export function canDeletePlace(place: Pick<PlaceView, "registrant">, who: string, memberNames: string[]) {
+  const registrant = place.registrant;
+  return !registrant || registrant === who || !memberNames.includes(registrant);
 }
 export const STATUS_ORDER: PlaceStatus[] = ["wish", "again", "visited", "meh"];
 /** Map and list open on the places still to visit; filter reset returns here. */

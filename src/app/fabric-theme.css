@@ -342,3 +342,15 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 /* 회원 탈퇴: 설정 맨 아래의 작은 글자 버튼(주요 실행처럼 보이지 않게), 확인 창 안의 안내 */
 .settings-leave{align-self:center;display:block;min-height:44px;margin:18px auto 0;padding:0 16px;font-size:15px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px}
 .settings-leave-detail{text-align:left}.settings-leave-detail p{margin:0 0 8px}
+/* 저장할 폴더: 저장 화면 탭 아래의 한 줄(원단 점선 행). 누르면 폴더 고르기 창 */
+.folder-chooser{width:100%;display:flex;align-items:center;gap:10px;min-height:52px;margin:0 0 14px;padding:8px 14px;border:1px dashed var(--line);border-radius:12px;background:var(--cream) var(--weave);color:var(--ink);font:inherit;text-align:left}
+.folder-chooser:focus-visible{outline:3px solid var(--forest);outline-offset:2px}
+.folder-chooser-label{flex:none;font-size:15px;color:var(--ink-soft)}
+.folder-chooser-value{flex:1;min-width:0;display:flex;align-items:center;gap:6px;color:var(--forest)}
+.folder-chooser-value b{font-weight:400;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-chooser>svg:last-child{flex:none;color:var(--ink-soft)}
+/* 폴더별 알림: 알림 줄 아래 들여 쓴 폴더 스위치들 */
+.push-folders{display:flex;flex-direction:column;margin:0 0 4px;padding-left:28px;border-left:1px dashed var(--line);margin-left:12px}
+.push-folder-row{min-height:48px}
+.push-folder-row .settings-copy>span{font-size:17px}
+.place-delete-hint{margin:4px 0 0;text-align:center;font-size:15px}

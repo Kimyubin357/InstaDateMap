@@ -44,7 +44,7 @@ class Q {
   insert(input: Row | Row[]) { if (this.failed("insert")) return this; this.result = (Array.isArray(input) ? input : [input]).map((r) => { const row = { id: `id${++seq}`, ...r }; tables[this.t].push(row); return row; }); return this; }
   upsert(input: Row | Row[], opts: { ignoreDuplicates?: boolean } = {}) {
     if (this.failed("upsert")) return this;
-    const keys = this.t === "push_subscriptions" ? ["endpoint_hash"] : uniq[this.t] || ["id"];
+    const keys = this.t === "push_subscriptions" ? ["endpoint_hash", "board_id"] : uniq[this.t] || ["id"];
     this.result = (Array.isArray(input) ? input : [input]).map((r) => {
       const found = tables[this.t].find((x) => keys.every((k) => x[k] === r[k]));
       if (found) { if (!opts.ignoreDuplicates) Object.assign(found, r); return found; }
@@ -75,6 +75,19 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
   const snapshot = structuredClone(tables);
   const check = (r: { error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); };
   try {
+    if (name === "dm_delete_place") {
+      // 017: 처음 등록한 사람만(등록한 사람이 방에 없으면 누구나). 방에서 바로 빼고 지운 사람의 기록에 남김.
+      legacyAccounts();
+      const me = tables.board_members?.find((m) => m.board_id === p.p_board && m.user_id === p.p_user)?.member_name;
+      if (!me) throw Error("참여한 방의 장소만 지울 수 있어요.");
+      const row = tables.places?.find((r) => r.id === p.p_place && r.board_id === p.p_board && !r.deleted_at);
+      if (!row) return { data: { ok: true, already_deleted: true, deleted_id: p.p_place }, error: null };
+      const first = [...(tables.place_saves ?? []).filter((x) => x.place_id === row.id)].sort((a, b) => String(a.added_at ?? "").localeCompare(String(b.added_at ?? "")))[0]?.added_by;
+      if (first && first !== me && tables.board_members?.some((m) => m.board_id === p.p_board && m.member_name === first)) throw Error(`${first}님이 등록한 장소라 지울 수 없어요.`);
+      (tables.place_trash_log ??= []).push({ id: `log${++seq}`, user_id: p.p_user, board_id: p.p_board, place: { name: row.name }, deleted_at: new Date().toISOString() });
+      check(await new Q("places").delete().eq("id", row.id));
+      return { data: { ok: true, deleted_id: row.id }, error: null };
+    }
     if (name === "dm_trash_place") {
       const row = tables.places?.find((r) => r.id === p.p_id && r.board_id === p.p_board);
       if (!row) return { data: p.p_action === "restore" ? { code: "PLACE_NOT_FOUND" } : { ok: true, deleted_id: p.p_id, already_deleted: true }, error: null };
@@ -195,6 +208,11 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       if (!tables.board_members.some((m) => m.board_id === b.id && m.user_id === p.p_user)) tables.board_members.push({ board_id: b.id, user_id: p.p_user, role: "member", member_name: p.p_name, joined_at: new Date().toISOString() });
       const user = tables.app_users?.find((u) => u.id === p.p_user); if (user) user.last_board_id = b.id;
       return { data: { board_id: b.id, member_name: p.p_name, auth_version: b.auth_version }, error: null };
+    }
+    if (name === "dm_list_folders") {
+      legacyAccounts();
+      const mine = (tables.board_members ?? []).filter((m) => m.user_id === p.p_user);
+      return { data: mine.map((m) => { const b = tables.boards?.find((x) => x.id === m.board_id); return { id: m.board_id, name: b?.name ?? "", role: m.role, member_name: m.member_name }; }), error: null };
     }
     throw Error("unknown RPC");
   } catch (e) { for (const k of Object.keys(tables)) delete tables[k]; Object.assign(tables, snapshot); return { data: null, error: { message: e instanceof Error ? e.message : "error" } }; }

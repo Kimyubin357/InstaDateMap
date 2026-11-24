@@ -31,7 +31,7 @@ export async function GET(req: Request) {
         .order("created_at", { ascending: false }),
       db()
         .from("source_places")
-        .select("place_id, added_by, sources!inner(id, url, media_type, board_id)")
+        .select("place_id, added_by, added_at, sources!inner(id, url, media_type, board_id)")
         .eq("sources.board_id", board.id),
       db()
         .from("sources")
@@ -58,7 +58,12 @@ export async function GET(req: Request) {
       namesBySource.set(row.source_id, names);
     }
 
-    type Link = { place_id: string; added_by: string; sources: { id: string; url: string; media_type: string } };
+    type Link = { place_id: string; added_by: string; added_at?: string; sources: { id: string; url: string; media_type: string } };
+    // 처음 등록한 사람: 저장 기록과 원본 연결 중 가장 이른 것(DB의 dm_place_registrant와 같은 기준)
+    const first = new Map<string, { by: string; at: string }>();
+    const noteFirst = (id: string, by: string, at?: string) => { const prev = first.get(id); if (at && (!prev || at < prev.at)) first.set(id, { by, at }); };
+    for (const l of (links ?? []) as unknown as Link[]) noteFirst(l.place_id, l.added_by, l.added_at);
+    for (const s of saveResult.data ?? []) noteFirst(s.place_id, s.added_by, s.added_at);
     const byPlace = new Map<string, { sharers: Set<string>; sources: Map<string, { url: string; media_type: string }> }>();
     for (const l of (links ?? []) as unknown as Link[]) {
       const e = byPlace.get(l.place_id) ?? { sharers: new Set(), sources: new Map() };
@@ -89,6 +94,7 @@ export async function GET(req: Request) {
           ...p,
           kakao_place_id: p.kakao_place_id ?? null,
           sharers: e ? [...e.sharers] : [],
+          registrant: first.get(p.id)?.by ?? null,
           sources: e ? [...e.sources.values()] : [],
           last_saved_at: latest.get(p.id) || p.created_at,
         };
