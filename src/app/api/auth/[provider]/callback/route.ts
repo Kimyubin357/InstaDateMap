@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** board_id가 null이면 폴더를 모두 지운 계정입니다. 지도 대신 폴더 화면으로 갑니다. */
-interface LoginResult { user_id: string; board_id: string | null; member_name: string | null; auth_version: number; created: boolean }
+interface LoginResult { user_id: string; board_id: string | null; member_name: string | null; auth_version: number; created: boolean; name_confirmed?: boolean }
 
 /** 공급자에서 돌아온 뒤: state 확인 → 사용자 정보 → 계정·내 장소 → 90일 로그인 세션. */
 export async function GET(req: Request, { params }: { params: Promise<{ provider: string }> }) {
@@ -41,7 +41,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
     // 이 기기에 남아 있던 예전 세션(PIN 등)은 새 로그인 세션으로 대체합니다.
     const previous = cookieValue(req, SESSION_COOKIE);
     if (/^[0-9a-f]{64}$/.test(previous)) await db().from("access_sessions").delete().eq("token_hash", tokenHash(previous));
-    return finish(setSessionCookie(NextResponse.redirect(new URL(login.board_id || next.startsWith("/invite/") ? next : "/folders", req.url)), token, true));
+    const destination = login.board_id || next.startsWith("/invite/") ? next : "/folders";
+    // 처음 가입했거나 이름을 아직 확인하지 않았으면 이름·사진부터 정합니다.
+    const target = login.name_confirmed === false ? `/welcome?next=${encodeURIComponent(destination)}` : destination;
+    return finish(setSessionCookie(NextResponse.redirect(new URL(target, req.url)), token, true));
   } catch (e) {
     if (!(e instanceof AccessError)) console.error(`OAuth ${provider} callback failed`, e instanceof Error ? e.message : e);
     return back("failed");

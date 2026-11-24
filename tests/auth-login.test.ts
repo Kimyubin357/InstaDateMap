@@ -94,7 +94,8 @@ describe("로그인 완료", () => {
   it("계정과 내 장소를 만들고 90일 세션으로 원래 가려던 주소에 보내며, 예전 PIN 세션은 지운다", async () => {
     vi.stubGlobal("fetch", providerFetch(kakaoProfile).fetcher);
     const res = await callback(callbackRequest("kakao", `code=abc&state=${state}`, state, `; datemap_session=${legacyToken}`), params("kakao"));
-    expect(res.headers.get("location")).toBe("http://localhost:3000/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F");
+    // 처음 가입하면 이름·사진 확인 화면을 거쳐 원래 가려던 주소로 갑니다.
+    expect(res.headers.get("location")).toBe(`http://localhost:3000/welcome?next=${encodeURIComponent("/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F")}`);
     expect(res.headers.get("set-cookie")).toMatch(/Max-Age=7776000/);
     expect(res.headers.get("set-cookie")).toMatch(/datemap_oauth=;/);
     const token = sessionCookie(res);
@@ -113,6 +114,22 @@ describe("로그인 완료", () => {
     expect(noCode.headers.get("location")).toContain("error=failed");
     for (const res of [cancelled, mismatch, noCode]) expect(sessionCookie(res)).toBe("");
     expect(fetcher).not.toHaveBeenCalled(); expect(tables.app_users ?? []).toHaveLength(0);
+  });
+});
+
+describe("가입 후 이름 확인", () => {
+  it("이름을 확인한 계정은 다음 로그인부터 원래 가려던 주소로 바로 간다", async () => {
+    vi.stubGlobal("fetch", providerFetch(kakaoProfile).fetcher);
+    await callback(callbackRequest("kakao", `code=abc&state=${state}`), params("kakao"));
+    tables.app_users[0].name_confirmed = true;
+    const again = await callback(callbackRequest("kakao", `code=def&state=${state}`), params("kakao"));
+    expect(again.headers.get("location")).toBe("http://localhost:3000/add?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FX%2F");
+  });
+  it("카카오의 http 프로필 사진 주소는 https로 바꾸고, 다른 http 주소는 버린다", async () => {
+    const http = { ...kakaoProfile, kakao_account: { ...kakaoProfile.kakao_account, profile: { nickname: "유빈", profile_image_url: "http://k.kakaocdn.net/dn/a.jpg" } } };
+    expect((await exchangeProfile("kakao", { clientId: "k" }, "http://x/cb", "c", providerFetch(http).fetcher as unknown as typeof fetch)).avatar).toBe("https://k.kakaocdn.net/dn/a.jpg");
+    const other = { ...kakaoProfile, kakao_account: { ...kakaoProfile.kakao_account, profile: { nickname: "유빈", profile_image_url: "http://evil.example/a.jpg" } } };
+    expect((await exchangeProfile("kakao", { clientId: "k" }, "http://x/cb", "c", providerFetch(other).fetcher as unknown as typeof fetch)).avatar).toBeNull();
   });
 });
 
