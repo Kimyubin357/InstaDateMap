@@ -14,6 +14,7 @@ import AddForm from "@/app/add/AddForm";
 import SettingsForm from "@/app/settings/SettingsForm";
 import FoldersPanel from "@/app/folders/FoldersPanel";
 import ProfilePanel from "@/app/settings/profile/ProfilePanel";
+import NotificationsPanel from "@/app/settings/notifications/NotificationsPanel";
 import TrashPlaces from "./TrashPlaces";
 import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
@@ -142,6 +143,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {pathname === "/settings" && <div className="shell-page" key="settings"><SettingsForm who={state.access.who} /></div>}
       {pathname === "/folders" && <div className="shell-page" key="folders"><FoldersPanel /></div>}
       {pathname === "/settings/profile" && <div className="shell-page" key="profile"><ProfilePanel /></div>}
+      {pathname === "/settings/notifications" && <div className="shell-page" key="notifications"><NotificationsPanel /></div>}
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       {accessError && pathname !== "/settings" && <ActionDialog title="입장 정보를 다시 확인해 주세요" message={accessError} tone="error" confirmLabel="입장 정보 다시 확인" onClose={() => { void resetAccess(false); }} />}
