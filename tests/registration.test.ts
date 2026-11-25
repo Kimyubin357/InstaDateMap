@@ -150,6 +150,12 @@ describe("링크 입력 미리 확인(2026-11-25 점검 엣지 케이스)", () =
     expect(postLinkIn("https://instagram.com/reels/XyZ123/")).toEqual({ link: "https://instagram.com/reels/XyZ123/" });
     expect(postLinkIn("https://naver.me/5abcdEFG")).toEqual({ problem: "not_instagram" });
     expect(postLinkIn("https://www.instagram.com/newatdawn/")).toEqual({ problem: "not_post" });
+    expect(postLinkIn("https://www.instagram.com/p/")).toEqual({ problem: "cut_off" });
+    expect(postLinkIn("https://www.instagram.com/reel")).toEqual({ problem: "cut_off" });
+    expect(postLinkIn("https://www.instagram.com/stories/newatdawn/3412345678901234567?igsh=x")).toEqual({ problem: "story" });
+    expect(postLinkIn("https://www.instagram.com/s/aGlnaGxpZ2h0OjE3?story_media_id=1")).toEqual({ problem: "story" });
+    expect(postLinkIn("https://www.instagram.com/explore/tags/성수맛집/")).toEqual({ problem: "not_post_page" });
+    expect(postLinkIn("https://www.instagram.com/share/reel/BAabc123/")).toEqual({ link: "https://www.instagram.com/share/reel/BAabc123/" });
     expect(postLinkIn("안녕하세요")).toEqual({ problem: "not_instagram" });
   });
 });

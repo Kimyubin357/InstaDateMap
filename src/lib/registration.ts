@@ -136,13 +136,25 @@ export function instagramLinkIn(text: string): string | null {
  * 서버에 보내기 전에 입력을 확인합니다. 글 속에 섞인 링크도 골라내고, 게시물·릴스 주소가 아니면 이유를 돌려줍니다.
  * (인스타가 아닌 링크·계정 주소를 넣고 분석 화면까지 갔다가 되돌아오지 않도록)
  */
-export type PostLinkCheck = { link: string } | { problem: "not_instagram" | "not_post" };
+export type PostLinkProblem = "not_instagram" | "not_post" | "story" | "cut_off" | "not_post_page";
+export type PostLinkCheck = { link: string } | { problem: PostLinkProblem };
 export function postLinkIn(text: string): PostLinkCheck {
   const link = instagramLinkIn(text);
   if (!link) return { problem: "not_instagram" };
-  return /instagram\.com\/(?:[^/?#]+\/)?(?:p|reels?|tv)\/[A-Za-z0-9_-]+/i.test(link) ? { link } : { problem: "not_post" };
+  if (/instagram\.com\/(?:[^/?#]+\/)?(?:p|reels?|tv)\/[A-Za-z0-9_-]+/i.test(link)) return { link };
+  // 게시물 주소가 아니면 왜 안 되는지 나눠 알려 줍니다(모두 '계정 주소'라고 하던 문제, 2026-11-26).
+  const path = link.replace(/^https?:\/\/(?:www\.)?instagram\.com/i, "").replace(/[?#].*$/, "");
+  const parts = path.split("/").filter(Boolean);
+  if (/^(stories|s)$/i.test(parts[0] ?? "") || /^stories$/i.test(parts[1] ?? "")) return { problem: "story" };
+  if (/^(p|reels?|tv)$/i.test(parts.at(-1) ?? "")) return { problem: "cut_off" };
+  const reserved = /^(explore|accounts|direct|about|legal|developer|web|challenge|share|reels?|p|tv)$/i;
+  if (parts.length === 1 && !reserved.test(parts[0])) return { problem: "not_post" };
+  return { problem: "not_post_page" };
 }
-export const POST_LINK_HINT: Record<"not_instagram" | "not_post", string> = {
+export const POST_LINK_HINT: Record<PostLinkProblem, string> = {
   not_instagram: "인스타그램 게시물이나 릴스 링크가 아니에요. 인스타에서 ‘링크 복사’로 가져와 주세요.",
   not_post: "계정 주소예요. 저장하려는 게시물이나 릴스를 열고 ‘링크 복사’를 눌러 주세요.",
+  story: "스토리는 저장할 수 없어요. 게시물이나 릴스의 ‘링크 복사’로 가져와 주세요.",
+  cut_off: "링크가 중간에 잘렸어요. 게시물에서 ‘링크 복사’를 다시 눌러 붙여 넣어 주세요.",
+  not_post_page: "게시물이나 릴스 링크가 아니에요. 저장하려는 게시물을 열고 ‘링크 복사’를 눌러 주세요.",
 };

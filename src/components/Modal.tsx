@@ -9,6 +9,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(); const [dragging, setDragging] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number }>();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const stops = useRef(sheetStops(844)); const stop = useRef<SheetStop>(initialStop); const mobile = useRef(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
@@ -20,7 +21,8 @@ export default function Modal({ title, children, onClose, variant = "resizable",
       mobile.current = window.matchMedia(resizeMedia).matches || (fullScreenAtMax && stop.current === 2);
       const layoutHeight = layoutViewportHeight();
       const editable = !!document.activeElement?.matches("input,textarea,[contenteditable=true]");
-      const { top, height } = visibleViewport(layoutHeight, window.visualViewport?.height || window.innerHeight, window.visualViewport?.offsetTop || 0, editable);
+      const { top, height, keyboard } = visibleViewport(layoutHeight, window.visualViewport?.height || window.innerHeight, window.visualViewport?.offsetTop || 0, editable);
+      setKeyboardOpen(keyboard);
       const content = summaryRef.current && footerRef.current && ref.current;
       const preview = body.current?.querySelector<HTMLElement>("[data-sheet-preview]");
       const style = content ? getComputedStyle(ref.current!) : undefined;
@@ -188,7 +190,7 @@ export default function Modal({ title, children, onClose, variant = "resizable",
   if (typeof document === "undefined") return null;
   const fullScreen = fullScreenAtMax && !!viewport && stop.current === 2;
   const collapsed = !!summary && !!viewport && stop.current === 0 && !dragging;
-  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}${fullScreen ? " is-fullscreen" : ""}${collapsed ? " is-collapsed" : ""} ${className}`} data-resizable={!!viewport && variant === "resizable"} data-sheet-stop={stop.current} style={height === undefined ? undefined : { height }} onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)} onLostPointerCapture={(event) => finish(event, true)} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
+  return createPortal(<div className="modal-root" style={viewport ? { top: viewport.top, height: viewport.height, bottom: "auto" } : undefined}><div className="sheet-backdrop" onClick={onClose} /><section ref={ref} tabIndex={-1} className={`sheet${variant === "compact" ? " sheet-compact" : ""}${dragging ? " is-dragging" : ""}${fullScreen ? " is-fullscreen" : ""}${collapsed ? " is-collapsed" : ""}${keyboardOpen ? " is-keyboard" : ""} ${className}`} data-resizable={!!viewport && variant === "resizable"} data-sheet-stop={stop.current} style={height === undefined ? undefined : { height }} onClickCapture={(event) => { if (dragFromContent && Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)} onLostPointerCapture={(event) => finish(event, true)} onTransitionEnd={revealInput} role={dialogRole} aria-modal="true" aria-label={title}>
     {variant === "resizable" && <div className="sheet-handle" tabIndex={fullScreen ? -1 : 0} aria-hidden={fullScreen || undefined} role="separator" aria-orientation="horizontal" aria-label="패널 크기 조절" aria-valuemin={0} aria-valuemax={2} aria-valuenow={stop.current} aria-valuetext={["낮게 접힘", "중간 높이", "최대로 펼침"][stop.current]} onPointerDown={start}
       onKeyDown={(e) => { if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); snap(e.key === "Home" ? 0 : e.key === "End" ? 2 : Math.max(0, Math.min(2, stop.current + (e.key === "ArrowUp" ? 1 : -1))) as SheetStop); } }}><span className="grabber" /><span className="sr-only">위아래로 드래그하거나 방향키로 크기를 바꿔요. 아래로 끝까지 내리면 닫혀요.</span></div>}
     <div className="sheet-heading">

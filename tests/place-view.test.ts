@@ -7,6 +7,11 @@ describe("지도와 리스트의 공통 보기", () => {
     expect(filterPlaces(all, "수원 창가", ["wish"], "카페").map((p) => p.id)).toEqual(["one"]);
     expect(filterPlaces(all, "없는곳", ["wish"], "")).toEqual([]);
   });
+  it("자모가 나뉜 이름·보이지 않는 글자가 섞여도 같은 글자로 찾습니다", () => {
+    const nfd = place("nfd", { name: "토러스".normalize("NFD") }), hidden = place("zw", { name: "토\u200b러스" });
+    expect(filterPlaces([nfd, hidden], "토러스", ["wish"], "").map((p) => p.id)).toEqual(["nfd", "zw"]);
+    expect(filterPlaces([place("x", { name: "토러스" })], "토러".normalize("NFD"), ["wish"], "").map((p) => p.id)).toEqual(["x"]);
+  });
   it("최근 저장과 가까운순은 원본 목록을 변경하지 않음", () => {
     const all = [place("old"), place("new", { last_saved_at: "2026-02-01", lat: 38 })];
     expect(sortPlaces(all).map((p) => p.id)).toEqual(["new", "old"]);
