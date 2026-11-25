@@ -40,10 +40,27 @@ describe("서버가 확인 저장의 장소 정보를 결정", () => {
     expect(response.status).toBe(200); expect(tables.places[0]).toMatchObject({ name: "서버가 찾은 식당", lat: 37 });
   });
   it("갱신된 세대와 다른 소유자의 확인 저장을 거절", async () => {
-    expect((await confirm(request({ version: "old", selections: [] }), params)).status).toBe(409);
+    const selections = [{ extraction_id: "e1", include: true, place_id: "original" }];
+    expect((await confirm(request({ version: "old", selections }), params)).status).toBe(409);
     tables.sources[0].work_owner = "other";
-    expect((await confirm(request({ selections: [] }), params)).status).toBe(409);
+    expect((await confirm(request({ selections }), params)).status).toBe(409);
     expect(tables.sources[0].status).toBe("pending_confirm");
+  });
+  it("담을 곳이 0곳인 확인은 거절하고 링크를 그대로 둠(정리는 dismiss로만)", async () => {
+    for (const selections of [[], [{ extraction_id: "e1", include: false, place_id: null }]]) {
+      const response = await confirm(request({ selections }), params);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ status: "error", code: "NOTHING_TO_SAVE", message: expect.stringContaining("이 링크 정리하기") });
+    }
+    expect(tables.sources[0].status).toBe("pending_confirm");
+    expect(tables.extractions[0].excluded).toBeUndefined();
+    expect(tables.places ?? []).toHaveLength(0);
+  });
+  it("저장한 장소 id를 모두 돌려줌(방금 담은 곳 시트)", async () => {
+    const response = await confirm(request({ selections: [{ extraction_id: "e1", include: true, place_id: "original" }] }), params);
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ saved: 1, place_ids: [tables.places[0].id], place_url: `/?place=${tables.places[0].id}` });
   });
   it("카카오 조회 중 재분석이 시작되어도 오래된 결과를 커밋하지 않음", async () => {
     vi.mocked(keywordSearch).mockImplementationOnce(async () => { tables.sources[0].analysis_version = "new"; return [place]; });

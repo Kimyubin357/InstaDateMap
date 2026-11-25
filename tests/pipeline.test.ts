@@ -172,6 +172,31 @@ describe("공유 → 저장 흐름", () => {
     expect(r.confirm_url).toContain("/confirm/");
   });
 
+  it("위치 태그는 장소 후보가 아님: 캡션 없이 위치 태그만 있으면 내용을 못 읽은 링크", async () => {
+    vi.mocked(fetchCaption).mockResolvedValueOnce({ caption: null, method: null, locationTag: "용산역" });
+    const llm = vi.fn(llmFor(["용산역"]));
+    const r = await ingestShare({ ...base, text: "https://www.instagram.com/reel/TAG/" }, llm);
+    expect(r.status).toBe("needs_caption");
+    expect(llm).not.toHaveBeenCalled();
+    expect(tables.extractions ?? []).toHaveLength(0);
+  });
+
+  it("캡션과 위치 태그가 함께 있으면 캡션 이름만 후보로 저장", async () => {
+    vi.mocked(fetchCaption).mockResolvedValueOnce({ caption: "딩티엔 용산점 다녀옴", method: "og", locationTag: "용산역" });
+    const r = await ingestShare({ ...base, text: "https://www.instagram.com/reel/DING/" }, llmFor(["없는집"]));
+    expect(r.status).toBe("needs_review");
+    expect(tables.extractions.map((e) => [e.module, e.raw_name])).toEqual([["caption", "없는집"]]);
+  });
+
+  it("0곳 확인은 서버에서 거절하고 링크를 끝내지 않음", async () => {
+    vi.mocked(fetchCaption).mockResolvedValueOnce({ caption: "코스: 어니언, 자연도소금빵", method: "og", locationTag: null });
+    const r = await ingestShare({ ...base, text: "https://www.instagram.com/reel/ZERO/" }, llmFor(["어니언", "자연도소금빵"]));
+    const rows = tables.extractions.map((e) => ({ extraction_id: e.id, include: false, place_id: null }));
+    await expect(confirmSelections("b1", r.source_id!, "민지", rows, null, base.owner, tables.sources[0].analysis_version)).rejects.toThrow("이 링크 정리하기");
+    expect(tables.sources[0].status).toBe("pending_confirm");
+    expect(tables.places ?? []).toHaveLength(0);
+  });
+
   it("인스타 링크가 아니면 에러", async () => {
     const r = await ingestShare({ ...base, text: "https://naver.com" }, llmFor([]));
     expect(r.status).toBe("error");

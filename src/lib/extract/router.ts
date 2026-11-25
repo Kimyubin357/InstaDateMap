@@ -1,13 +1,16 @@
 import { AnalysisError, type AnalysisIssue } from "../analysis-issue";
 import type { ExtractorModule, ModuleDeps, PlaceCandidate, SourceContext } from "./types";
 import { captionModule } from "./modules/caption";
-import { locationTagModule } from "./modules/locationTag";
 import { imageModule } from "./modules/image";
 import { videoModule } from "./modules/video";
 import { mergeCandidates } from "./merge";
 
-/** 등록된 모듈. 새 모듈은 여기에 한 줄 추가하면 됩니다. */
-export const MODULES: ExtractorModule[] = [locationTagModule, captionModule, imageModule, videoModule];
+/**
+ * 등록된 모듈. 새 모듈은 여기에 한 줄 추가하면 됩니다.
+ * 장소 이름은 캡션에서만 읽습니다(사용자 결정 2026-11-25). 위치 태그(역·동네 등)는 식당의 보조 위치일 때가 많아
+ * 장소 후보로 쓰지 않으므로 locationTag 모듈은 등록하지 않습니다(코드는 modules/locationTag.ts에 남김).
+ */
+export const MODULES: ExtractorModule[] = [captionModule, imageModule, videoModule];
 
 /** 이 신뢰도 이상인 후보가 하나라도 있으면 무거운 모듈을 건너뜁니다. */
 export const GOOD_ENOUGH = 0.6;

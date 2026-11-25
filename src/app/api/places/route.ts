@@ -49,13 +49,21 @@ export async function GET(req: Request) {
     const { data: links } = linkResult;
     const { data: pending } = pendingResult;
     const pendingIds = (pending ?? []).map((source) => source.id);
-    const candidateNames = pendingIds.length ? await db().from("extractions").select("source_id, raw_name, branch").in("source_id", pendingIds) : { data: [], error: null };
+    const candidateNames = pendingIds.length ? await db().from("extractions").select("source_id, module, raw_name, branch, candidates, excluded").in("source_id", pendingIds) : { data: [], error: null };
     const namesBySource = new Map<string, Set<string>>();
+    // 확인 대기의 남은 이유: 지도 후보가 없는 곳(missing)·여러 지점 중 고를 곳(choose). 위치 태그 후보는 쓰지 않습니다.
+    const leftBySource = new Map<string, { missing: number; choose: number }>();
     if (!candidateNames.error) for (const row of candidateNames.data ?? []) {
+      if (row.module === "location_tag") continue;
       const names = namesBySource.get(row.source_id) ?? new Set<string>();
       const name = [row.raw_name, row.branch].filter(Boolean).join(" ").trim();
       if (name) names.add(name);
       namesBySource.set(row.source_id, names);
+      if (row.excluded) continue;
+      const left = leftBySource.get(row.source_id) ?? { missing: 0, choose: 0 };
+      const count = Array.isArray(row.candidates) ? row.candidates.length : 0;
+      if (count === 0) left.missing++; else if (count > 1) left.choose++;
+      leftBySource.set(row.source_id, left);
     }
 
     type Link = { place_id: string; added_by: string; added_at?: string; sources: { id: string; url: string; media_type: string } };
@@ -99,7 +107,7 @@ export async function GET(req: Request) {
           last_saved_at: latest.get(p.id) || p.created_at,
         };
       }),
-      pending: (pending ?? []).map((source) => ({ ...source, place_names: [...(namesBySource.get(source.id) ?? [])] })),
+      pending: (pending ?? []).map((source) => ({ ...source, place_names: [...(namesBySource.get(source.id) ?? [])], missing_count: leftBySource.get(source.id)?.missing ?? 0, choose_count: leftBySource.get(source.id)?.choose ?? 0 })),
     }, { headers: { "Cache-Control": "no-store", ETag: etag } });
     }
     return Response.json({ status: "error", message: "변경 내용을 맞추는 중이에요. 잠시 후 다시 확인할게요." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "1" } });

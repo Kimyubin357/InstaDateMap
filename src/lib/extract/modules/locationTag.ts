@@ -12,11 +12,14 @@ export function isRegionTag(raw: string): boolean {
   return parts.length > 0 && parts.every((p) => REGIONS.has(p) || /(?:특별시|광역시|특별자치시|특별자치도|시|군|구|동|읍|면)$/.test(p));
 }
 
-/** 게시물에 위치 태그가 있으면 LLM 없이 그대로 후보로 씁니다. */
+/**
+ * 게시물 위치 태그를 LLM 없이 후보로 만드는 모듈.
+ * 2026-11-25부터 장소 후보는 캡션에서만 읽으므로 라우터(MODULES)에 등록하지 않고 꺼 둡니다.
+ */
 export const locationTagModule: ExtractorModule = {
   name: "location_tag",
   cost: "cheap",
-  enabled: true,
+  enabled: false,
   canRun: (ctx) => !!ctx.locationTag,
   async run(ctx) {
     const raw = ctx.locationTag!.trim();

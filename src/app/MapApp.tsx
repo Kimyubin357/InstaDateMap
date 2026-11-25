@@ -2,6 +2,8 @@
 import CollectionsList from "@/components/CollectionsList";
 import useNewPlaceIds from "@/components/useNewPlaceIds";
 import PendingLinks from "@/components/PendingLinks";
+import JustSavedSheet from "@/components/JustSavedSheet";
+import { takeJustSaved, type JustSaved } from "@/lib/saved-memory";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SEARCH_TOOLS_ID } from "@/lib/search-tools";
@@ -56,6 +58,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState<JustSaved | null>(null);
   const duplicateArrival = useRef(false);
   const restoredArrival = useRef(false);
   const [initialMap, setInitialMap] = useState<MapPosition>(); const [restored, setRestored] = useState(false);
@@ -160,9 +163,13 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!place && (syncing || error || !["0", "1"].includes(savedArrival))) return;
     setView("map");
     if (!restoredArrival.current || !visible.some((p) => p.id === place?.id)) { setStatuses(statusesShowing(place)); setCategory(""); }
-    setFocusedId(place?.id || null);
+    // 등록 화면에서 방금 담은 곳(시안 9번): 칩 "'방'에 N곳을 담았어요" + '방금 담은 N곳' 시트. 시트가 장소 카드 자리를 씁니다.
+    const fresh = !restoredArrival.current && savedArrival !== "0" && !duplicateArrival.current && data ? takeJustSaved(data.boardId) : null;
+    const arrived = fresh && (savedArrival === "1" || fresh.ids.includes(savedArrival)) ? fresh : null;
+    setJustSaved(arrived);
+    setFocusedId(arrived ? null : place?.id || null);
     setMapRequest(place ? { sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true, level: 3 } : { sequence: ++requestSequence.current, kind: "saved" });
-    if (!restoredArrival.current) notify(savedArrival === "0" ? "저장 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 저장한 장소예요." : "장소를 저장했어요.");
+    if (!restoredArrival.current) notify(savedArrival === "0" ? "저장 없이 링크를 정리했어요." : duplicateArrival.current ? "이미 저장한 장소예요." : arrived ? `‘${board}’에 ${arrived.ids.length}곳을 담았어요.` : "장소를 저장했어요.");
     setSavedArrival(null);
     const url = new URL(window.location.href); url.searchParams.delete("saved"); url.searchParams.delete("duplicate"); url.searchParams.delete("restored"); url.searchParams.delete("view"); url.searchParams.delete("collection"); url.searchParams.delete("section");
     history.replaceState(history.state, "", url.pathname + url.search);
@@ -200,7 +207,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   }
   function previewPlace(id: string) {
     const place = mapPlaces.find((item) => item.id === id); if (!place) return;
-    setFocusedId(id);
+    setJustSaved(null); setFocusedId(id);
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true });
   }
   /** Map area left free by search, chips, an open region list and the bottom navigation. */
@@ -208,7 +215,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     const box = root.current?.getBoundingClientRect(); if (!box) return null;
     const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
     const stackTop = [...(root.current?.querySelectorAll(".map-chip-stack>:not(.region-sheet):not(.map-status-card)") ?? [])].reduce((bottom, el) => Math.max(bottom, el.getBoundingClientRect().bottom), rect(".unified-search-header")?.bottom ?? box.top + 80);
-    const sheet = root.current?.querySelector<HTMLElement>(".region-sheet")?.getBoundingClientRect();
+    const sheet = root.current?.querySelector<HTMLElement>(".region-sheet, .just-saved-sheet")?.getBoundingClientRect();
     const nav = rect(".bottom-nav");
     const inset = { top: stackTop - box.top + 24, right: 72, bottom: box.bottom - (nav?.top ?? box.bottom) + 24, left: 40 };
     if (sheet && landscape) inset.left = sheet.right - box.left + 24;
@@ -244,9 +251,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     onClose={() => setRegionSelection(null)} onPick={(id) => { setRegionSelection(null); previewPlace(id); }} />;
   const statusView = status && <MapStatus status={status} landscape={landscape} onClose={() => setDismissedStatus(statusSignature)} />;
   const showPlaceCard = view === "map" && !!focused && !(overlay === "place" && selected);
+  const justPlaces = useMemo(() => justSaved ? justSaved.ids.map((id) => places.find((p) => p.id === id)).filter((p): p is PlaceView => !!p) : [], [justSaved, places]);
+  const showJustSaved = active && view === "map" && !overlay && !regionSelection && justPlaces.length > 0;
   const all = statuses.length === STATUS_ORDER.length;
-  return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} onRegionOpen={(selection) => { setFocusedId(null); setRegionSelection(selection); }} />}</div>
+  return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={selectedId || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={previewPlace} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
     <h1 className="sr-only">{board}</h1>
     {view === "map" && searchTools && createPortal(<button className="icon-btn bordered search-filter-btn" aria-label="상세 필터" onClick={() => open("filters")}><Icon name="sliders" />{(category || !all) && <i className="filter-dot" />}</button>, searchTools)}
     <div className="map-chip-stack">
@@ -266,12 +275,13 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     </div>}
     {view === "list" && !loaded && !error && <div className="loading-state" role="status">우리 장소를 불러오는 중…</div>}
     {view === "list" && error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={() => void store.refresh()}>다시 불러오기</button></div>}
+    {showJustSaved && <JustSavedSheet room={board} places={justPlaces} url={justSaved?.url ?? null} onOpen={(id) => open("place", id)} onClose={() => setJustSaved(null)} />}
     {view === "map" && focused && <PlaceCarousel hidden={!showPlaceCard} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!visible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved", closer: true }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} view={view} onClose={close} onShowMap={() => showPlaceOnMap(selected)} onPatch={(patch) => store.patchPlace(selected.id, patch)} onDelete={() => { store.removePlace(selected.id); setFocusedId(null); close(); setOverlay(null); setSelectedId(null); }} />}
     {overlay === "place" && loaded && !selected && <Modal title="장소를 찾을 수 없어요" onClose={close}><p className="lead">이미 지워진 장소일 수 있어요.</p></Modal>}
     {overlay === "filters" && <Modal title="어떤 곳을 볼까요?" variant={view === "map" ? "resizable" : "compact"} initialStop={view === "map" && typeof window !== "undefined" && window.matchMedia("(orientation:landscape) and (max-height:600px)").matches ? 2 : 1} dragFromContent={view === "map"} resizeMedia={view === "map" ? "all" : undefined} className={view === "map" ? "sheet-map-filters" : ""} headerActions={view === "map" ? <button type="button" className="icon-btn filter-close-btn" aria-label="필터 닫기" onClick={close}><Icon name="close" width={18} /></button> : undefined} onClose={close} footer={<div className="actions"><button className="btn" onClick={reset}>초기화</button><button className="btn primary" onClick={close}>장소 보기</button></div>}>{PLACE_STATUS_ENABLED && <><h3>우리의 상태</h3><div className="filter-options"><button className="chip" aria-pressed={all} onClick={() => setStatuses([...STATUS_ORDER])}>전체</button>{STATUS_ORDER.map((s) => <button key={s} className="chip" aria-pressed={!all && statuses.includes(s)} onClick={() => toggleStatus(s)}>{STATUS_LABEL[s]}</button>)}</div></>}<h3>장소 종류</h3><div className="filter-options"><button className="chip" aria-pressed={!category} onClick={() => setCategory("")}>모든 종류</button>{categories.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div></Modal>}
-    {overlay === "pending" && <Modal title="조금만 더 확인해요" initialStop={2} onClose={close}><p className="lead">링크별로 남은 확인을 이어가세요.</p><PendingLinks sources={pending} onChanged={() => { void store.refresh(); }} /></Modal>}
+    {overlay === "pending" && <Modal title="확인 대기" initialStop={2} onClose={close}><PendingLinks sources={pending} room={board} onChanged={() => { void store.refresh(); }} /></Modal>}
   </div>;
 }
