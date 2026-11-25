@@ -231,7 +231,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       notify(`${transferIds.length}곳을 ‘${result.folder}’ 방에 담았어요.`);
     }} />}
     {deletingPlaces && <PlacesDeleteDialog places={deletingPlaces} onClose={closePlacesDeletion} onDeleted={() => closePlacesDeletion([], true)} />}
-    <div className={styles.switch} aria-label="리스트 보기 방식"><button aria-pressed={mode === "all" && !currentId} onClick={() => onNavigate("all")}>전체 장소</button><button aria-pressed={mode === "collections" || !!currentId} onClick={() => onNavigate("collections")}>모음</button></div>
+    <div className={styles.switch} aria-label="리스트 보기 방식"><button aria-pressed={mode === "all" && !currentId} onClick={() => onNavigate("all")}>전체 장소 <span className="switch-count">{places.length}</span></button><button aria-pressed={mode === "collections" || !!currentId} onClick={() => onNavigate("collections")}>모음 <span className="switch-count">{collections.length}</span></button></div>
     <div className={current ? styles.detailLayout : undefined}>
     {current && <header className={styles.detail} style={toneStyle(current.color)}>
       <div className={styles.detailNav}><button className="text-btn" onClick={() => onNavigate("collections")}><Icon name="back" width={18} />모음</button><button className="text-btn" onClick={() => beginEditor(current)}>편집</button></div>

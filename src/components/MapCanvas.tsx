@@ -8,6 +8,8 @@ import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
 import { CLUSTER_MIN_LEVEL, regionCards, stackCards, zoomInLevel, type RegionCard } from "@/lib/map-clusters";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
+import { paletteVar } from "@/lib/palette";
+import { roomShares, splitColors } from "@/lib/rooms";
 export interface MapPosition { lat: number; lng: number; level: number }
 /** A failed interactive map reports here so the map screen can show it with the other map states. */
 export interface MapRecovery { loading: boolean; retry?: () => void }
@@ -18,13 +20,20 @@ export interface MapInsets { top: number; right: number; bottom: number; left: n
 export interface RegionSelection { label: string | null; ids: string[] }
 declare global { interface Window { kakao: any; instgrm?: { Embeds: { process: () => void } } } }
 
+/**
+ * 방 색(2026-11-25 방 고르기·전체 보기): 핀 색 = 방 색. 전체(all)에서는 지역 카드가 크림 바탕 + 방 비율 막대,
+ * 방 하나에서는 지역 카드가 그 방 색입니다. 여러 방에 있는 같은 가게는 핀 하나에 방 수와 나눈 색 꼬리를 붙입니다.
+ */
+export interface MapRoomLook { all: boolean; roomsOf: (place: PlaceView) => readonly string[]; colorOf: (room: string) => string | null | undefined; order: readonly string[] }
+
 /** A card holding the selected place stays above every stacked card. */
 const SELECTED_Z = 100000;
 /** 첫 화면에 꽉 채울 남한 땅(제주 남쪽 해안~휴전선, 태안~동해안) */
 const KOREA_LAND = { south: 33.2, west: 126.1, north: 38.3, east: 129.6 };
 
-function regionCardButton(card: RegionCard<PlaceView>) {
-  const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}`;
+function regionCardButton(card: RegionCard<PlaceView>, look?: MapRoomLook) {
+  const button = document.createElement("button"); button.type = "button"; button.className = `region-card${card.label ? "" : " is-unnamed"}${look?.all ? " is-all" : ""}`;
+  if (look && !look.all) button.style.setProperty("--region-tone", paletteVar(look.colorOf(look.roomsOf(card.places[0])[0] ?? "")));
   const single = card.places.length === 1;
   const where = card.label || "이 지역";
   const counts = PLACE_STATUS_ENABLED ? `가고 싶음 ${card.wish}곳, 지도에 ${card.places.length}곳, 지역 전체 ${card.total}곳 중 ${card.visited}곳 다녀옴` : `장소 ${card.wish}곳`;
@@ -41,17 +50,33 @@ function regionCardButton(card: RegionCard<PlaceView>) {
     const fill = document.createElement("i"); fill.style.width = `${card.total ? Math.round(card.visited / card.total * 100) : 0}%`;
     track.append(fill); button.append(track);
   }
+  if (look?.all) {
+    // 방 비율 막대(방 목록 순서). 두 방에 있는 가게는 두 방 모두에 셉니다.
+    const bar = document.createElement("span"); bar.className = "region-card-share";
+    const shares = roomShares(card.places.map((place) => ({ ...place, room_ids: [...look.roomsOf(place)] })), look.order);
+    for (const [room, count] of shares) { const part = document.createElement("i"); part.style.flex = String(count); part.style.background = paletteVar(look.colorOf(room)); bar.append(part); }
+    button.append(bar);
+  }
   for (const node of button.children) node.setAttribute("aria-hidden", "true");
   return button;
 }
 
-function placeButton(p: PlaceView, interactive: boolean, isNew = false) {
+function placeButton(p: PlaceView, interactive: boolean, isNew = false, look?: MapRoomLook) {
   const button = document.createElement("button"); button.type = "button"; button.className = PLACE_STATUS_ENABLED ? `pin ${p.status}` : "pin";
   const status = PLACE_STATUS_ENABLED ? `, ${STATUS_LABEL[p.status]}` : "";
-  button.setAttribute("aria-label", `${p.name}${status}`);
+  const rooms = look?.roomsOf(p) ?? [];
+  button.setAttribute("aria-label", `${p.name}${status}${rooms.length > 1 ? `, 방 ${rooms.length}곳에 있음` : ""}`);
   button.id = `${interactive ? "map" : "preview"}-place-${p.id}`;
-  const dot = document.createElement("i"); dot.className = "mark";
-  const label = document.createElement("span"); label.textContent = p.name; button.append(dot, label);
+  const label = document.createElement("span"); label.textContent = p.name;
+  if (rooms.length > 1) {
+    // 같은 가게가 여러 방에: 이름 옆 점 대신 방 수, 꼬리는 방 색을 나눈 동그라미
+    button.classList.add("is-multi"); button.style.setProperty("--pin-dot", splitColors(rooms.map((room) => look!.colorOf(room))));
+    const count = document.createElement("span"); count.className = "pin-rooms"; count.textContent = String(rooms.length);
+    button.append(label, count);
+  } else {
+    if (rooms.length) button.style.setProperty("--wish", paletteVar(look!.colorOf(rooms[0])));
+    const dot = document.createElement("i"); dot.className = "mark"; button.append(dot, label);
+  }
   if (isNew) {
     const badge = document.createElement("span"); badge.className = "new-place-badge"; badge.textContent = "NEW";
     badge.setAttribute("aria-hidden", "true"); button.append(badge);
@@ -72,7 +97,7 @@ function lookupRegion(services: any, point: RegionPoint) {
   });
 }
 
-export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds, onRecovery, allPlaces, onRegionOpen, fitPadding }: {
+export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds, onRecovery, allPlaces, onRegionOpen, fitPadding, look }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
   viewRequest: MapViewRequest | null;
@@ -84,6 +109,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   allPlaces?: PlaceView[];
   onRegionOpen?: (selection: RegionSelection) => void;
   fitPadding?: () => MapInsets | null;
+  /** 핀·지역 카드의 방 색(없으면 예전 한 가지 색) */
+  look?: MapRoomLook;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
   const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any; z: number }[]>([]); const me = useRef<any>(null);
@@ -272,7 +299,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       });
       // Back to front: cards with more places are drawn over the ones they overlap.
       markers.current = stackCards(cards).map((card, order) => {
-        const button = regionCardButton(card), z = 10 + order;
+        const button = regionCardButton(card, look), z = 10 + order;
         const point = projection.coordsFromContainerPoint(new k.Point(card.x, card.y));
         const ids = card.places.map((place) => place.id);
         button.classList.toggle("active", ids.includes(focused.current || ""));
@@ -288,7 +315,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       });
     } else {
       markers.current = [...new Map(places.map((p) => [p.id, p])).values()].sort((a, b) => a.id.localeCompare(b.id)).map((p) => {
-        const button = placeButton(p, interactive, newPlaceIds?.has(p.id));
+        const button = placeButton(p, interactive, newPlaceIds?.has(p.id), look);
         button.classList.toggle("active", p.id === focused.current);
         button.onclick = () => { k.event.preventMap(); if (interactive) pick.current(p.id); };
         const marker = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === selectedId ? 5 : 1 });
@@ -297,7 +324,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     }
     if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
     pendingMarkerFocus.current = undefined;
-  }, [places, allPlaces, ready, level, interactive, regions, regionVersion, newPlaceIds]);
+  }, [places, allPlaces, ready, level, interactive, regions, regionVersion, newPlaceIds, look]);
   useEffect(() => {
     for (const marker of markers.current) {
       const selected = marker.ids.includes(selectedId || "");
