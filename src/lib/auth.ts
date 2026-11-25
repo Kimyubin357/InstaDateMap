@@ -51,16 +51,33 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   if (!session) return null;
   return { userId: session.user_id, sessionHash: session.token_hash, boardId: session.board_id ?? null, remember: session.remember, expiresAt: session.expires_at };
 }
-export async function boardFromRequest(req: Request): Promise<Board | null> {
+/**
+ * 요청한 방(`?room=`): 전체 보기에서 다른 방의 장소를 고칠 때 씁니다(2026-11-25 방 고르기·전체 보기).
+ * 형식이 틀리면 없는 것으로 보고 이 기기가 연 방을 씁니다. 멤버 확인은 boardFromRequest가 계정 id로 합니다.
+ */
+export function requestedRoom(req: Request): string | undefined {
+  const room = new URL(req.url).searchParams.get("room");
+  return room && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(room) ? room : undefined;
+}
+/**
+ * 이 기기가 연 방(세션의 board_id), 또는 `room`으로 고른 다른 방.
+ * 다른 방은 그 방 멤버(계정 id)일 때만 열립니다. 세션의 인증 버전은 세션이 연 방에만 해당해 다른 방에는 비교하지 않습니다.
+ */
+export async function boardFromRequest(req: Request, room?: string | null): Promise<Board | null> {
   const session = await sessionFromRequest(req);
-  if (!session?.board_id) return null;
-  const { data: board, error: boardError } = await db().from("boards").select("id, name, member_names, auth_version").eq("id", session.board_id).maybeSingle();
+  const override = !!room && room !== session?.board_id;
+  const boardId = override ? room : session?.board_id;
+  if (!session || !boardId) return null;
+  const { data: board, error: boardError } = await db().from("boards").select("id, name, member_names, auth_version").eq("id", boardId).maybeSingle();
   if (boardError) { console.error("boardFromRequest: board query failed", boardError.code, boardError.message); throw new Error("지도에 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
-  if (!board || board.auth_version !== session.auth_version) return null;
+  // 다른 방을 찾지 못하거나 멤버가 아니면 로그인 문제가 아니라 없는 방으로 답합니다(로그아웃되지 않게).
+  if (!board && override) throw new AccessError("방을 찾을 수 없어요.", 404);
+  if (!board || (!override && board.auth_version !== session.auth_version)) return null;
   // 폴더 멤버일 때만 열립니다. 이름은 멤버 기록의 이름을 사용합니다.
   const { data: members, error: memberError } = await db().from("board_members").select("user_id, member_name, joined_at").eq("board_id", board.id).order("joined_at");
   if (memberError) { console.error("boardFromRequest: member query failed", memberError.code, memberError.message); throw new Error("지도에 연결하지 못했어요. 잠시 후 다시 시도해 주세요."); }
   const me = members?.find((m) => m.user_id === session.user_id);
+  if (!me && override) throw new AccessError("방을 찾을 수 없어요.", 404);
   if (!me) return null;
   const memberNames = [...new Set([...(board.member_names ?? []), ...(members ?? []).map((m) => m.member_name as string)])];
   return { id: board.id, name: board.name, who: me.member_name, sessionHash: session.token_hash, remember: session.remember,

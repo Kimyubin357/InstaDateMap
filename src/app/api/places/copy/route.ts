@@ -10,13 +10,14 @@ export interface CopyResult { to: string; folder: string; created: number; merge
 
 /**
  * 지금 방의 장소를 다른 방에 담습니다(복사, 원래 방에도 그대로 남음). 옮기기 기능은 없습니다(담은 뒤 원래 방에서 지움).
- * body: { to: 방 id, ids: 장소 id 목록(1~100) } — 017_folder_transfer_push.sql의 dm_copy_places
+ * body: { to: 방 id, ids: 장소 id 목록(1~100), from?: 장소가 있는 방 id } — 017_folder_transfer_push.sql의 dm_copy_places
  */
 export async function POST(req: Request) {
   try {
-    const board = await boardFromRequest(req);
+    const body = await req.json().catch(() => null) as { to?: unknown; ids?: unknown; from?: unknown } | null;
+    // from: 전체 보기에서 다른 방의 장소를 담을 때 그 장소의 방(멤버 확인은 계정 id로). 없으면 이 기기가 연 방.
+    const board = await boardFromRequest(req, isUuid(body?.from) ? body.from : undefined);
     if (!board) return unauthorized();
-    const body = await req.json().catch(() => null) as { to?: unknown; ids?: unknown } | null;
     if (!isUuid(body?.to)) throw new AccessError("담을 방을 골라 주세요.");
     const ids = Array.isArray(body?.ids) ? [...new Set(body.ids)] : [];
     if (!ids.length || ids.length > 100 || ids.some((id) => !isUuid(id))) throw new AccessError("장소를 1~100곳 골라 주세요.");

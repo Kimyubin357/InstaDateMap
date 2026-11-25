@@ -6,6 +6,8 @@ import { connectBoardSync } from "@/lib/sync-connection";
 import { accessSender, announceAccess, type AccessMessage } from "@/lib/board-events";
 import { cacheScope, type SyncAccess } from "@/lib/sync-types";
 import { refreshAccess } from "@/lib/access-refresh";
+import { RoomsStore, EMPTY_ROOMS_STATE } from "@/lib/rooms-store";
+import { requestJson } from "@/lib/client-request";
 import MapApp from "@/app/MapApp";
 import SearchApp from "./SearchApp";
 import useKeyboardViewport from "./useKeyboardViewport";
@@ -24,12 +26,18 @@ function AddPanel() {
   return <AddForm key={url} initialUrl={url} initialRetry={params.get("retry") === "1"} />;
 }
 
-interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; accessError: string; checkingAccess: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<boolean>; lock: () => Promise<void>; notify: (message: string, tone?: "success" | "error" | "info", action?: ToastAction) => void }
+interface BoardContext { store: BoardStore; rooms: RoomsStore;
+  /** 보는 범위 바꾸기: "all" = 전체, 방 id = 그 방(이 기기가 연 방이 아니면 그 방을 열고 다시 접속합니다). */
+  chooseScope: (target: "all" | string) => Promise<boolean>;
+  homeHref: string; suspended: boolean; accessError: string; checkingAccess: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<boolean>; lock: () => Promise<void>; notify: (message: string, tone?: "success" | "error" | "info", action?: ToastAction) => void }
 const Context = createContext<BoardContext | null>(null);
 export function useBoardSync() { const context = useContext(Context); if (!context) throw new Error("BoardProvider missing"); return context; }
 export function useBoardState() { const { store } = useBoardSync(); return useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE); }
+/** 방 고르기·전체 보기 상태(범위·방 목록·전체 장소·본 장소) */
+export function useRooms() { const { rooms } = useBoardSync(); return useSyncExternalStore(rooms.subscribe, rooms.getSnapshot, () => EMPTY_ROOMS_STATE); }
 export default function BoardProvider({ children }: { children: ReactNode }) {
   const [store] = useState(() => new BoardStore()); const [suspended, setSuspended] = useState(false);
+  const [rooms] = useState(() => new RoomsStore());
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, () => EMPTY_BOARD_STATE);
   const pathname = usePathname(); const router = useRouter();
   const [lockScreen, setLockScreen] = useState<string | null>(null);
@@ -73,7 +81,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     const next = ["/enter", "/login"].includes(window.location.pathname) ? "/" : window.location.pathname + window.location.search;
     // Cover the old route before clearing access, so its MapEntry cannot flash during navigation.
     setLockScreen(next); setNotice(null); setToast(null); suspend();
-    const forgotten = store.forget();
+    const forgotten = store.forget(); rooms.forget();
     try { sessionStorage.removeItem("datemap-view"); } catch {}
     if (broadcast) announceAccess("locked");
     router.replace(`/login?next=${encodeURIComponent(next)}`);
@@ -106,6 +114,26 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return task;
   };
   store.onUnauthorized = () => { void lock(); };
+  const chooseScope = async (target: "all" | string) => {
+    if (target === "all") { rooms.setScope("all"); return true; }
+    if (target === store.getSnapshot().access?.boardId) { rooms.setScope("room"); return true; }
+    await requestJson(`/api/folders/${encodeURIComponent(target)}/open`, { method: "POST", notifyBoardChange: false, headers: { "Content-Type": "application/json" }, body: "{}" });
+    rooms.setScope("room");
+    return resetAccess();
+  };
+  const userId = state.access?.userId ?? null, openRoom = state.access?.boardId ?? null;
+  useEffect(() => { if (!suspended) rooms.bind(userId); }, [rooms, userId, openRoom, suspended]);
+  // 열린 방의 변경(실시간)·화면 복귀·30초마다 전체 보기도 맞춥니다(변경이 없으면 304).
+  const revision = state.snapshot?.revision;
+  useEffect(() => { if (revision) rooms.schedule(); }, [rooms, revision]);
+  useEffect(() => {
+    if (!userId) return;
+    const visible = () => document.visibilityState !== "hidden";
+    const back = () => { if (visible()) rooms.schedule(0); };
+    const timer = setInterval(() => { if (visible() && rooms.getSnapshot().scope === "all") void rooms.loadAll(); }, 30000);
+    document.addEventListener("visibilitychange", back); window.addEventListener("online", back);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", back); window.removeEventListener("online", back); };
+  }, [rooms, userId]);
   const scope = state.access ? cacheScope(state.access) : "";
   useEffect(() => { if (!scope || suspended) return; return connectBoardSync(store); }, [scope, suspended, store]);
   useEffect(() => {
@@ -118,11 +146,11 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (["/enter", "/login"].includes(pathname)) {
       accessRequest.current?.abort(); accessRequest.current = null; accessFlight.current = null;
-      setAccessError(""); setCheckingAccess(false); void store.forget();
+      setAccessError(""); setCheckingAccess(false); void store.forget(); rooms.forget();
     }
   }, [pathname, store]);
   useEffect(() => {
-    const change = () => store.invalidate();
+    const change = () => { store.invalidate(); rooms.schedule(); };
     const seen = new Set<number>();
     const receive = (event: { type?: AccessMessage; nonce?: number; sender?: string }) => {
       if (event?.sender === accessSender || typeof event?.nonce !== "number" || seen.has(event.nonce)) return;
@@ -134,8 +162,8 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     const storage = (event: StorageEvent) => { if (event.key === "datemap-access-event" && event.newValue) { try { receive(JSON.parse(event.newValue)); } catch {} } };
     window.addEventListener("datemap:changed", change); window.addEventListener("storage", storage);
     return () => { channel?.close(); window.removeEventListener("datemap:changed", change); window.removeEventListener("storage", storage); };
-  }, [store]);
-  return <Context.Provider value={{ store, homeHref, suspended, accessError, checkingAccess, suspend, resume, resetAccess, lock, notify }}>
+  }, [store, rooms]);
+  return <Context.Provider value={{ store, rooms, chooseScope, homeHref, suspended, accessError, checkingAccess, suspend, resume, resetAccess, lock, notify }}>
     {lockScreen !== null ? <LoginScreen next={lockScreen} disabled /> : <>
     {state.access && <><div ref={(element) => { if (element) element.inert = pathname !== "/"; }} className={`persistent-map${pathname === "/" ? "" : " is-away"}`} aria-hidden={pathname !== "/"} data-sync-status={state.connected ? "connected" : "reconnecting"}><MapApp key={scope} who={state.access.who} kakaoKey={state.access.kakaoKey} active={pathname === "/"} keyboard={viewport.keyboard} onViewChange={setBackHref} /></div>
       <div className={`persistent-search${onMap ? "" : " is-away"}${pathname === "/search" ? " is-covering" : ""}`} aria-hidden={!onMap}><SearchApp key={scope} active={pathname === "/search"} backHref={backHref} viewport={viewport} /></div>

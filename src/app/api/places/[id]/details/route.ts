@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized, requireIdentity, accessError, AccessError } from "@/lib/auth";
+import { boardFromRequest, requestedRoom, unauthorized, requireIdentity, accessError, AccessError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { placeDetails } from "@/lib/place-details";
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const maxDuration = 30;
 /** 장소 상세의 가게 정보(전화·사진·메뉴·영업시간·예약). 이 폴더의 장소만 조회합니다. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const board = await boardFromRequest(req);
+    const board = await boardFromRequest(req, requestedRoom(req));
     if (!board) return unauthorized();
     requireIdentity(board);
     const { id } = await params;
