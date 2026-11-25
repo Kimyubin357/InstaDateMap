@@ -6,7 +6,7 @@ vi.mock("next/server", async (original) => ({ ...await original<typeof import("n
 import { GET as listTrash } from "@/app/api/trash/route";
 import { POST as restore, DELETE as purge } from "@/app/api/trash/[id]/route";
 import { DELETE } from "@/app/api/places/[id]/route";
-import { POST as copy } from "@/app/api/places/copy/route";
+import { POST as move } from "@/app/api/places/move/route";
 import { canDeletePlace } from "@/lib/place-view";
 import { placeNotification } from "@/lib/push-server";
 const token = "a".repeat(64);
@@ -88,22 +88,22 @@ describe("나만 보는 삭제 기록", () => {
   });
 });
 
-describe("다른 방에 담기 API", () => {
-  const req = (body: unknown, origin = "http://localhost") => new Request("http://localhost/api/places/copy", { method: "POST", headers: headers(origin), body: JSON.stringify(body) });
-  it("지금 방에서 고른 방으로 복사하고 결과를 돌려준다(옮기기 없음)", async () => {
-    const rpc = vi.spyOn(fakeDb, "rpc").mockResolvedValueOnce({ data: { to: room, folder: "내 장소", created: 1, merged: 0, place_ids: ["n1"] }, error: null });
-    const res = await copy(req({ to: room, ids: [p1, p1], mode: "move" }));
-    expect(res.status).toBe(200); expect((await res.json()).folder).toBe("내 장소");
-    expect(rpc).toHaveBeenCalledWith("dm_copy_places", { p_user: "u:우리", p_from: "b1", p_to: room, p_ids: [p1] });
+describe("다른 방으로 옮기기 API", () => {
+  const req = (body: unknown, origin = "http://localhost") => new Request("http://localhost/api/places/move", { method: "POST", headers: headers(origin), body: JSON.stringify(body) });
+  it("지금 방에서 고른 방으로 옮기고 결과를 돌려준다", async () => {
+    const rpc = vi.spyOn(fakeDb, "rpc").mockResolvedValueOnce({ data: { to: room, from: "b1", folder: "내 장소", created: 1, merged: 0, place_ids: ["n1"], moved_ids: [p1] }, error: null });
+    const res = await move(req({ to: room, ids: [p1, p1] }));
+    expect(res.status).toBe(200); expect(await res.json()).toMatchObject({ folder: "내 장소", moved_ids: [p1] });
+    expect(rpc).toHaveBeenCalledWith("dm_move_places", { p_user: "u:우리", p_from: "b1", p_to: room, p_ids: [p1] });
   });
   it("잘못된 입력·외부 요청은 거절하고, DB 안내는 한국어로 전한다", async () => {
     const rpc = vi.spyOn(fakeDb, "rpc");
-    expect((await copy(req({ to: "x", ids: [p1] }))).status).toBe(400);
-    expect((await copy(req({ to: room, ids: [] }))).status).toBe(400);
-    expect((await copy(req({ to: room, ids: [p1] }, "https://evil.test"))).status).toBe(403);
+    expect((await move(req({ to: "x", ids: [p1] }))).status).toBe(400);
+    expect((await move(req({ to: room, ids: [] }))).status).toBe(400);
+    expect((await move(req({ to: room, ids: [p1] }, "https://evil.test"))).status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
-    rpc.mockResolvedValueOnce({ data: null, error: { message: "참여한 방 사이에서만 담을 수 있어요.", code: "P0001" } } as never);
-    expect((await (await copy(req({ to: room, ids: [p1] }))).json()).message).toBe("참여한 방 사이에서만 담을 수 있어요.");
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "수민님이 등록한 장소라 옮길 수 없어요.", code: "P0001" } } as never);
+    expect((await (await move(req({ to: room, ids: [p1] }))).json()).message).toBe("수민님이 등록한 장소라 옮길 수 없어요.");
   });
 });
 

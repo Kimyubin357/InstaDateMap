@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import BottomNav from "./BottomNav";
 import { CollectionCover, RoomCard, toneStyle } from "./Palette";
-import { RoomCards, RoomDot } from "./Rooms";
+import { RoomCards } from "./Rooms";
 import cl from "./CollectionsList.module.css";
 import styles from "./Onboarding.module.css";
 import {
@@ -104,7 +104,7 @@ export default function Onboarding({ rooms, roomScope, room, collections, placeC
     plus: { kicker: "장소 담기", title: "+ 누르고 붙여넣기", target: () => document.querySelector(".map-controls .save-fab"), pad: 6, radius: 999,
       body: <>앱으로 돌아와 <b>+</b>를 누르고, 링크 칸을 길게 눌러 붙여넣어요. 캡션에서 가게를 찾아 방에 담아 줘요.</> },
     room: { kicker: "방 바꾸기", title: "방 버튼으로 전체 ↔ 방", target: () => document.querySelector(".room-scope-btn"), pad: 6, radius: 999,
-      body: <>가운데 동그라미가 지금 보는 범위예요. <b>여러 색</b>이면 모든 방, <b>한 색</b>이면 그 방만. 누르면 ‘내 방’ 카드가 열려요.</> },
+      body: <>네 칸 버튼을 누르면 ‘내 방’ 카드가 열려요. <b>전체</b>로 모든 방을 함께 보거나, 방 하나로 들어가요. 카드의 ⚙로 방 설정도 바로 가요.</> },
     collections: { kicker: "모음", title: "방 안에서 모음으로 묶기", target: () => listRef.current, pad: 8, radius: 24,
       body: <>리스트 탭의 <b>모음</b>에서 ‘성수 카페 투어’, ‘첫날 · 둘째날’처럼 장소를 묶어요. 방을 또 만들 필요 없이, 같은 방 사람들과 함께 정리해요.</> },
     invite: { kicker: "친구 초대", title: "방을 함께 쓰려면 초대 링크", target: () => inviteRef.current, pad: 8, radius: 26,
@@ -196,7 +196,7 @@ export default function Onboarding({ rooms, roomScope, room, collections, placeC
       <div className={styles.art}><ul className={styles.recap}>
         <li><span className={styles.recapIcon}><Icon name="link" width={20} /></span>인스타에서 Copy link → + → 붙여넣기</li>
         <li><span className={styles.recapIcon}><Icon name="map" width={20} /></span>방 버튼으로 전체 ↔ 방 바꾸기</li>
-        <li><span className={styles.recapIcon}><Icon name="heart" width={20} /></span>방 안에서 모음으로 묶기(첫날·둘째날)</li>
+        <li><span className={styles.recapIcon}><Icon name="collection" width={20} /></span>방 안에서 모음으로 묶기(첫날·둘째날)</li>
         <li><span className={styles.recapIcon}><Icon name="user" width={20} /></span>초대 링크로 연인·친구와 함께</li>
       </ul></div>
       <h1 id={titleId} className={styles.headline}>이제 <em>첫 장소</em>를<br />담아 볼까요?</h1>
@@ -236,8 +236,8 @@ function InstagramShare({ copyRef }: { copyRef: RefObject<HTMLSpanElement | null
 /** 위 줄 모양(검색 · 방 버튼 · 설정)만 그린 것 */
 function FakeTopBar({ room }: { room: OnboardingRoom }) {
   return <div className={styles.fakeTop}>
-    <span className={styles.fakeSearch}><Icon name="search" width={20} />이 방에서 검색</span>
-    <span className={styles.fakeRound}><RoomDot colors={[room.color]} /></span>
+    <span className={styles.fakeSearch}><Icon name="search" width={20} />{room.name}에서 검색</span>
+    <span className={styles.fakeRound}><Icon name="rooms" width={21} /></span>
     <span className={styles.fakeRound}><Icon name="settings" width={21} /></span>
   </div>;
 }
@@ -249,11 +249,11 @@ function CollectionsScreen({ listRef, room, collections, placeCount }: { listRef
   return <div className={styles.screen} ref={inertRef} aria-hidden="true">
     <FakeTopBar room={room} />
     <div ref={listRef} className={styles.listArea}>
-      <div className={cl.switch}><button type="button" tabIndex={-1} aria-pressed={false}>전체 장소{real && <> <span className="switch-count">{placeCount}</span></>}</button><button type="button" tabIndex={-1} aria-pressed>모음 <span className="switch-count">{real ? collections.length : shown.length}</span></button></div>
-      <p className={styles.listLabel}>{real ? `모음 ${collections.length}개` : "모음 예시"}</p>
-      <div className={`${cl.grid} ${styles.grid}`}>
-        {shown.map((c) => <span key={c.id} className={cl.card} style={toneStyle(c.color)}><CollectionCover color={c.color} icon={c.icon} /><strong>{c.name}</strong><span>장소 {c.count}곳</span></span>)}
-        <span className={`${cl.card} ${cl.addCard}`}><Icon name="plus" width={26} /><span>새 모음</span></span>
+      <div className={cl.switch}><button type="button" tabIndex={-1} aria-pressed={false}>장소{real && <> <span className="switch-count">{placeCount}</span></>}</button><button type="button" tabIndex={-1} aria-pressed>모음 <span className="switch-count">{real ? collections.length : shown.length}</span></button></div>
+      {!real && <p className={styles.listLabel}>모음 예시</p>}
+      <div className={cl.mlist}>
+        {shown.map((c) => <span key={c.id} className={cl.mrow}><CollectionCover icon={c.icon} size={52} /><span className={cl.mcopy}><strong>{c.name}</strong><small>장소 {c.count}곳</small></span><Icon name="chevron" width={18} /></span>)}
+        <span className={`${cl.mrow} ${cl.mrowAdd}`}><span className={cl.addTile}><Icon name="plus" width={22} /></span><span className={cl.mcopy}><strong>새 모음</strong><small>이 방 안에 만들어요</small></span></span>
       </div>
     </div>
     <BottomNav hidden={false} current="list" />

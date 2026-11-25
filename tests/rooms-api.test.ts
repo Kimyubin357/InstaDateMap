@@ -8,7 +8,7 @@ import { GET as allPlaces } from "@/app/api/places/all/route";
 import { GET as rooms } from "@/app/api/rooms/route";
 import { GET as seenList, POST as markSeen } from "@/app/api/places/seen/route";
 import { GET as readPlace, PATCH as patchPlace, DELETE as deletePlace } from "@/app/api/places/[id]/route";
-import { POST as copy } from "@/app/api/places/copy/route";
+import { POST as move } from "@/app/api/places/move/route";
 
 const token = "c".repeat(64);
 const ME = "aaaaaaaa-0000-4000-8000-000000000001", MINHO = "aaaaaaaa-0000-4000-8000-000000000002", OTHER = "aaaaaaaa-0000-4000-8000-000000000003";
@@ -28,7 +28,7 @@ beforeEach(() => {
     }
     if (name === "dm_patch_place") return { data: { ok: true, memo_version: 1, memo_changed: false }, error: null };
     if (name === "dm_delete_place") return { data: { ok: true, deleted_id: params.p_place }, error: null };
-    if (name === "dm_copy_places") return { data: { to: params.p_to, folder: "내 장소", created: 1, merged: 0, place_ids: [] }, error: null };
+    if (name === "dm_move_places") return { data: { to: params.p_to, from: params.p_from, folder: "내 장소", created: 1, merged: 0, place_ids: [], moved_ids: params.p_ids }, error: null };
     if (name === "dm_mark_seen") return { data: params.p_places.length, error: null };
     if (name === "dm_seen_places") return { data: [P_OURS, "not-a-uuid"], error: null };
     return fakeDb.rpc(name, params);
@@ -128,11 +128,11 @@ describe("다른 방의 장소 고치기: ?room= + 계정 id로 멤버 확인", 
   });
 
   it("다른 방에 담기: from 방의 멤버일 때만 그 방에서 담는다", async () => {
-    expect((await copy(req("places/copy", "POST", { to: OURS, ids: [P_JEJU], from: JEJU }))).status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("dm_copy_places", { p_user: ME, p_from: JEJU, p_to: OURS, p_ids: [P_JEJU] });
-    expect((await copy(req("places/copy", "POST", { to: OURS, ids: [P_STRANGER], from: STRANGER }))).status).toBe(404);
-    expect((await copy(req("places/copy", "POST", { to: JEJU, ids: [P_OURS] }))).status).toBe(200);
-    expect(rpc).toHaveBeenLastCalledWith("dm_copy_places", { p_user: ME, p_from: OURS, p_to: JEJU, p_ids: [P_OURS] });
+    expect((await move(req("places/move", "POST", { to: OURS, ids: [P_JEJU], from: JEJU }))).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("dm_move_places", { p_user: ME, p_from: JEJU, p_to: OURS, p_ids: [P_JEJU] });
+    expect((await move(req("places/move", "POST", { to: OURS, ids: [P_STRANGER], from: STRANGER }))).status).toBe(404);
+    expect((await move(req("places/move", "POST", { to: JEJU, ids: [P_OURS] }))).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("dm_move_places", { p_user: ME, p_from: OURS, p_to: JEJU, p_ids: [P_OURS] });
   });
 });
 

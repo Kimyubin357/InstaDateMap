@@ -15,15 +15,11 @@ describe("모음 표지: 색 + 이모지", () => {
     expect(collectionEmoji("heart")).toBe("💞"); expect(collectionEmoji("culture")).toBe("🎨"); expect(collectionEmoji("🍊")).toBe("🍊");
     expect(lastEmoji("커피☕ 그리고 🍰")).toBe("🍰"); expect(lastEmoji("커피")).toBeNull();
   });
-  it("같은 방 모음끼리 색·이모지가 겹치면 회색 한 줄 안내를 만든다(자기 자신은 빼고)", () => {
-    expect(duplicateNote({ id: "new", color: "plum", icon: "🌿" }, others)).toBe("‘기념일 저녁’ 모음도 이 색을 써요.");
-    // 색과 이모지가 서로 다른 모음과 겹치면 이모지 쪽을 한 줄로 알린다
-    expect(duplicateNote({ id: "new", color: "plum", icon: "☕" }, others)).toBe("‘성수 카페’ 모음도 이 이모지(☕)를 써요.");
-    expect(duplicateNote({ id: "new", color: "red", icon: "🍷" }, others)).toBe("‘기념일 저녁’ 모음도 이 이모지(🍷)를 써요.");
-    expect(duplicateNote({ id: "new", color: "plum", icon: "🍷" }, others)).toBe("‘기념일 저녁’ 모음도 이 색과 이 이모지(🍷)를 써요.");
-    expect(duplicateNote({ id: "new", color: "teal", icon: "☕" }, others)).toBe("‘성수 카페’ 모음도 이 색과 이 이모지(☕)를 써요.");
-    expect(duplicateNote({ id: "new", color: "red", icon: "🌿" }, others)).toBe("");
-    expect(duplicateNote({ id: "a", color: "plum", icon: "🍷" }, others)).toBe("");
+  it("같은 방 모음끼리 이모지가 겹치면 회색 한 줄 안내를 만든다(색은 방에만 써서 보지 않음, 자기 자신은 빼고)", () => {
+    expect(duplicateNote({ id: "new", icon: "🌿" }, others)).toBe("");
+    expect(duplicateNote({ id: "new", icon: "☕" }, others)).toBe("‘성수 카페’ 모음도 이 이모지(☕)를 써요.");
+    expect(duplicateNote({ id: "new", icon: "🍷" }, others)).toBe("‘기념일 저녁’ 모음도 이 이모지(🍷)를 써요.");
+    expect(duplicateNote({ id: "a", icon: "🍷" }, others)).toBe("");
   });
   it("자주 쓰는 이모지 14개, 여섯 묶음, 한국어 낱말로 찾기", () => {
     expect(FREQUENT_EMOJI).toHaveLength(14);

@@ -38,13 +38,9 @@ export function lastEmoji(value: string): string | null {
 }
 
 /** 같은 방의 다른 모음과 색·이모지가 겹치면 회색 한 줄로만 알립니다(막지 않음). 둘 다 같은 모음을 먼저 봅니다. */
-export function duplicateNote(editor: { id: string; color: string; icon: string }, collections: readonly { id: string; name: string; color: string; icon: string }[]) {
-  const others = collections.filter((c) => c.id !== editor.id);
+export function duplicateNote(editor: { id: string; icon: string }, collections: readonly { id: string; name: string; icon: string }[]) {
+  // 모음은 색 없이 이모지로만 구분합니다(방·모음 구분 A안, 2026-11-25: 색은 방에만). 같은 방에서 이모지가 겹칠 때만 알립니다.
   const emoji = collectionEmoji(editor.icon);
-  const both = others.find((c) => c.color === editor.color && collectionEmoji(c.icon) === emoji);
-  if (both) return `‘${both.name}’ 모음도 이 색과 이 이모지(${emoji})를 써요.`;
-  const sameEmoji = others.find((c) => collectionEmoji(c.icon) === emoji);
-  if (sameEmoji) return `‘${sameEmoji.name}’ 모음도 이 이모지(${emoji})를 써요.`;
-  const sameColor = others.find((c) => c.color === editor.color);
-  return sameColor ? `‘${sameColor.name}’ 모음도 이 색을 써요.` : "";
+  const same = collections.find((c) => c.id !== editor.id && collectionEmoji(c.icon) === emoji);
+  return same ? `‘${same.name}’ 모음도 이 이모지(${emoji})를 써요.` : "";
 }

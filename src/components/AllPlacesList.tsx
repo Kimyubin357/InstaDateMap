@@ -30,7 +30,7 @@ export default function AllPlacesList({ mode, places, total, rooms, roomsError, 
       {!rooms && !roomsError && <p className="search-hint" role="status">방 목록을 불러오고 있어요…</p>}
       {roomsError && !rooms && <p className="error" role="alert">{roomsError}</p>}
       {rooms && <RoomCards rooms={rooms} onPick={(id) => { if (id !== "all") onEnterRoom(id); }} />}
-      <p className="rooms-quiet"><Icon name="list" width={18} /><span>방을 누르면 그 방으로 들어가요. 지도도 그 방 장소만 보여 주고, 리스트는 <b>전체 장소 | 모음</b>으로 바뀌어요.</span></p>
+      <p className="rooms-quiet"><Icon name="list" width={18} /><span>방을 누르면 그 방으로 들어가요. 지도도 그 방 장소만 보여 주고, 리스트는 <b>장소 | 모음</b>으로 바뀌어요.</span></p>
     </> : <>
       <div className={styles.filters}>{tools}</div>
       {places.map((p) => <button type="button" key={p.id} data-place-id={p.id} className={`place-row ${styles.row}`} onClick={() => onOpen(p.id)}>
@@ -45,7 +45,7 @@ export default function AllPlacesList({ mode, places, total, rooms, roomsError, 
         </span>
         <Icon name="chevron" width={18} />
       </button>)}
-      {loaded && !places.length && <div className={styles.empty}><Icon name="heart" width={32} /><h3>{total ? "조건에 맞는 장소가 없어요" : "첫 장소를 담아 봐요"}</h3><p>{total ? "다른 종류를 골라 보세요." : "모든 방의 장소를 여기에서 함께 볼 수 있어요."}</p>{total > 0 && <button className="text-btn" onClick={onReset}>모든 종류 보기</button>}</div>}
+      {loaded && !places.length && <div className={styles.empty}><Icon name={total ? "search" : "pin"} width={32} /><h3>{total ? "조건에 맞는 장소가 없어요" : "첫 장소를 담아 봐요"}</h3><p>{total ? "다른 종류를 골라 보세요." : "모든 방의 장소를 여기에서 함께 볼 수 있어요."}</p>{total > 0 && <button className="text-btn" onClick={onReset}>모든 종류 보기</button>}</div>}
     </>}
     </div>
   </section>;
