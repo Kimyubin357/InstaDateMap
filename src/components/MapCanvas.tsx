@@ -75,7 +75,9 @@ function placeButton(p: PlaceView, interactive: boolean, isNew = false, look?: M
     button.append(label, count);
   } else {
     if (rooms.length) button.style.setProperty("--wish", paletteVar(look!.colorOf(rooms[0])));
-    const dot = document.createElement("i"); dot.className = "mark"; button.append(dot, label);
+    // 지도 핀은 이름 왼쪽 점 없이(2026-11-25 사용자 결정). 상세의 작은 지도는 이름을 숨기고 점만 핀으로 씁니다.
+    if (interactive) button.append(label);
+    else { const dot = document.createElement("i"); dot.className = "mark"; button.append(dot, label); }
   }
   if (isNew) {
     const badge = document.createElement("span"); badge.className = "new-place-badge"; badge.textContent = "NEW";

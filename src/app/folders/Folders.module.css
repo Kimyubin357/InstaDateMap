@@ -117,18 +117,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  min-height: 60px;
+  gap: 12px;
+  min-height: 64px;
   padding: 8px 0;
   border-bottom: 1px dashed var(--line);
 }
 .memberName { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 18px; }
 .memberName > svg { flex: none; color: var(--forest); }
 .memberName small { color: var(--ink-soft); font-size: 14px; }
-.memberActions { display: flex; gap: 14px; margin-left: auto; }
-.memberActions :global(.text-btn) { min-height: 44px; font-size: 15px; font-weight: 400; color: var(--forest); padding: 0 2px; }
-.memberActions :global(.text-btn):last-child { color: var(--accent-ink); }
+.memberName { flex: 1; }
+.memberCopy { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.memberCopy > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 멤버 ⋯ : 방장 넘기기 · 내보내기 동작 시트를 엽니다(방장만) */
+.memberMore { flex: none; width: 44px; height: 44px; margin-right: -8px; display: grid; place-items: center; border: 0; background: none; color: var(--ink-soft); }
 
 .invite { display: flex; flex-direction: column; }
 .inviteBox { display: grid; gap: 12px; padding: 14px 0; border-bottom: 1px dashed var(--line); }
@@ -146,8 +147,6 @@
   background: var(--cream) var(--weave);
 }
 .inviteBox :global(.hint) { margin: 0; font-size: 14px; }
-.danger :global(.settings-row) > svg:first-child { color: var(--accent-ink); }
-.danger :global(.settings-row) :global(.settings-copy) > span:first-child { color: var(--accent-ink); }
 
 /* 짧은 가로: 행 높이를 조금 줄이고 좌우 안전영역은 설정 화면 규칙을 따릅니다. */
 @media (orientation: landscape) and (max-height: 560px) {

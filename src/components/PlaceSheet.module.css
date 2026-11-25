@@ -19,7 +19,8 @@
 .route:global(.btn.primary){background:var(--accent) var(--grain);border-color:var(--accent)}
 .act:global(.btn){color:var(--forest)}
 
-.memo{margin:14px 0 6px}
+/* 중간 높이에서 메모 윗부분이 비치지 않게 사진과 간격을 둡니다(시트는 사진 아래 16px까지 보여 줌). */
+.memo{margin:26px 0 6px}
 .memo :global(textarea.memo){min-height:56px;border-radius:14px;border:1px dashed var(--line);background:#fffaf0}
 
 .insta{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px;border-radius:16px;border:1px dashed var(--line);background:var(--cream) var(--weave);color:var(--ink);text-decoration:none}

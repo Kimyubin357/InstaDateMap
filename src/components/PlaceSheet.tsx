@@ -153,17 +153,18 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); }
   }
   // 끝까지 올린 창: 본문 맨 위 이름이 머리에 가려지면 ‹ 옆으로 이름을 올립니다(네이버 상세처럼).
-  const bodyTitle = useRef<HTMLDivElement>(null);
+  const bodyTitle = useRef<HTMLHeadingElement>(null);
   const [titleUp, setTitleUp] = useState(false);
   useEffect(() => {
     const el = bodyTitle.current, root = el?.closest(".sheet-body");
     if (!el || !root) return;
-    const observer = new IntersectionObserver(([entry]) => setTitleUp(!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)), { root, threshold: 0 });
+    // 이름 글자가 머리 밑으로 조금이라도 들어가면 바로 올립니다(본문 영역 = 머리 바로 아래부터).
+    const observer = new IntersectionObserver(([entry]) => setTitleUp(entry.intersectionRatio < 1 && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0) + 1), { root, threshold: [0, 1] });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
   const titleBlock = (body: boolean) => <>
-    <h2 className={styles.name}>{place.name}{PLACE_STATUS_ENABLED && <span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span>}</h2>
+    <h2 ref={body ? bodyTitle : undefined} className={styles.name}>{place.name}{PLACE_STATUS_ENABLED && <span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span>}</h2>
     {meta && <p className={styles.meta}>{meta}</p>}
     <div className={styles.chips}>
       <OpenChip details={info.details} />
@@ -189,7 +190,7 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     footer={actions}
     overview={<>
       {/* 끝까지 올린 창에서만 보이는 본문 머리(이름·분류·칩). 시트일 때는 머리의 요약이 같은 내용을 보여 줍니다. */}
-      <div ref={bodyTitle} className={styles.bodyTitle}>{titleBlock(true)}</div>
+      <div className={styles.bodyTitle}>{titleBlock(true)}</div>
       <PlacePhotos details={info.details} loading={info.loading} />
     </>}
     details={<>

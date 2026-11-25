@@ -2,11 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import Modal from "./Modal";
+import ActionSheet, { ActionLead, type ActionItem } from "./ActionSheet";
 import ShellLink from "./ShellLink";
 import { toneStyle } from "./Palette";
 import { categoryIcon } from "@/lib/place-presentation";
 import { placeMeta, type PlaceView } from "@/lib/place-view";
 import { membersLabel, splitColors, timeAgo, type RoomSummary, type Scope } from "@/lib/rooms";
+import { INVITE_DAYS, type FolderSummary } from "@/lib/folders";
 import styles from "./Rooms.module.css";
 
 /** 방 고르기 · 전체 보기(2026-11-25, 시안 design-lab/rooms-view 1~10번) */
@@ -35,8 +37,41 @@ export function MemberFaces({ names, avatars = [], count }: { names: readonly st
     : <i key={`${n}-${i}`}>{Array.from(n.trim())[0] ?? "?"}</i>)}</span>{membersLabel(count)}</span>;
 }
 
-/** 그 방 설정(이름·색·멤버·초대)으로 바로 가는 주소 */
-export const roomSettingsHref = (id: string) => `/folders?room=${encodeURIComponent(id)}`;
+/** 방 ⚙ 시트에서 고르는 일. 방 설정 화면(/folders?room=<id>&view=…)이 그 화면만 보여 줍니다. */
+export type RoomAction = "edit" | "members" | "invite" | "delete" | "leave";
+/** 그 방의 멤버·초대 화면(view 없으면 멤버 화면)으로 바로 가는 주소 */
+export const roomSettingsHref = (id: string, view: RoomAction = "members") => `/folders?room=${encodeURIComponent(id)}&view=${view}`;
+
+type ActionRoom = FolderSummary & Partial<Pick<RoomSummary, "member_names" | "member_avatars">>;
+/**
+ * 방 ⚙ → 동작 시트(시안 design-lab/edit-sheets 3·4번).
+ * 방장: 수정하기 · 멤버 관리 · 초대하기 · 이 방 알림 · (멤버가 있으면 방 나가기) · 방 삭제하기(빨강, 맨 아래).
+ * 멤버: 멤버 보기 · 이 방 알림 · 방 나가기(빨강). 초대 링크는 방장만 만들 수 있어 멤버에게는 초대하기를 두지 않습니다.
+ * onGo가 있으면 그 자리에서 화면을 바꾸고(방 설정 목록), 없으면 방 설정 화면으로 이동합니다.
+ */
+export function RoomActionSheet({ room, onClose, onGo }: { room: ActionRoom; onClose: () => void; onGo?: (action: RoomAction) => void }) {
+  const owner = room.role === "owner", others = room.member_count > 1, full = room.member_count >= room.member_limit;
+  const names = room.member_names ?? [], avatars = room.member_avatars ?? [];
+  const faces = names.length > 0 ? <span className={styles.sheetFaces} aria-hidden="true">{names.slice(0, 3).map((n, i) => avatars[i]
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <i key={`${n}-${i}`} className={styles.photo}><img src={avatars[i]!} alt="" referrerPolicy="no-referrer" decoding="async" /></i>
+    : <i key={`${n}-${i}`}>{Array.from(n.trim())[0] ?? "?"}</i>)}</span> : undefined;
+  const go = (action: RoomAction): Pick<ActionItem, "href" | "onSelect"> => onGo ? { onSelect: () => { onClose(); onGo(action); } } : { href: roomSettingsHref(room.id, action) };
+  const count = `${room.member_count}/${room.member_limit}명`;
+  const items: ActionItem[] = owner ? [
+    { icon: "edit", title: "수정하기", note: "방 이름 · 색", ...go("edit") },
+    { icon: "user", title: "멤버 관리", note: others ? `${count} · 방장 넘기기 · 내보내기` : `${count} · 아직 나만 있어요`, side: faces, ...go("members") },
+    { icon: "link", title: "초대하기", note: full ? "인원이 가득 찼어요" : `${INVITE_DAYS}일 동안 쓸 수 있는 링크 보내기`, ...go(full ? "members" : "invite") },
+    { icon: "bell", title: "이 방 알림", note: "새 장소 · 메모", href: "/settings/notifications" },
+    ...(others ? [{ icon: "back", title: "방 나가기", note: "가장 먼저 참여한 멤버가 방장이 돼요", danger: true, ...go("leave") } satisfies ActionItem] : []),
+    { icon: "trash", title: "방 삭제하기", note: others ? "모든 멤버에게서 장소·모음이 사라져요" : "이 방의 장소·모음이 모두 사라져요", danger: true, ...go("delete") },
+  ] : [
+    { icon: "user", title: "멤버 보기", note: count, side: faces, ...go("members") },
+    { icon: "bell", title: "이 방 알림", note: "새 장소 · 메모", href: "/settings/notifications" },
+    { icon: "back", title: "방 나가기", note: "내가 담은 장소는 방에 남아요", danger: true, ...go("leave") },
+  ];
+  return <ActionSheet title={room.name} note={`${owner ? "방장" : "멤버"} · ${membersLabel(room.member_count)} · 장소 ${room.place_count}곳`} lead={<ActionLead tone={room.color} />} items={items} onClose={onClose} />;
+}
 
 /**
  * 방 색 카드 2열. withAll: 맨 앞 전체 카드(내 방 시트). 지금 보는 카드에 초록 테두리 + 체크.
@@ -47,6 +82,7 @@ export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick 
 }) {
   const total = rooms.reduce((sum, r) => sum + r.place_count, 0);
   const check = <span className={styles.check} aria-hidden="true"><Icon name="check" width={15} strokeWidth={2.6} /></span>;
+  const [actions, setActions] = useState<RoomSummary | null>(null);
   return <div className={`${styles.grid}${compact ? ` ${styles.compact}` : ""}`} role={withAll ? "radiogroup" : undefined} aria-label={withAll ? "보는 방" : "내 방"}>
     {withAll && <button type="button" role="radio" aria-checked={selected === "all"} disabled={disabled} className={`${styles.card} ${styles.allCard}${selected === "all" ? ` ${styles.on}` : ""}`} onClick={() => onPick("all")}>
       <RoomDot colors={rooms.map((r) => r.color)} shape="all" /><strong>전체</strong><small>방 {rooms.length}개 · 장소 {total}곳</small>{selected === "all" && check}
@@ -57,18 +93,21 @@ export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick 
         className={`${styles.card} ${styles.roomCard}${selected === r.id ? ` ${styles.on}` : ""}${r.color === "forest" ? ` ${styles.onRed}` : ""}`} style={toneStyle(r.color)} onClick={() => onPick(r.id)}>
         <strong>{r.name}</strong><small>{roomMeta(r)}</small><MemberFaces names={r.member_names} avatars={r.member_avatars} count={r.member_count} />{selected === r.id && check}
       </button>
-      <ShellLink href={roomSettingsHref(r.id)} className={styles.gear} aria-label={`${r.name} 방 설정`} aria-disabled={disabled} onClick={(e) => { if (disabled) e.preventDefault(); }}><i><Icon name="settings" width={17} /></i></ShellLink>
+      <button type="button" className={styles.gear} aria-label={`${r.name} 방 설정`} aria-haspopup="dialog" disabled={disabled} onClick={() => setActions(r)}><i><Icon name="settings" width={17} /></i></button>
     </div>)}
     <ShellLink href={NEW_ROOM_HREF} className={`${styles.card} ${styles.addCard}`} aria-disabled={disabled}><Icon name="plus" width={26} />새 방 만들기</ShellLink>
+    {actions && <RoomActionSheet room={actions} onClose={() => setActions(null)} />}
   </div>;
 }
 
 /** 방 안 리스트 맨 위 방 머리띠: 지금 어느 방인지(방 색 · 이름 · 멤버 · 장소 수) + ⚙ 방 설정(방·모음 구분 A안) */
 export function RoomHeader({ room, fallbackName }: { room?: RoomSummary; fallbackName: string }) {
   const name = room?.name ?? fallbackName;
+  const [actions, setActions] = useState(false);
   return <div className={styles.band} style={toneStyle(room?.color)}>
     <span className={styles.bandCopy}><strong>{name}</strong>{room && <small>방 · {membersLabel(room.member_count)} · 장소 {room.place_count}곳</small>}</span>
-    {room && <ShellLink href={roomSettingsHref(room.id)} className={styles.gear} aria-label={`${name} 방 설정`}><i><Icon name="settings" width={18} /></i></ShellLink>}
+    {room && <button type="button" className={styles.gear} aria-label={`${name} 방 설정`} aria-haspopup="dialog" onClick={() => setActions(true)}><i><Icon name="settings" width={18} /></i></button>}
+    {room && actions && <RoomActionSheet room={room} onClose={() => setActions(false)} />}
   </div>;
 }
 
