@@ -8,13 +8,14 @@ import type { FoldersResponse } from "@/lib/folders";
 import { friendlyMessage, requestJson, RequestError, ConnectionError } from "@/lib/client-request";
 import { VerifiedWrite, CHECKING_SAVE } from "@/lib/verified-write";
 import { collectionUndo } from "@/lib/collection-undo";
-import { distanceM, placeMeta, type PlaceView } from "@/lib/place-view";
+import { placeMeta, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
-import { STATUS_LABEL } from "@/lib/types";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import { useBoardState, useBoardSync, useRooms } from "./BoardProvider";
 import { RoomHeader, roomSettingsHref } from "./Rooms";
 import { EmptyStart } from "./EmptyStates";
+import PlaceRowBody from "./PlaceRowBody";
+import { usePlaceBriefs } from "./usePlaceBriefs";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import ActionDialog from "./ActionDialog";
@@ -210,22 +211,12 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   function placeRow(p: PlaceView, selection: boolean, modal = false) {
     const joined = memberships.get(p.id) ?? [];
     const className = `place-row ${styles.row}${selection && chosen.includes(p.id) ? ` ${styles.checked}` : ""}`;
-    const content = <>
-      {selection ? <span className={styles.check}><Icon name={chosen.includes(p.id) ? "check" : "plus"} width={18} /></span> : <span className={`category-icon category-${categoryIcon(p.category)}`}><Icon name={categoryIcon(p.category)} width={26} /></span>}
-      <span className="row-copy">
-        <strong>{p.name} {newPlaceIds.has(p.id) && <span className="new-place-badge">NEW</span>}</strong>
-        <span className={styles.metaLine}>
-          <span className="row-meta">{placeMeta(p)}{distanceOrigin ? ` · ${(distanceM(distanceOrigin, p) / 1000).toFixed(1)}km` : ""}</span>
-          {PLACE_STATUS_ENABLED && <span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>}
-        </span>
-        <span className={styles.attribution}>
-          <small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? `${p.sharers.length}명이 저장` : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>
-          {!current && joined.length > 0 && <small className={styles.membership} title={joined.map((c) => c.name).join(", ")}><span className={styles.membershipName}>모음: {joined[0].name}</span>{joined.length > 1 && <span className={styles.membershipCount}>+{joined.length - 1}</span>}</small>}
-        </span>
+    const content = <PlaceRowBody place={p} brief={briefOf(p.kakao_place_id)} origin={distanceOrigin} faceOf={faceOf} isNew={newPlaceIds.has(p.id)}
+      lead={selection ? <span className={styles.check}><Icon name={chosen.includes(p.id) ? "check" : "plus"} width={18} /></span> : undefined}
+      extra={<>
+        {!current && joined.length > 0 && <small className={styles.membership} title={joined.map((c) => c.name).join(", ")}><span className={styles.membershipName}>모음: {joined[0].name}</span>{joined.length > 1 && <span className={styles.membershipCount}>+{joined.length - 1}</span>}</small>}
         {current && p.memo && <small className={styles.memo}>{p.memo}</small>}
-      </span>
-      {!selection && <Icon name="chevron" width={18} />}
-    </>;
+      </>} />;
     if (selection) return <button type="button" key={p.id} className={className} aria-pressed={chosen.includes(p.id)} disabled={modal && frozen} onClick={() => toggle(p.id, chosen, setSelected)}>{content}</button>;
     return <SwipeablePlaceRow key={p.id} placeId={p.id} name={p.name} className={className} open={revealedId === p.id}
       onReveal={(open) => setRevealedId((id) => open ? p.id : id === p.id ? null : id)}
@@ -238,6 +229,10 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   const roomsState = useRooms();
   const roomEmpty = loaded && !places.length && !current;
   const room = roomsState.rooms?.find((r) => r.id === access?.boardId);
+  // 저장한 사람 얼굴: 이 방 멤버 이름 → 프로필 사진
+  const faces = useMemo(() => new Map((room?.member_names ?? []).map((n, i) => [n, room?.member_avatars?.[i] ?? null])), [room]);
+  const faceOf = (name: string) => faces.get(name);
+  const briefOf = usePlaceBriefs(visible.map((p) => p.kakao_place_id));
   const duplicate = editor ? duplicateNote(editor, collections) : "";
   return <section ref={workspace} data-selecting={selecting} className={`${styles.workspace}${showCollections ? ` ${styles.overview}` : ""}`} aria-label="저장한 장소와 모음">
     {deletingPlace && <PlaceDeleteDialog place={deletingPlace} onClose={() => closePlaceDeletion()} onDeleted={() => closePlaceDeletion(true)} />}

@@ -335,7 +335,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   useEffect(() => {
     if (!ready) return;
     if (!fitted.current && places.length && active) {
-      showSaved(false, true);
+      // 처음 지도도 전체 보기 버튼과 같은 맞춤(한 단계 가깝게, 2026-11-26 사용자 결정).
+      showSaved(true);
       fitted.current = true;
     }
   }, [places, ready, active]);

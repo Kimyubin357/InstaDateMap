@@ -1,0 +1,43 @@
+/* 장소 상세(시안 design-lab/place-detail, 2026-11-26). 원단·점선·잉크 토큰, 포커스 표시 없음. */
+.summary{display:block!important;width:100%;min-width:0;margin:0!important}
+.full{min-width:0}
+.name{margin:0;font-size:26px;font-weight:400;line-height:1.25;color:var(--ink);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.meta{margin:2px 0 0;font-size:15px;line-height:1.4;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chips:empty{display:none}
+.roomChip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:16px;border:1px dashed var(--line);background:var(--cream) var(--weave);font-size:14px;color:var(--ink);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roomChip i{width:11px;height:11px;border-radius:4px;background:var(--tone);flex:none}
+.compact{display:none;min-width:0;font-size:20px;font-weight:400;line-height:44px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 본문 머리: 끝까지 올린 창에서만(시트일 때는 머리의 요약이 같은 내용) */
+.bodyTitle{display:none;padding:2px 0 14px}
+.bodyTitle .name{-webkit-line-clamp:unset;display:block}
+
+/* 할 일 줄(시트 아래 고정): 길찾기 · 모음에 담기 · 옮기기 */
+.actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;width:100%}
+.actions>:first-child{min-width:0}
+.actions :global(.btn){min-height:48px;padding:0 8px;gap:5px;font-size:16px;border-radius:24px;white-space:nowrap}
+.route:global(.btn.primary){background:var(--accent) var(--grain);border-color:var(--accent)}
+.act:global(.btn){color:var(--forest)}
+
+.memo{margin:14px 0 6px}
+.memo :global(textarea.memo){min-height:56px;border-radius:14px;border:1px dashed var(--line);background:#fffaf0}
+
+.insta{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px;border-radius:16px;border:1px dashed var(--line);background:var(--cream) var(--weave);color:var(--ink);text-decoration:none}
+.insta>svg:last-child{color:var(--ink-soft);flex:none}
+.instaIcon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#f58529,#dd2a7b,#8134af);color:#fff;display:grid;place-items:center;flex:none}
+.instaText{flex:1;min-width:0;display:flex;flex-direction:column;font-size:15px;line-height:1.4}
+.instaText b{font-weight:400;font-size:13px;color:#8134af}
+.byline{display:flex;align-items:center;gap:6px;margin:14px 0 0;font-size:14px;color:var(--ink-soft)}
+.byline img,.byline i{width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none;background:var(--cream);display:grid;place-items:center;box-shadow:0 0 0 1.5px var(--paper)}
+.byline>:nth-child(2):not(span){margin-left:-8px}
+.mini{margin:14px 0 0;height:140px;border-radius:16px;overflow:hidden}
+.delete{position:relative;width:100%;min-height:52px;margin:16px 0 4px;border:0;border-radius:26px;background:var(--accent) var(--grain);color:var(--cream);font:inherit;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--print-shadow)}
+.delete::after{content:"";position:absolute;inset:4px;border:1px dashed #fbf6e870;border-radius:inherit;pointer-events:none}
+.delete:disabled{opacity:.6}
+
+/* 끝까지 올린 창: 머리에는 ‹ · (가려지면) 이름 · X 만. 이름·칩은 본문 맨 위로. */
+:global(.sheet-place.is-fullscreen) .full{display:none}
+:global(.sheet-place.is-fullscreen) .compact{display:block;opacity:0;transition:opacity .15s}
+:global(.sheet-place.is-fullscreen) .titleUp .compact{opacity:1}
+:global(.sheet-place.is-fullscreen) .bodyTitle{display:block}
+@media (prefers-reduced-motion:reduce){:global(.sheet-place.is-fullscreen) .compact{transition:none}}
