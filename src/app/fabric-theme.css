@@ -343,14 +343,14 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .settings-leave{align-self:center;display:block;min-height:44px;margin:18px auto 0;padding:0 16px;font-size:15px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px}
 .settings-leave-detail{text-align:left}.settings-leave-detail p{margin:0 0 8px}
 /* 저장할 폴더: 저장 화면 탭 아래의 한 줄(원단 점선 행). 누르면 폴더 고르기 창 */
-.folder-chooser{width:100%;display:flex;align-items:center;gap:10px;min-height:52px;margin:0 0 14px;padding:8px 14px;border:1px dashed var(--line);border-radius:12px;background:var(--cream) var(--weave);color:var(--ink);font:inherit;text-align:left}
-.folder-chooser:focus-visible{outline:3px solid var(--forest);outline-offset:2px}
-.folder-chooser-label{flex:none;font-size:15px;color:var(--ink-soft)}
-.folder-chooser-value{flex:1;min-width:0;display:flex;align-items:center;gap:6px;color:var(--forest)}
-.folder-chooser-value b{font-weight:400;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.folder-chooser>svg:last-child{flex:none;color:var(--ink-soft)}
 /* 폴더별 알림: 알림 줄 아래 들여 쓴 폴더 스위치들 */
 .push-folders{display:flex;flex-direction:column;margin:0 0 4px;padding-left:28px;border-left:1px dashed var(--line);margin-left:12px}
 .push-folder-row{min-height:48px}
 .push-folder-row .settings-copy>span{font-size:17px}
 .place-delete-hint{margin:4px 0 0;text-align:center;font-size:15px}
+/* 저장 없이 링크 정리 확인창(DismissSource): 담지 않을 장소 이름 */
+.dismiss-list{list-style:none;margin:12px 0 0;padding:0;border-top:1px dashed var(--line);text-align:left}
+.dismiss-list li{display:flex;align-items:center;gap:8px;min-height:40px;border-bottom:1px dashed var(--line);font-size:16px;line-height:1.4}
+.dismiss-list li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.dismiss-list small{font-size:14px;color:var(--ink-soft);white-space:nowrap}
+.dismiss-note{font-size:14px;color:var(--ink-soft);margin:10px 0 0}

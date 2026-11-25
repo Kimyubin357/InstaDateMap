@@ -123,7 +123,8 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
   try {
     input.onProgress?.("caption");
     if (!caption) { const r = await fetchCaption(url); caption = r.caption; method = r.method; locationTag = r.locationTag; }
-    if (!caption && !locationTag && images.length === 0) {
+    // 장소 이름은 캡션에서만 읽습니다. 위치 태그만 있는 게시물은 읽을 캡션이 없는 것과 같습니다.
+    if (!caption && images.length === 0) {
       await finish("needs_caption", []);
       return { status: "needs_caption", message: "게시물에서 장소 정보를 읽지 못했어요. 다시 분석하거나 장소를 직접 검색해 주세요.", source_id: sourceId, source_version: existing.analysis_version, confirm_url: confirmUrl(sourceId) };
     }
@@ -215,7 +216,10 @@ async function searchedPlace(selection: DirectSelection) {
   if (!place) throw new AccessError("검색 결과가 바뀌었어요. 다시 검색해서 골라 주세요.", 409);
   return place;
 }
+/** 확인 화면이 담을 곳 없이 저장을 보냈을 때. 0곳 완료는 '이 링크 정리하기'(확인창)로만 합니다. */
+export const NOTHING_TO_SAVE = "담을 장소가 아직 없어요. 장소의 위치를 확인하거나, 저장하지 않으려면 '이 링크 정리하기'를 눌러 주세요.";
 export async function confirmSelections(boardId: string, sourceId: string, who: string, selections: Selection[], direct: DirectSelection | null, owner: string, version: string) {
+  if (!direct && !selections.some((s) => s.include)) throw new AccessError(NOTHING_TO_SAVE);
   const { data: src, error } = await db().from("sources").select("id, analysis_version").eq("id", sourceId).eq("board_id", boardId).maybeSingle();
   checkDb(error, "링크 조회 실패");
   if (!src) throw new AccessError(SOURCE_MESSAGES.SOURCE_NOT_FOUND, 404);

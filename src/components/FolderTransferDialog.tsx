@@ -24,7 +24,7 @@ export default function FolderTransferDialog({ ids, onClose, onDone }: {
     setError(""); setFolders(null);
     requestJson<FoldersResponse>("/api/folders", { cache: "no-store", notifyBoardChange: false })
       .then((data) => { const others = data.folders.filter((f) => f.id !== data.current); setFolders(others); if (others.length === 1) setTarget(others[0].id); })
-      .catch((e) => setError(friendlyMessage(e, "폴더 목록을 불러오지 못했어요. 다시 시도해 주세요.")));
+      .catch((e) => setError(friendlyMessage(e, "방 목록을 불러오지 못했어요. 다시 시도해 주세요.")));
   };
   useEffect(load, []);
   async function send() {
@@ -34,16 +34,16 @@ export default function FolderTransferDialog({ ids, onClose, onDone }: {
     catch (e) { setError(friendlyMessage(e, "장소를 담지 못했어요. 다시 시도해 주세요.")); setBusy(false); }
   }
   const count = ids.length > 1 ? `${ids.length}곳` : "";
-  const close = <button className="icon-btn sheet-close-btn" aria-label="폴더 고르기 닫기" disabled={busy} onClick={onClose}><Icon name="close" width={18} /></button>;
-  return <Modal title="다른 폴더에 담기" variant="compact" className={styles.modal} headerActions={close} onClose={() => { if (!busy) onClose(); }}
+  const close = <button className="icon-btn sheet-close-btn" aria-label="방 고르기 닫기" disabled={busy} onClick={onClose}><Icon name="close" width={18} /></button>;
+  return <Modal title="다른 방에 담기" variant="compact" className={styles.modal} headerActions={close} onClose={() => { if (!busy) onClose(); }}
     footer={folders?.length ? <div className="actions">
       <button className="btn primary" disabled={!target || busy} onClick={() => void send()}>{busy ? "담는 중…" : `${count} 담기`.trim()}</button>
     </div> : undefined}>
-    {!folders && !error && <p className={styles.lead} role="status">폴더 목록을 불러오고 있어요…</p>}
-    {folders && !folders.length && <div className={styles.empty}><p>보낼 수 있는 다른 폴더가 없어요.</p><ShellLink className="btn" href="/folders">새 폴더 만들기</ShellLink></div>}
+    {!folders && !error && <p className={styles.lead} role="status">방 목록을 불러오고 있어요…</p>}
+    {folders && !folders.length && <div className={styles.empty}><p>담을 수 있는 다른 방이 없어요.</p><ShellLink className="btn" href="/folders">새 방 만들기</ShellLink></div>}
     {folders && folders.length > 0 && <>
-      <p className={styles.lead}>이 폴더에도 그대로 남아요. 같은 가게가 이미 있으면 그쪽 장소를 두고 메모만 합쳐요.</p>
-      <div role="radiogroup" aria-label="보낼 폴더">
+      <p className={styles.lead}>이 방에도 그대로 남아요. 같은 가게가 이미 있으면 그쪽 장소를 두고 메모만 합쳐요.</p>
+      <div role="radiogroup" aria-label="담을 방">
         {folders.map((f) => <button key={f.id} type="button" role="radio" aria-checked={target === f.id} className={styles.row} disabled={busy} onClick={() => setTarget(f.id)}>
           <span className={styles.check}><Icon name={target === f.id ? "check" : f.icon} width={20} /></span>
           <span><strong>{f.name}</strong><small>{f.place_count}곳 · {f.member_count > 1 ? `${f.member_count}명` : "혼자"}</small></span>

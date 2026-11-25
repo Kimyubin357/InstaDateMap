@@ -20,8 +20,8 @@ import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
 
 function AddPanel() {
-  const url = useSearchParams().get("url") || "";
-  return <AddForm key={url} initialUrl={url} />;
+  const params = useSearchParams(); const url = params.get("url") || "";
+  return <AddForm key={url} initialUrl={url} initialRetry={params.get("retry") === "1"} />;
 }
 
 interface BoardContext { store: BoardStore; homeHref: string; suspended: boolean; accessError: string; checkingAccess: boolean; suspend: () => void; resume: () => void; resetAccess: (broadcast?: boolean) => Promise<boolean>; lock: () => Promise<void>; notify: (message: string, tone?: "success" | "error" | "info", action?: ToastAction) => void }

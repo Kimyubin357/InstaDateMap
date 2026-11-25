@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { candidatesFromLlm } from "@/lib/extract/normalize";
 import { mergeCandidates } from "@/lib/extract/merge";
-import { extractPlaces } from "@/lib/extract/router";
+import { extractPlaces, MODULES } from "@/lib/extract/router";
 import type { ExtractorModule, PlaceCandidate, SourceContext } from "@/lib/extract/types";
 import { captionModule } from "@/lib/extract/modules/caption";
 import { locationTagModule } from "@/lib/extract/modules/locationTag";
@@ -128,7 +128,16 @@ describe("라우터", () => {
     expect(r.candidates).toHaveLength(2);
     expect(r.candidates[0]).toMatchObject({ name: "어니언", branch: "성수점" });
   });
-  it("도시 위치 태그는 제외하고 실제 공원·가게는 유지", async () => {
+  it("장소 이름은 캡션에서만: 위치 태그 모듈은 등록·실행되지 않음", async () => {
+    expect(MODULES.map((m) => m.name)).not.toContain("location_tag");
+    expect(locationTagModule.enabled).toBe(false);
+    const llm = async () => '{"places":[{"name":"딩티엔","branch":"용산점","confidence":0.9}]}';
+    const onlyTag = await extractPlaces(ctx({ locationTag: "용산역" }), { llm });
+    expect(onlyTag.candidates).toEqual([]);
+    const both = await extractPlaces(ctx({ caption: "딩티엔 용산점", locationTag: "용산역" }), { llm });
+    expect(both.candidates.map((c) => [c.module, c.name])).toEqual([["caption", "딩티엔"]]);
+  });
+  it("도시 위치 태그는 제외하고 실제 공원·가게는 유지(모듈 코드 자체)", async () => {
     const deps = { llm: async () => "" };
     for (const locationTag of ["경기도 수원", "서울특별시", "경기 수원시 권선구"]) {
       expect(await locationTagModule.run(ctx({ locationTag }), deps)).toEqual([]);

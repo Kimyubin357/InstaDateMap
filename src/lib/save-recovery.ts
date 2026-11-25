@@ -31,7 +31,7 @@ export async function verifyDirectSave(kakaoId: string, sourceId?: string): Prom
   return current.result?.status === "saved" ? current.result : null;
 }
 export type ConfirmChoice = { extraction_id: string; include: boolean; place: { kakao_place_id: string } | null };
-export type ConfirmSaved = { saved: number; place_url?: string; saved_place?: ShareResult["saved_place"] };
+export type ConfirmSaved = { saved: number; place_url?: string; place_ids?: string[]; saved_place?: ShareResult["saved_place"] };
 export async function verifyConfirmation(sourceId: string, choices: ConfirmChoice[]): Promise<ConfirmSaved | null> {
   const current = await readStatus({ source_id: sourceId });
   if (current.source?.status === "processing") throw new UnconfirmedWriteError("아직 링크를 처리하고 있어요. 잠시 후 다시 확인해 주세요.");

@@ -391,3 +391,6 @@ body:has(.persistent-map:not(.is-away) .view-list [data-selecting=true]):not(:ha
   .map-status-card .map-status-actions{margin-top:8px}.map-status-card .map-status-actions>.btn{padding-top:8px;padding-bottom:8px}
   .map-status-card .map-status-close.icon-btn{top:0;right:0}
 }
+/* 저장 뒤 '방금 담은 N곳' 시트(시안 9번): 지도 도구와 칩(토스트)을 시트 위 12px로 올림. 도구 자체는 그대로. */
+.has-just-saved .map-controls{bottom:calc(var(--map-bottom) + var(--just-saved-height,0px) + 12px)}
+body:has(.persistent-map:not(.is-away) .has-just-saved) .global-feedback.is-map{bottom:calc(var(--map-bottom) + var(--just-saved-height,0px) + 12px)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { savedMapHref, shareDestination } from "@/lib/share-navigation";
+import { reviewDestination, savedMapHref, shareDestination } from "@/lib/share-navigation";
 
 describe("중간 완료 화면 없이 다음 단계로 이동", () => {
   it("후보를 찾으면 토큰과 사용자 쿼리 없이 선택 화면을 바로 연다", () => {
@@ -17,5 +17,10 @@ describe("중간 완료 화면 없이 다음 단계로 이동", () => {
     }
     expect(shareDestination({ status: "confirm", message: "", confirm_url: "javascript:alert(1)" })).toBeNull();
     expect(savedMapHref("/?place=bad%2Fpath&t=old")).toBe("/?saved=1");
+  });
+  it("지도에서 못 찾은 링크(needs_review)는 실패 화면 대신 장소 확인으로", () => {
+    expect(reviewDestination({ status: "needs_review", message: "", confirm_url: "https://datemap.example/confirm/source-9" })).toBe("/confirm/source-9");
+    for (const status of ["needs_caption", "error", "confirm"]) expect(reviewDestination({ status, message: "", confirm_url: "/confirm/source-9" })).toBeNull();
+    expect(reviewDestination({ status: "needs_review", message: "", confirm_url: "javascript:alert(1)" })).toBeNull();
   });
 });
