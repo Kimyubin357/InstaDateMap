@@ -13,14 +13,14 @@ export async function GET(req: Request, { params }: Params) {
   } catch (e) { return accessError(e); }
 }
 
-/** 이름·표지 수정(방장) */
+/** 이름·색 수정(방장). 아이콘은 받지 않고 DB의 값을 그대로 둡니다(018: p_icon이 null이면 유지). */
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const account = await requireAccount(req);
     const id = folderId((await params).id);
     const input = folderInput(await req.json().catch(() => null));
     if (typeof input === "string") throw new AccessError(input);
-    await folderRpc("dm_update_folder", { p_user: account.userId, p_board: id, p_name: input.name, p_color: input.color, p_icon: input.icon }, "방을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.");
+    await folderRpc("dm_update_folder", { p_user: account.userId, p_board: id, p_name: input.name, p_color: input.color, p_icon: null }, "방을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.");
     return NextResponse.json(await folderDetail(account, id), noStore);
   } catch (e) { return accessError(e); }
 }

@@ -220,4 +220,5 @@ it("locally removing a confirmed trashed place also clears its visible collectio
 });
 it("invalid collection cache data is rejected before rendering icons or membership",()=>{
  expect(isSnapshot({...snapshot(),collections:[{id:"c",name:"모음",description:"",color:"red",icon:"script",version:1,created_at:"2026-01-01",place_ids:[]}]})).toBe(false);
+ expect(isSnapshot({...snapshot(),collections:[{id:"c",name:"모음",description:"",color:"plum",icon:"🍷",version:1,created_at:"2026-01-01",place_ids:[]}]})).toBe(true);
 });

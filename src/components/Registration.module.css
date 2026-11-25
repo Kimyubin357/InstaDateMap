@@ -6,13 +6,11 @@
 .page{padding-bottom:calc(var(--safe-b) + 180px)}
 .pageShort{padding-bottom:calc(var(--safe-b) + 40px)}
 
-/* ── 저장할 방 ── (방 색은 모음·방 화면과 같은 값) */
-.roomCard,.roomLine,.sheet,.justSheet{--collection-red:var(--accent);--collection-forest:var(--forest);--collection-gold:#8b692d;--collection-blue:#466b79}
-.roomCard{display:flex;align-items:center;gap:12px;padding:14px 12px 14px 14px;border-radius:18px;background:var(--cream) var(--weave);border:1.5px dashed var(--accent);box-shadow:var(--print-shadow);color:var(--ink)}
+/* ── 저장할 방 ── 방은 색 띠 + 이름(아이콘 없음, 시안 design-lab/room-look 7번). 색은 --palette-* */
+.roomCard{display:flex;align-items:center;gap:14px;min-height:84px;padding:0 12px 0 14px;border-radius:18px;background:var(--cream) var(--weave);border:1.5px dashed var(--tone,var(--accent));box-shadow:var(--print-shadow);color:var(--ink)}
+.roomCard .roomCardBand{width:10px;margin:14px 0}
+.roomCard>div{padding:12px 0}
 .roomCard>div{flex:1;min-width:0}
-.avatar{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--cream);background:var(--room-color,var(--accent)) var(--grain);box-shadow:var(--print-shadow)}
-.avatarSm{width:32px;height:32px;border-radius:10px;box-shadow:none}
-.avatarRow{width:40px;height:40px;border-radius:12px}
 .kicker{display:block;font-size:15px;line-height:1.4;color:var(--ink-soft)}
 .roomBig{display:block;font-size:23px;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere}
 .roomBig em,.roomLine em{font-style:normal;color:var(--accent-ink)}
@@ -30,7 +28,9 @@
 .sheet :global(.sheet-footer){padding:10px max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));border-top:1px dashed var(--line);display:flex;gap:8px}
 .sheet :global(.sheet-footer) :global(.btn){flex:1;min-width:0;min-height:50px;padding-left:10px;padding-right:10px}
 .sheetLead{font-size:15px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;word-break:keep-all}
-.roomRow{width:100%;display:flex;align-items:center;gap:12px;min-height:66px;padding:10px 0;text-align:left;background:none;border:0;border-top:1px dashed var(--line);color:var(--ink);font:inherit;text-decoration:none}
+.roomRow{width:100%;display:flex;align-items:center;gap:14px;min-height:62px;padding:0;text-align:left;background:none;border:0;border-top:1px dashed var(--line);color:var(--ink);font:inherit;text-decoration:none}
+.roomRow .rowBand{margin:11px 0}
+.roomRow>span:nth-child(2){padding:8px 0}
 .roomRow>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}
 .roomRow strong{font-size:19px;line-height:1.3;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .roomRow small{font-size:15px;color:var(--ink-soft);line-height:1.4}
@@ -38,7 +38,7 @@
 .roomRow:focus-visible{outline:3px solid var(--forest);outline-offset:-3px;border-radius:10px}
 .recent{flex:none;font-size:13px;line-height:22px;padding:0 8px;border-radius:11px;border:1px dashed var(--forest);color:var(--forest);white-space:nowrap}
 .check{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--forest) var(--grain);color:var(--cream)}
-.newAvatar{background:var(--cream) var(--weave);border:1.5px dashed var(--forest);color:var(--forest);box-shadow:none}
+.newBand{width:8px;align-self:stretch;margin:11px 0;border-radius:4px;border:1.5px dashed var(--forest);flex:none}
 .note{font-size:14px;color:var(--ink-soft);line-height:1.5;padding:10px 0 0;margin:0;border-top:1px dashed var(--line);word-break:keep-all}
 
 /* ── 링크 넣기 ── */

@@ -1,26 +1,22 @@
 "use client";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import Icon from "./Icon";
 import ShellLink from "./ShellLink";
 import { useBoardState, useBoardSync } from "./BoardProvider";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import type { FolderIcon, FolderSummary, FoldersResponse } from "@/lib/folders";
+import type { FolderSummary, FoldersResponse } from "@/lib/folders";
+import { RoomBand, toneStyle } from "./Palette";
 import { lastSavedRoom } from "@/lib/saved-memory";
 import styles from "./Registration.module.css";
 
-export type RoomLook = { color?: string | null; icon?: FolderIcon | null };
-const roomColor = (color?: string | null): CSSProperties => ({ "--room-color": color ? `var(--collection-${color})` : "var(--accent)" } as CSSProperties);
+/** 방은 이름과 색만 있습니다(2026-11-25, 시안 design-lab/room-look 7번). 아이콘은 그리지 않습니다. */
+export type RoomLook = { color?: string | null };
 const members = (f: FolderSummary) => f.member_count > 1 ? `${f.member_count}명` : "나만";
-
-/** 방 색·아이콘 표지 */
-export function RoomAvatar({ room, size = "lg" }: { room?: RoomLook | null; size?: "lg" | "row" | "sm" }) {
-  return <span className={`${styles.avatar}${size === "sm" ? ` ${styles.avatarSm}` : size === "row" ? ` ${styles.avatarRow}` : ""}`} style={roomColor(room?.color)} aria-hidden="true"><Icon name={room?.icon ?? "heart"} width={size === "sm" ? 18 : 22} /></span>;
-}
 
 /** 확인 화면·분석 중의 읽기 전용 한 줄: "'방'에 담아요" (분석이 시작된 링크는 그 방에 담깁니다) */
 export function RoomLine({ name, room }: { name: string; room?: RoomLook | null }) {
-  return <div className={styles.roomLine}><RoomAvatar room={room} size="sm" /><span>‘<em>{name}</em>’에 담아요</span></div>;
+  return <div className={styles.roomLine}><RoomBand color={room?.color} shape="square" /><span>‘<em>{name}</em>’에 담아요</span></div>;
 }
 
 /**
@@ -43,7 +39,7 @@ export default function RoomChooser({ disabled = false, onRoom }: { disabled?: b
   };
   useEffect(() => { setLast(lastSavedRoom()); void load(); }, [state.access?.boardId]);
   const current = data?.folders.find((f) => f.id === (data.current ?? state.access?.boardId)) ?? null;
-  useEffect(() => { onRoom?.(current); }, [current?.id, current?.name, current?.color, current?.icon]);
+  useEffect(() => { onRoom?.(current); }, [current?.id, current?.name, current?.color]);
   async function choose(folder: FolderSummary) {
     if (busy) return;
     if (folder.id === current?.id) { setOpen(false); return; }
@@ -58,8 +54,8 @@ export default function RoomChooser({ disabled = false, onRoom }: { disabled?: b
   const kicker = current ? `${last === current.id ? "마지막에 저장한 방" : "지금 보고 있는 방"} · ${members(current)}` : "저장할 방";
   const close = <button className="icon-btn sheet-close-btn" aria-label="방 고르기 닫기" disabled={busy} onClick={() => setOpen(false)}><Icon name="close" width={18} /></button>;
   return <>
-    <div className={styles.roomCard}>
-      <RoomAvatar room={current} />
+    <div className={styles.roomCard} style={toneStyle(current?.color)}>
+      <RoomBand color={current?.color} className={styles.roomCardBand} />
       <div><span className={styles.kicker}>{kicker}</span><span className={styles.roomBig}>{shown ? <>‘<em>{shown}</em>’에 저장해요</> : "방을 확인하고 있어요…"}</span></div>
       <button type="button" className={styles.change} disabled={disabled || busy} aria-haspopup="dialog" onClick={() => { setOpen(true); if (!data) void load(); }}>바꾸기</button>
     </div>
@@ -68,12 +64,12 @@ export default function RoomChooser({ disabled = false, onRoom }: { disabled?: b
       {!data && !error && <p className={styles.status} role="status">방 목록을 불러오고 있어요…</p>}
       {data && <div role="radiogroup" aria-label="저장할 방">
         {data.folders.map((f) => <button key={f.id} type="button" role="radio" aria-checked={f.id === current?.id} className={styles.roomRow} disabled={busy} onClick={() => void choose(f)}>
-          <RoomAvatar room={f} size="row" />
+          <RoomBand color={f.color} className={styles.rowBand} />
           <span><strong>{f.name}</strong><small>{members(f)} · 장소 {f.place_count}</small></span>
           {f.id === last && <span className={styles.recent}>최근</span>}
           {f.id === current?.id && <span className={styles.check} aria-hidden="true"><Icon name="check" width={16} /></span>}
         </button>)}
-        <ShellLink className={`${styles.roomRow} ${styles.roomNew}`} href="/folders"><span className={`${styles.avatar} ${styles.avatarRow} ${styles.newAvatar}`} aria-hidden="true"><Icon name="plus" width={20} /></span><span><strong>새 방 만들기</strong><small>만들면 그 방이 열리고, 거기에 저장해요</small></span></ShellLink>
+        <ShellLink className={`${styles.roomRow} ${styles.roomNew}`} href="/folders"><span className={styles.newBand} aria-hidden="true" /><span><strong>새 방 만들기</strong><small>만들면 그 방이 열리고, 거기에 저장해요</small></span></ShellLink>
       </div>}
       {busy && <p className={styles.status} role="status">방을 바꾸는 중…</p>}
       {error && <div role="alert"><p className="error">{error}</p>{!data && <button className="text-btn" onClick={() => void load()}>다시 불러오기</button>}</div>}

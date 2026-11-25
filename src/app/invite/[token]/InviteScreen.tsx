@@ -1,13 +1,14 @@
 "use client";
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import Icon from "@/components/Icon";
+import { toneStyle } from "@/components/Palette";
 import { ProviderButtons } from "@/app/login/LoginScreen";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
 import type { InvitePreview } from "@/lib/folders";
 import styles from "@/app/login/Login.module.css";
 import invite from "./Invite.module.css";
 
-/** 초대 링크 화면: 폴더 미리보기 → (로그인) → 참여하고 그 폴더 열기 */
+/** 초대 링크 화면: 방 미리보기(방 색) → (로그인) → 참여하고 그 방 열기 */
 export default function InviteScreen({ token, preview, loggedIn }: { token: string; preview: InvitePreview | null; loggedIn: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +25,7 @@ export default function InviteScreen({ token, preview, loggedIn }: { token: stri
     : `${preview.owner ? `${preview.owner}님의 방 · ` : ""}멤버 ${preview.member_count}/${preview.member_limit}명`;
   return <main className={styles.page}>
     <section className={styles.hero}>
-      <div className={invite.cover} style={{ "--folder-color": `var(--folder-${valid ? preview.color : "forest"})` } as CSSProperties} aria-hidden="true"><Icon name={valid ? preview.icon! : "link"} width={56} /></div>
+      {valid ? <div className={`${invite.cover} ${invite.room}`} style={toneStyle(preview.color)} aria-hidden="true" /> : <div className={invite.cover} style={toneStyle("forest")} aria-hidden="true"><Icon name="link" width={56} /></div>}
       <h1 className={`${styles.title} ${invite.title}`}>{title}</h1>
       <p className={styles.subtitle}>{subtitle}</p>
     </section>

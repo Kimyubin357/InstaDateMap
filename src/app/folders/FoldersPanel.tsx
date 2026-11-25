@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ClientReady from "@/components/ClientReady";
 import Icon from "@/components/Icon";
@@ -8,29 +8,33 @@ import ActionDialog from "@/components/ActionDialog";
 import Avatar from "@/components/Avatar";
 import { useBoardSync } from "@/components/BoardProvider";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import { FOLDER_COLORS, FOLDER_COLOR_LABEL, FOLDER_ICONS, FOLDER_ICON_LABEL, INVITE_DAYS, type FolderColor, type FolderDetail, type FolderIcon, type FolderMember, type FolderSummary, type FoldersResponse } from "@/lib/folders";
+import { FOLDER_COLOR_LABEL, INVITE_DAYS, ROOM_LIMIT, ROOM_NAME_MAX, type FolderColor, type FolderDetail, type FolderMember, type FolderSummary, type FoldersResponse } from "@/lib/folders";
+import { ColorSwatches, FieldLabel, RoomBand, RoomCard } from "@/components/Palette";
 import styles from "./Folders.module.css";
 
-interface Draft { name: string; color: FolderColor; icon: FolderIcon }
+interface Draft { name: string; color: FolderColor }
 type Confirm = { kind: "delete" } | { kind: "leave" } | { kind: "kick"; member: FolderMember } | { kind: "owner"; member: FolderMember };
-const NEW_DRAFT: Draft = { name: "", color: "red", icon: "heart" };
+/** 새 방은 빨강으로 시작합니다(쓰지 않는 색을 미리 골라 두지 않음, 2026-11-25). */
+const NEW_DRAFT: Draft = { name: "", color: "red" };
 const call = <T,>(url: string, method = "GET", body?: unknown) => requestJson<T>(url, { method, cache: "no-store", notifyBoardChange: false,
   ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) });
+const clean = (name: string) => name.replace(/\s+/g, " ").trim();
+const people = (count: number) => count > 1 ? `${count}명` : "나만";
 
-function Cover({ color, icon, size = 44 }: { color: FolderColor; icon: FolderIcon; size?: number }) {
-  return <span className={styles.cover} style={{ "--folder-color": `var(--folder-${color})`, width: size, height: size } as CSSProperties} aria-hidden="true"><Icon name={icon} width={Math.round(size * .5)} /></span>;
-}
-
-/** 이름·색·아이콘. 폴더 만들기와 방장의 수정에 함께 씁니다. */
-function FolderEditor({ draft, onChange, busy, submitLabel, busyLabel, onSubmit, onCancel, unchanged = false }: {
-  draft: Draft; onChange: (d: Draft) => void; busy: boolean; submitLabel: string; busyLabel: string; onSubmit: () => void; onCancel?: () => void; unchanged?: boolean;
+/** 방 이름·색 고르기(시안 1·3번). 맨 위 색 카드는 고르는 대로 바로 바뀌고, 저장 버튼은 아래 고정 바에 있습니다. */
+function RoomEditor({ draft, onChange, busy, kicker, meta, note, submitLabel, busyLabel, onSubmit, unchanged = false, children }: {
+  draft: Draft; onChange: (d: Draft) => void; busy: boolean; kicker: string; meta: string; note: ReactNode; submitLabel: string; busyLabel: string; onSubmit: () => void; unchanged?: boolean; children?: ReactNode;
 }) {
-  const trimmed = draft.name.replace(/\s+/g, " ").trim();
+  const trimmed = clean(draft.name);
   return <form className={styles.editor} aria-busy={busy} onSubmit={(e: FormEvent) => { e.preventDefault(); if (!busy && trimmed && !unchanged) onSubmit(); }}>
-    <label>방 이름<input value={draft.name} maxLength={30} onChange={(e) => onChange({ ...draft, name: e.target.value })} placeholder="예: 부산 여행, 동네 맛집" disabled={busy} enterKeyHint="done" /></label>
-    <fieldset disabled={busy}><legend>표지 색</legend><div className={styles.swatches}>{FOLDER_COLORS.map((color) => <button type="button" key={color} aria-label={FOLDER_COLOR_LABEL[color]} aria-pressed={draft.color === color} style={{ "--folder-color": `var(--folder-${color})` } as CSSProperties} onClick={() => onChange({ ...draft, color })}>{draft.color === color && <Icon name="check" width={20} />}</button>)}</div></fieldset>
-    <fieldset disabled={busy}><legend>표지 아이콘</legend><div className={styles.icons}>{FOLDER_ICONS.map((icon) => <button type="button" key={icon} aria-label={FOLDER_ICON_LABEL[icon]} aria-pressed={draft.icon === icon} onClick={() => onChange({ ...draft, icon })}><Icon name={icon} /></button>)}</div></fieldset>
-    <div className={styles.editorActions}>{onCancel && <button type="button" className="btn" onClick={onCancel} disabled={busy}>취소</button>}<button className="btn primary" disabled={busy || !trimmed || unchanged}>{busy ? busyLabel : submitLabel}</button></div>
+    <RoomCard color={draft.color} kicker={kicker} name={trimmed} meta={meta} />
+    <FieldLabel htmlFor="room-name" aside={<small>{draft.name.length}/{ROOM_NAME_MAX}</small>}>방 이름</FieldLabel>
+    <input id="room-name" className={styles.nameField} value={draft.name} maxLength={ROOM_NAME_MAX} onChange={(e) => onChange({ ...draft, name: e.target.value })} placeholder="예: 부산 여행, 동네 맛집" disabled={busy} enterKeyHint="done" />
+    <FieldLabel aside={<b>{FOLDER_COLOR_LABEL[draft.color]}</b>}>색</FieldLabel>
+    <ColorSwatches value={draft.color} disabled={busy} label="방 색" onChange={(color) => onChange({ ...draft, color })} />
+    <p className={styles.note}><Icon name="user" width={20} /><span>{note}</span></p>
+    {children}
+    <div className={styles.bar}><button className="btn primary" disabled={busy || !trimmed || unchanged}>{busy ? busyLabel : submitLabel}</button></div>
   </form>;
 }
 
@@ -59,13 +63,13 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   const say = useCallback((message: string) => { if (standalone) setStatus(message); else sync.notify(message); }, [standalone, sync]);
   const load = useCallback(async () => {
     setLoadError("");
-    try { const next = await call<FoldersResponse>("/api/folders"); setData(next); if (!next.folders.length) setCreating(true); return next; }
+    try { const next = await call<FoldersResponse>("/api/folders"); setData(next); return next; }
     catch (e) { setLoadError(friendlyMessage(e, "방 목록을 불러오지 못했어요. 다시 시도해 주세요.")); return null; }
   }, []);
   useEffect(() => { void load(); }, [load]);
   const loadDetail = useCallback(async (id: string) => {
     setError("");
-    try { const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color, icon: next.folder.icon } : null); }
+    try { const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color } : null); }
     catch (e) { setError(friendlyMessage(e, "방 정보를 불러오지 못했어요.")); }
   }, []);
   useEffect(() => { if (selected) { setDetail(null); setInvite(null); void loadDetail(selected); } }, [selected, loadDetail]);
@@ -154,13 +158,15 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     const folder = detail?.folder ?? folders.find((f) => f.id === selected);
     const owner = detail?.folder.role === "owner";
     const others = detail ? detail.members.length - 1 : 0;
-    return <main className={`form-page settings-page ${styles.page}`}>{header(folder?.name ?? "방", () => { setSelected(null); setError(""); setStatus(""); })}<ClientReady>
+    return <main className={`form-page settings-page ${styles.page}${owner ? ` ${styles.withBar}` : ""}`}>{header(folder?.name ?? "방", () => { setSelected(null); setError(""); setStatus(""); })}<ClientReady>
       {feedback}
       {!detail ? !error && <p className="hint" role="status">방 정보를 불러오고 있어요…</p> : <div className={styles.detail}>
-        <section className="settings-group" aria-labelledby="folder-about"><h2 id="folder-about" className="settings-label">방</h2>
-          {owner && edit ? <FolderEditor draft={edit} onChange={setEdit} busy={busy} submitLabel="저장" busyLabel="저장하는 중…" onSubmit={() => { void save(); }}
-            unchanged={edit.name.replace(/\s+/g, " ").trim() === detail.folder.name && edit.color === detail.folder.color && edit.icon === detail.folder.icon} />
-            : <div className={styles.aboutRow}><Cover color={detail.folder.color} icon={detail.folder.icon} /><span><strong>{detail.folder.name}</strong><small>이름과 표지는 방장이 바꿀 수 있어요</small></span></div>}
+        <section className={styles.about} aria-label="방 이름과 색">
+          {owner && edit ? <RoomEditor draft={edit} onChange={setEdit} busy={busy} kicker="방장 · 나" meta={`${people(detail.members.length)} · 장소 ${detail.folder.place_count}곳`}
+            note={<>바꾸면 <b>모든 멤버에게</b> 바뀐 이름과 색으로 보여요.</>} submitLabel="저장" busyLabel="저장하는 중…" onSubmit={() => { void save(); }}
+            unchanged={clean(edit.name) === detail.folder.name && edit.color === detail.folder.color} />
+            : <><RoomCard color={detail.folder.color} kicker={`멤버 · 방장 ${detail.members.find((m) => m.role === "owner")?.name ?? ""}`.trim()} name={detail.folder.name} meta={`${people(detail.members.length)} · 장소 ${detail.folder.place_count}곳`} />
+              <p className={styles.note}><Icon name="user" width={20} /><span>이름과 색은 방장이 바꿀 수 있어요.</span></p></>}
         </section>
         <section className="settings-group" aria-labelledby="folder-members"><h2 id="folder-members" className="settings-label">멤버 {detail.members.length}/{detail.folder.member_limit}명</h2>
           <ul className={styles.members}>{detail.members.map((m) => <li key={m.user_id}>
@@ -185,33 +191,44 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
       </div>}
       {confirm && detail && <ActionDialog
         title={confirm.kind === "delete" ? `‘${detail.folder.name}’ 방을 삭제할까요?` : confirm.kind === "leave" ? `‘${detail.folder.name}’ 방에서 나갈까요?` : confirm.kind === "kick" ? `${confirm.member.name}님을 내보낼까요?` : `${confirm.member.name}님에게 방장을 넘길까요?`}
-        message={confirm.kind === "delete" ? `장소 ${detail.folder.place_count}곳과 메모·모음이 ${others > 0 ? "모든 멤버에게서 " : ""}사라지고 되돌릴 수 없어요.` : confirm.kind === "leave" ? "내가 저장한 장소는 방에 남아요. 다시 들어오려면 초대 링크가 필요해요." : confirm.kind === "kick" ? "저장한 장소는 방에 남아요. 다시 들어오려면 새 초대 링크가 필요해요." : "이름·표지 수정, 초대, 내보내기, 삭제를 새 방장이 하게 돼요."}
+        message={confirm.kind === "delete" ? `장소 ${detail.folder.place_count}곳과 메모·모음이 ${others > 0 ? "모든 멤버에게서 " : ""}사라지고 되돌릴 수 없어요.` : confirm.kind === "leave" ? "내가 저장한 장소는 방에 남아요. 다시 들어오려면 초대 링크가 필요해요." : confirm.kind === "kick" ? "저장한 장소는 방에 남아요. 다시 들어오려면 새 초대 링크가 필요해요." : "이름·색 수정, 초대, 내보내기, 삭제를 새 방장이 하게 돼요."}
         tone={confirm.kind === "owner" ? "info" : "error"} destructive={confirm.kind === "delete" || confirm.kind === "kick"} cancelLabel="취소"
         confirmLabel={confirm.kind === "delete" ? "삭제" : confirm.kind === "leave" ? "나가기" : confirm.kind === "kick" ? "내보내기" : "넘기기"} busy={busy}
         onClose={() => { if (!busy) { setConfirm(null); setError(""); } }} onConfirm={runConfirm}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
     </ClientReady></main>;
   }
 
+  if (creating) {
+    return <main className={`form-page settings-page ${styles.page} ${styles.withBar}`}>{header("새 방", () => { setCreating(false); setDraft(NEW_DRAFT); setError(""); })}<ClientReady>
+      {feedback}
+      <RoomEditor draft={draft} onChange={setDraft} busy={busy} kicker="미리보기" meta="나만 · 장소 0곳"
+        note={<>방을 만들면 <b>초대 링크</b>로 함께 쓸 사람을 부를 수 있어요. 방 안은 <b>모음</b>으로 나눠요.</>} submitLabel="만들기" busyLabel="만드는 중…" onSubmit={() => { void create(); }} />
+    </ClientReady></main>;
+  }
+
+  const full = folders.length >= ROOM_LIMIT;
   return <main className={`form-page settings-page ${styles.page}`}>{header("방")}<ClientReady>
     {!data && !loadError && <p className="hint" role="status">방 목록을 불러오고 있어요…</p>}
     {loadError && <section className="settings-notice"><p className="error" role="alert">{loadError}</p><button type="button" className="btn" onClick={() => { void load(); }}>다시 불러오기</button></section>}
     {data && <>
       {!folders.length && <p className={styles.empty}>아직 방이 없어요. 새 방을 만들거나, 받은 초대 링크로 참여해 보세요.</p>}
       {feedback}
-      {folders.length > 0 && <section className="settings-group" aria-labelledby="folder-list"><h2 id="folder-list" className="settings-label">내 방 {folders.length}개</h2>
-        <ul className={styles.list}>{folders.map((f) => { const current = f.id === data.current; return <li key={f.id} className={current ? styles.current : undefined}>
+      <section className="settings-group" aria-labelledby="folder-list">
+        <h2 id="folder-list" className={`settings-label ${styles.countLabel}`}><span>내 방 {folders.length}개</span><span>{ROOM_LIMIT}개까지</span></h2>
+        {folders.length > 0 && <ul className={styles.list}>{folders.map((f) => { const current = f.id === data.current; return <li key={f.id} className={current ? styles.current : undefined}>
           <button type="button" className={styles.openRow} disabled={busy} aria-current={current ? "true" : undefined} onClick={() => open(f)}>
-            <Cover color={f.color} icon={f.icon} />
-            <span className={styles.rowCopy}><strong>{f.name}</strong><small>{f.role === "owner" ? "방장 · " : ""}멤버 {f.member_count}명 · 장소 {f.place_count}곳</small></span>
+            <RoomBand color={f.color} className={styles.band} />
+            <span className={styles.rowCopy}><strong>{f.name}</strong><small>{f.role === "owner" ? "방장 · " : ""}{people(f.member_count)} · 장소 {f.place_count}곳</small></span>
             {current && <span className={styles.badge}>보는 중</span>}
           </button>
           <button type="button" className={styles.manage} disabled={busy} aria-label={`${f.name} 방 관리`} onClick={() => { setError(""); setStatus(""); setSelected(f.id); }}><Icon name="settings" /></button>
-        </li>; })}</ul>
-      </section>}
-      <section className="settings-group" aria-labelledby="folder-new"><h2 id="folder-new" className="settings-label">새 방</h2>
-        {creating ? <FolderEditor draft={draft} onChange={setDraft} busy={busy} submitLabel="만들고 열기" busyLabel="만드는 중…" onSubmit={() => { void create(); }} onCancel={folders.length ? () => { setCreating(false); setDraft(NEW_DRAFT); setError(""); } : undefined} />
-          : <button type="button" className={`settings-row ${styles.create}`} disabled={busy} onClick={() => setCreating(true)}><Icon name="plus" /><span className="settings-copy"><span>새 방 만들기</span><small>혼자 모으거나, 둘이·친구들과 함께 쓸 방</small></span></button>}
+        </li>; })}</ul>}
+        <button type="button" className={styles.newRow} disabled={busy || full} onClick={() => { setError(""); setStatus(""); setDraft(NEW_DRAFT); setCreating(true); }}>
+          <span className={styles.newBand} aria-hidden="true" />
+          <span className={styles.rowCopy}><span>새 방 만들기</span><small>{full ? `방은 ${ROOM_LIMIT}개까지예요. 쓰지 않는 방을 정리하면 새로 만들 수 있어요.` : "혼자 모으거나, 둘이·친구들과 함께 쓸 방"}</small></span>
+        </button>
       </section>
+      {folders.length > 0 && <p className={styles.note}><Icon name="list" width={20} /><span>같은 사람과 주제만 다르면 방을 새로 만들지 말고 <b>방 안에 모음</b>을 만들어요. 다시 초대할 필요가 없어요.</span></p>}
     </>}
   </ClientReady></main>;
 }

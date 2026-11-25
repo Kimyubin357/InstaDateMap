@@ -1,4 +1,4 @@
-/* 다른 폴더로 담기·옮기기: 모음에 담기 선택 창과 같은 열린 행·점선 구분선·원단 테마 */
+/* 다른 방에 담기: 모음에 담기 선택 창과 같은 열린 행·점선 구분선·원단 테마 */
 .modal{width:min(540px,100%);max-width:100%;isolation:isolate}
 .modal :global(.sheet-body){padding-bottom:18px}
 .modal :global(.sheet-footer){padding:12px max(20px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));border-top:1px dashed var(--line)}
@@ -8,13 +8,14 @@
 .modal :global(.actions){margin:0;display:grid;grid-template-columns:1fr;gap:10px}
 .modal :global(.actions) button{min-height:48px;font-size:18px}
 .lead{font-size:17px;line-height:1.5;color:var(--ink-soft);margin:6px 0 12px}
-.row{width:100%;display:flex;align-items:center;gap:12px;text-align:left;min-height:68px;padding:12px 0;background:none;border:0;border-bottom:1px dashed var(--line);color:var(--ink)}
-.row>span:last-child{display:flex;flex-direction:column;min-width:0}
+.row{width:100%;display:flex;align-items:center;gap:14px;text-align:left;min-height:68px;padding:0;background:none;border:0;border-bottom:1px dashed var(--line);color:var(--ink)}
+.row .band{margin:12px 0}
+.copy{flex:1;display:flex;flex-direction:column;min-width:0;padding:10px 0}
 .row strong{font-size:21px;font-weight:400;overflow-wrap:anywhere}
 .row small{font-size:15px;color:var(--ink-soft)}
 .row[aria-checked=true] strong{color:var(--forest)}
 .row:focus-visible{outline:3px solid var(--forest);outline-offset:-3px;border-radius:10px}
-.check{flex:none;width:40px;height:40px;display:grid;place-items:center;border:1px dashed var(--line);border-radius:50%;background:var(--cream) var(--weave);color:var(--ink-soft)}
+.check{flex:none;width:30px;height:30px;display:grid;place-items:center;border:1px dashed var(--line);border-radius:50%;background:var(--cream) var(--weave);color:var(--cream)}
 .row[aria-checked=true] .check{border-color:var(--forest);color:var(--cream);background:var(--forest) var(--grain)}
 .empty{text-align:center;padding:18px 8px;color:var(--ink-soft);font-size:18px}
 .empty :global(.btn){min-height:44px;display:inline-flex;align-items:center}
@@ -27,8 +28,8 @@
   .modal :global(.sheet-heading){padding-top:0;padding-bottom:6px}
   .modal :global(.sheet-body){padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
   .lead{margin:2px 0 6px;font-size:16px}
-  .row{min-height:52px;padding:6px 0}
+  .row{min-height:52px}
+  .copy{padding:6px 0}
   .row strong{font-size:19px}
-  .check{width:34px;height:34px}
 }
 .create{min-height:48px;display:flex;gap:8px;align-items:center;color:var(--forest);font-size:19px;margin-top:8px;text-decoration:none}

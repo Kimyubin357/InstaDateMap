@@ -1,9 +1,10 @@
 /** Shared wire types and validation. Membership is independent of a place's visit status. */
-export const COLLECTION_COLORS = ["red", "forest", "gold", "blue"] as const;
-export const COLLECTION_ICONS = ["heart", "map", "cup", "food", "tree", "culture"] as const;
+import { PALETTE_COLORS, isCollectionIcon, isPaletteColor, type PaletteColor } from "./palette";
+/** 모음 색은 방과 같은 10가지. 표지는 이모지 하나(예전 선 아이콘 키도 읽기는 받음, 018). */
+export const COLLECTION_COLORS = PALETTE_COLORS;
 export interface CollectionView {
-  id: string; name: string; description: string; color: typeof COLLECTION_COLORS[number];
-  icon: typeof COLLECTION_ICONS[number]; version: number; created_at: string;
+  id: string; name: string; description: string; color: PaletteColor;
+  icon: string; version: number; created_at: string;
   place_ids: string[];
 }
 export type CollectionCommand =
@@ -24,12 +25,12 @@ export function validCollectionCommand(input: unknown): input is CollectionComma
   if (b.action !== "create" && (!Number.isSafeInteger(b.version) || Number(b.version) < 1 || Number(b.version) > 2147483647)) return false;
   if (b.action === "delete") return true;
   return typeof b.name === "string" && collectionName(b.name).length > 0 && collectionName(b.name).length <= 40 &&
-    typeof b.description === "string" && b.description.length <= 120 && COLLECTION_COLORS.includes(b.color as typeof COLLECTION_COLORS[number]) && COLLECTION_ICONS.includes(b.icon as typeof COLLECTION_ICONS[number]);
+    typeof b.description === "string" && b.description.length <= 120 && isPaletteColor(b.color) && isCollectionIcon(b.icon);
 }
 export function isCollection(value: unknown): value is CollectionView {
   if (!value || typeof value !== "object") return false;
   const c = value as CollectionView;
   return typeof c.id === "string" && typeof c.name === "string" && typeof c.description === "string" &&
-    COLLECTION_COLORS.includes(c.color) && COLLECTION_ICONS.includes(c.icon) && Number.isSafeInteger(c.version) && c.version >= 1 &&
+    isPaletteColor(c.color) && isCollectionIcon(c.icon) && Number.isSafeInteger(c.version) && c.version >= 1 &&
     typeof c.created_at === "string" && Array.isArray(c.place_ids) && c.place_ids.every((id) => typeof id === "string");
 }

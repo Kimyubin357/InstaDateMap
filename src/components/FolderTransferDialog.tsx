@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import Icon from "./Icon";
 import ShellLink from "./ShellLink";
+import { RoomBand } from "./Palette";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
 import type { FolderSummary, FoldersResponse } from "@/lib/folders";
 import type { CopyResult } from "@/app/api/places/copy/route";
 import styles from "./FolderTransferDialog.module.css";
 
 /**
- * 고른 장소를 다른 폴더(방)에 담습니다(복사). 장소 상세와 리스트의 여러 개 선택에서 함께 씁니다.
+ * 고른 장소를 다른 방에 담습니다(복사). 방은 색 띠 + 이름으로만 보여 줍니다(아이콘 없음). 장소 상세와 리스트의 여러 개 선택에서 함께 씁니다.
  * 옮기기 기능은 없습니다(사용자 결정 2026-11-25): 옮기려면 담은 뒤 이 폴더에서 지웁니다.
  * 담을 폴더에 같은 가게가 있으면 그 장소가 그대로 유지되고(원본 링크·상태는 그쪽 것), 메모만 합쳐집니다.
  */
@@ -45,8 +46,9 @@ export default function FolderTransferDialog({ ids, onClose, onDone }: {
       <p className={styles.lead}>이 방에도 그대로 남아요. 같은 가게가 이미 있으면 그쪽 장소를 두고 메모만 합쳐요.</p>
       <div role="radiogroup" aria-label="담을 방">
         {folders.map((f) => <button key={f.id} type="button" role="radio" aria-checked={target === f.id} className={styles.row} disabled={busy} onClick={() => setTarget(f.id)}>
-          <span className={styles.check}><Icon name={target === f.id ? "check" : f.icon} width={20} /></span>
-          <span><strong>{f.name}</strong><small>{f.place_count}곳 · {f.member_count > 1 ? `${f.member_count}명` : "혼자"}</small></span>
+          <RoomBand color={f.color} className={styles.band} />
+          <span className={styles.copy}><strong>{f.name}</strong><small>{f.place_count}곳 · {f.member_count > 1 ? `${f.member_count}명` : "혼자"}</small></span>
+          <span className={styles.check} aria-hidden="true">{target === f.id && <Icon name="check" width={16} />}</span>
         </button>)}
       </div>
     </>}

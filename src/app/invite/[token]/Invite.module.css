@@ -1,18 +1,17 @@
 .cover {
-  --folder-red: var(--accent);
-  --folder-forest: var(--forest);
-  --folder-gold: #8b692d;
-  --folder-blue: #466b79;
+  position: relative;
   width: 112px;
   height: 112px;
   margin-bottom: 22px;
   display: grid;
   place-items: center;
   border-radius: 28px;
-  background: var(--folder-color) var(--grain);
+  background: var(--tone) var(--grain);
   color: var(--cream);
   box-shadow: var(--print-shadow);
 }
+/* 방에는 아이콘이 없어 색 표지에 박음질 점선만 둡니다. */
+.room::after { content: ""; position: absolute; inset: 6px; border: 1px dashed #fbf6e873; border-radius: 22px; }
 .title { white-space: pre-line; overflow-wrap: anywhere; }
 .hint { margin: 0 0 2px; text-align: center; color: var(--ink-soft); font-size: 16px; }
 .join { width: 100%; }

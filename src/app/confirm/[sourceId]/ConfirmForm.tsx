@@ -20,7 +20,6 @@ import { savedMapHref, shareDestination } from "@/lib/share-navigation";
 import { useBoardSync } from "@/components/BoardProvider";
 import { aiIssueCopy, confirmPlan, initialChoice, pickedPlace, rowOptions, rowState, searchSuggestions, selectionsToSend, type RowChoice } from "@/lib/registration";
 import { placeIdFrom, rememberJustSaved } from "@/lib/saved-memory";
-import type { FolderIcon } from "@/lib/folders";
 import styles from "@/components/Registration.module.css";
 
 export interface ExtractionView {
@@ -33,7 +32,7 @@ export interface ExtractionView {
   candidates: KakaoPlace[];
   excluded?: boolean;
 }
-export interface ConfirmRoom { id: string; name: string; color?: string | null; icon?: string | null }
+export interface ConfirmRoom { id: string; name: string; color?: string | null }
 
 type Sheet = { kind: "search" | "branch"; id: string } | null;
 
@@ -66,7 +65,7 @@ export default function ConfirmForm({ source, extractions, room }: {
   const pending = confirmationWrite.pending || reprocessWrite.pending;
   const locked = !session.ready || saving || reprocessing || pending || leaving;
   const plan = useMemo(() => confirmPlan(extractions, choices), [extractions, choices]);
-  const roomLook = { color: room.color, icon: room.icon as FolderIcon | null | undefined };
+  const roomLook = { color: room.color };
 
   function returnToMap(href: string) { setLeaving(true); router.replace(href); }
   const update = (id: string, patch: Partial<RowChoice>) => setChoices((cur) => ({ ...cur, [id]: { ...cur[id], ...patch } }));

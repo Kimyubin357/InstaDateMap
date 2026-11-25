@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { SEARCH_TOOLS_ID } from "@/lib/search-tools";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
+import { CollectionCover } from "@/components/Palette";
 import Modal from "@/components/Modal";
 import MapCanvas, { type MapInsets, type MapPosition, type MapRecovery, type MapViewRequest, type RegionSelection } from "@/components/MapCanvas";
 import RegionPlacesList from "@/components/RegionPlacesList";
@@ -272,7 +273,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {/* Next step wires this to the new-place view; for now it only reports the count. */}
     {view === "map" && newPlaceIds.size > 0 && <button type="button" className="new-places-chip" aria-label={`새 장소 ${newPlaceIds.size}곳`}><span className="new-place-badge" aria-hidden="true">NEW</span><span>새 장소 {newPlaceIds.size}</span></button>}
-    {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><Icon name={collection.icon} width={18} /><span>{collection.name} · {visible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
+    {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><CollectionCover color={collection.color} icon={collection.icon} size={28} /><span>{collection.name} · {visible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
     {landscape && statusView}
     {landscape && regionView}
     </div>

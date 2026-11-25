@@ -1,0 +1,32 @@
+/* 방(색·이름)·모음(색·이모지) 공통 조각. 시안: design-lab/room-look. 색은 globals.css의 --palette-* 토큰. */
+.emoji{display:block;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal;line-height:1;font-synthesis:none}
+
+/* 방 표시: 왼쪽 색 띠 / 작은 색 네모 */
+.band{width:8px;align-self:stretch;margin:12px 0;border-radius:4px;background:var(--tone) var(--grain);flex:none;display:block}
+.band.square{width:14px;height:14px;align-self:center;margin:0;border-radius:5px}
+
+/* 방 색 카드(새 방·방 설정의 미리보기) */
+.roomCard{position:relative;display:block;border-radius:20px;background:var(--tone) var(--grain);color:var(--cream);padding:18px 18px 16px;box-shadow:0 2px 0 #382f2512,0 8px 18px #382f251f;transition:background-color .15s}
+.roomCard::after{content:"";position:absolute;inset:5px;border:1px dashed #fbf6e873;border-radius:16px;pointer-events:none}
+.kicker{display:block;font-size:14px;line-height:1.4;opacity:.85}
+.roomName{display:block;font-size:27px;line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.placeholder{opacity:.6}
+.meta{display:flex;align-items:center;gap:6px;font-size:15px;opacity:.9;margin-top:6px}
+
+/* 모음 표지 */
+.cover{--size:44px;width:var(--size);height:var(--size);border-radius:calc(var(--size) * .3);background:var(--tone) var(--grain);display:grid;place-items:center;flex:none;position:relative;box-shadow:var(--print-shadow)}
+.cover .emoji{font-size:calc(var(--size) * .5)}
+.coverBig{box-shadow:0 2px 0 #382f2512,0 10px 22px #382f2524}
+.coverBig::after{content:"";position:absolute;inset:6px;border:1px dashed #fbf6e873;border-radius:calc(var(--size) * .25);pointer-events:none}
+
+/* 색 10칸 */
+.swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.swatches button{height:46px;min-width:44px;border:0;border-radius:14px;background:var(--tone) var(--grain);display:grid;place-items:center;color:var(--cream);padding:0}
+.swatches button[aria-checked=true]{box-shadow:0 0 0 2.5px var(--paper),0 0 0 4.5px var(--tone)}
+.swatches button:disabled{opacity:.5}
+
+/* 폼 제목 줄 */
+.fieldLabel{font-size:16px;color:var(--ink-soft);margin:18px 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap}
+.fieldLabel>label,.fieldLabel>span{min-width:0}
+.fieldLabel small{font-size:14px}
+.fieldLabel b{font-weight:400;color:var(--forest)}

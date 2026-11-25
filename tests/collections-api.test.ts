@@ -39,6 +39,11 @@ it("snapshot includes only own collections and active memberships",async()=>{
 it("wire validation constrains cover values and operation bounds",()=>{
  expect(validCollectionCommand(command)).toBe(true);
  expect(validCollectionCommand({...command,icon:"script"})).toBe(false);
+ // 018: 10가지 색과 이모지 하나 표지. 글자·여러 개·태그는 거절
+ for(const icon of ["☕","🏖️","👩‍❤️‍👨","🇰🇷","1️⃣","👍🏽"]) expect(validCollectionCommand({...command,color:"navy",icon})).toBe(true);
+ for(const icon of ["☕☕","가","a","☕ ","<b>","",":)"]) expect(validCollectionCommand({...command,icon})).toBe(false);
+ for(const color of ["orange","olive","teal","plum","taupe"]) expect(validCollectionCommand({...command,color})).toBe(true);
+ expect(validCollectionCommand({...command,color:"purple"})).toBe(false);
  expect(validCollectionCommand({...command,name:"a".repeat(41)})).toBe(false);
  expect(validCollectionCommand({action:"delete",id:cid,version:0})).toBe(false);
  expect(validCollectionCommand({action:"remove",collection_ids:[cid],place_ids:[]})).toBe(false);
