@@ -1,4 +1,4 @@
-import { boardFromRequest, unauthorized, requireIdentity, accessError, dbUserError } from "@/lib/auth";
+import { boardFromRequest, requestedRoom, unauthorized, requireIdentity, accessError, dbUserError } from "@/lib/auth";
 import { schedulePlacePushes } from "@/lib/push-server";
 import { db } from "@/lib/db";
 import { actorName } from "@/lib/people";
@@ -10,7 +10,7 @@ const STATUSES = new Set(["wish", "visited", "again", "meh"]);
 export async function GET(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
     const params = await route;
-    const board = await boardFromRequest(req);
+    const board = await boardFromRequest(req, requestedRoom(req));
     if (!board) {
       const response = unauthorized();
       response.headers.set("Cache-Control", "no-store");
@@ -29,7 +29,7 @@ export async function GET(req: Request, { params: route }: { params: Promise<{ i
 export async function PATCH(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
     const params = await route;
-    const board = await boardFromRequest(req);
+    const board = await boardFromRequest(req, requestedRoom(req));
     if (!board) return unauthorized();
     requireIdentity(board);
     const body = (await req.json().catch(() => null)) as { status?: string; memo?: string; memo_version?: number } | null;
@@ -62,7 +62,7 @@ export async function PATCH(req: Request, { params: route }: { params: Promise<{
 export async function DELETE(req: Request, { params: route }: { params: Promise<{ id: string }> }) {
   try {
     const params = await route;
-    const board = await boardFromRequest(req);
+    const board = await boardFromRequest(req, requestedRoom(req));
     if (!board) return unauthorized();
     requireIdentity(board);
     const { data, error } = await db().rpc("dm_delete_place", { p_user: board.userId, p_board: board.id, p_place: params.id });

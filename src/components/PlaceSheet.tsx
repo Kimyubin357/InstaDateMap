@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import MapPlaceSheet from "./MapPlaceSheet";
 import ListPlaceSheet from "./ListPlaceSheet";
 import Icon from "./Icon";
@@ -7,7 +7,7 @@ import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, type PlaceView, placeMeta, canDeletePlace } from "@/lib/place-view";
 import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite, UnconfirmedWriteError } from "@/lib/verified-write";
-import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave } from "@/lib/save-recovery";
+import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave, placeUrl } from "@/lib/save-recovery";
 import MapCanvas from "./MapCanvas";
 import PlaceExtras from "./PlaceExtras";
 import ActionDialog from "./ActionDialog";
@@ -19,12 +19,21 @@ import ShellLink from "./ShellLink";
 import { navigateShell } from "@/lib/shell-navigation";
 import FolderTransferDialog from "./FolderTransferDialog";
 const ignore = () => {};
+/** 전체 보기에서 이 기기가 연 방이 아닌 다른 방의 장소: 그 방에서의 내 이름과 지금 멤버(삭제 권한), 요청은 ?room= 으로 그 방에. */
+export interface PlaceRoom { id: string; who: string; memberNames: string[]; memberIds: string[] }
 /** Share mutations and draft protection; map/list components own their UI independently. */
-export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, onPatch, onDelete }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void }) {
+export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, onPatch, onDelete, room, rooms, onOrganize }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void;
+  room?: PlaceRoom;
+  /** 전체 보기: 이 장소가 있는 방 한 줄 */
+  rooms?: ReactNode;
+  /** 전체 보기: 모음 정리는 그 방에 들어가서 합니다. */
+  onOrganize?: () => void }) {
   const { notify, store, lock } = useBoardSync();
   const [transferring, setTransferring] = useState(false);
   const access = useBoardState().access;
-  const deletable = canDeletePlace(place, access?.who ?? "", access?.memberNames ?? [], { userId: access?.userId, memberIds: access?.memberIds });
+  const deletable = room ? canDeletePlace(place, room.who, room.memberNames, { userId: access?.userId, memberIds: room.memberIds })
+    : canDeletePlace(place, access?.who ?? "", access?.memberNames ?? [], { userId: access?.userId, memberIds: access?.memberIds });
+  const url = placeUrl(place.id, room?.id);
   const copy = placeCopyContent(place);
   const organizeHref = `/?view=list&organize=${encodeURIComponent(place.id)}`;
   const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());
@@ -48,7 +57,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
   }
   const checking = () => setActivity(CHECKING_SAVE);
   const [statusSelection] = useState(() => new StatusSelection(place.status, async (status) => {
-    const patch = await statusWrite.run(async () => { await requestJson(`/api/places/${place.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) }); return { status }; }, () => verifyPlacePatch(place.id, { status }), checking);
+    const patch = await statusWrite.run(async () => { await requestJson(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) }); return { status }; }, () => verifyPlacePatch(place.id, { status }, room?.id), checking);
     onPatch(patch); setActivity("");
   }, ignore, (error) => { setStatusPending(statusWrite.pending); mutationError(error); }));
   const status = useSyncExternalStore(statusSelection.subscribe, statusSelection.getSnapshot, statusSelection.getSnapshot);
@@ -82,7 +91,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
   const preview = useMemo(() => [{ ...place, status: status.status }], [place, status.status]);
   function leave(destination: "close" | "map" | "organize") {
     if (destination === "map") onShowMap();
-    else if (destination === "organize") navigateShell(organizeHref);
+    else if (destination === "organize") { if (onOrganize) onOrganize(); else navigateShell(organizeHref); }
     else onClose();
   }
   function requestLeave(destination: "close" | "map" | "organize") {
@@ -95,7 +104,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     const expected = memoBase.current;
     setBusy(true); setError("");
     try {
-      const saved = await memoWrite.run(async () => { const result = await requestJson<{ memo_version: number }>(`/api/places/${place.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...value, memo_version: expected }) }); return { ...value, memo_version: result.memo_version }; }, () => verifyMemoSave(place.id, value.memo, expected), checking);
+      const saved = await memoWrite.run(async () => { const result = await requestJson<{ memo_version: number }>(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...value, memo_version: expected }) }); return { ...value, memo_version: result.memo_version }; }, () => verifyMemoSave(place.id, value.memo, expected, room?.id), checking);
       memoBase.current = saved.memo_version; setMemoConflict(null); lastMemo.current = saved.memo;
       setSavedEarlierMemo(saved.memo !== memoDraft.current);
       onPatch(saved); setActivity("");
@@ -119,7 +128,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     if (busy || deleteRequest.current) return;
     deleteRequest.current = true; setBusy(true); setError("");
     try {
-      const result = await deletion.run(() => requestJson<{ ok: boolean; deleted_id: string }>(`/api/places/${place.id}`, { method: "DELETE" }), () => verifyDeletedPlace(place.id), () => setError("응답이 늦어지고 있어요. 삭제 여부를 확인할게요."));
+      const result = await deletion.run(() => requestJson<{ ok: boolean; deleted_id: string }>(url, { method: "DELETE" }), () => verifyDeletedPlace(place.id, room?.id), () => setError("응답이 늦어지고 있어요. 삭제 여부를 확인할게요."));
       if (result.ok !== true || result.deleted_id !== place.id) throw new Error("삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.");
       onDelete(); notify("삭제한 장소로 옮겼어요.");
     }
@@ -134,7 +143,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}
-    overview={<><p className="addr">{place.address}</p>
+    overview={<><p className="addr">{place.address}</p>{rooms}
     <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>분류</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? `${place.sharers.length}명` : place.sharers[0] || "알 수 없음"}</strong><span>발견한 사람</span></div></div>
     {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">어떤 곳인가요?</span></div>
     <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div></>}
@@ -144,13 +153,14 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     {statusPending && <button className="text-btn" disabled={busy} onClick={retryStatus}>상태 저장 확인·재시도</button>}
     {activity && <p className="notice" role="status">{activity}</p>}
     {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
-    <PlaceExtras placeId={place.id} />
+    <PlaceExtras placeId={place.id} room={room?.id} />
     <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "메모"}</label><textarea id="place-memo" className="memo" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
     {savedEarlierMemo && memoDirty && <p id="memo-unsaved-hint" className="hint" role="status">새로 쓴 내용은 아직 저장되지 않았어요.</p>}
     <div className="place-source-actions">
       <div className="place-organize-row"><ShellLink className="btn place-organize-btn" href={organizeHref} aria-disabled={busy || status.pending} onClick={(event) => {
         if (busy || status.pending) { event.preventDefault(); return; }
         if (memoDirty && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) { event.preventDefault(); setLeaving("organize"); }
+        else if (onOrganize) { event.preventDefault(); onOrganize(); }
       }}><Icon name="heart" width="20" />모음에 담기</ShellLink>
       <button type="button" className="btn place-organize-btn" disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="map" width="20" />다른 방에 담기</button></div>
       {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
@@ -158,7 +168,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
         : <p className="hint place-delete-hint">삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
     </div>
     </>} />{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); leave(destination); }} />}
-    {transferring && <FolderTransferDialog ids={[place.id]} onClose={() => setTransferring(false)} onDone={(result) => {
+    {transferring && <FolderTransferDialog ids={[place.id]} from={room?.id} onClose={() => setTransferring(false)} onDone={(result) => {
       setTransferring(false); notify(`‘${result.folder}’에도 담았어요.`);
     }} />}
     {deleting && <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel="취소" confirmLabel="삭제하기" busy={busy} busyLabel="삭제 중…" onClose={dismissDelete} onConfirm={remove}>

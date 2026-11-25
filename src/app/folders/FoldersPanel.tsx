@@ -67,6 +67,8 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     catch (e) { setLoadError(friendlyMessage(e, "방 목록을 불러오지 못했어요. 다시 시도해 주세요.")); return null; }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // 내 방 시트·리스트 [방] 칸의 "+ 새 방 만들기"는 /folders?new=1 로 바로 만들기 화면을 엽니다.
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("new") === "1") setCreating(true); }, []);
   const loadDetail = useCallback(async (id: string) => {
     setError("");
     try { const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color } : null); }
@@ -87,6 +89,8 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   async function follow(current: string | null, goHome: boolean, message: string) {
     const was = sync.store.getSnapshot().access?.boardId ?? null;
     if (!current) { window.location.assign("/folders"); return; }
+    // 방을 열거나 새로 만들면 지도·리스트도 그 방만 봅니다(방 고르기·전체 보기, 2026-11-25).
+    if (goHome) sync.rooms.setScope("room");
     if (standalone) { window.location.assign(goHome ? "/" : "/folders"); return; }
     if (current !== was && !await sync.resetAccess()) return;
     say(message);

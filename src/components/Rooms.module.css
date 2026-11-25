@@ -1,0 +1,71 @@
+/* 방 고르기 · 전체 보기(시안 design-lab/rooms-view). 색은 --palette-* 토큰(--tone), 원단·점선·인쇄 그림자는 공통 토큰. */
+
+/* 방 버튼 가운데 색 동그라미: 전체 = 방 색을 나눈 동그라미, 방 안 = 그 방 색 */
+.dot{width:22px;height:22px;border-radius:50%;display:block;flex:none;box-shadow:0 0 0 2px var(--cream),0 0 0 3px #382f2526}
+.square{width:14px;height:14px;border-radius:5px;display:block;flex:none}
+
+/* 방 색 카드 2열(내 방 시트 · 리스트 [방] 칸) */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:10px 0 4px}
+.card{position:relative;min-width:0;min-height:118px;border:0;border-radius:18px;background:var(--tone) var(--grain);color:var(--cream);padding:14px 14px 12px;box-shadow:0 2px 0 #382f2512,0 6px 14px #382f251c;display:flex;flex-direction:column;align-items:stretch;text-align:left;font:inherit;text-decoration:none}
+.card::after{content:"";position:absolute;inset:5px;border:1px dashed #fbf6e873;border-radius:14px;pointer-events:none}
+.card strong{display:block;font-size:21px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card small{display:block;font-size:14px;line-height:1.45;opacity:.92}
+.who{display:flex;align-items:center;gap:5px;margin-top:auto;padding-top:6px;font-size:14px;opacity:.92}
+.compact .card{min-height:104px;padding:12px 12px 10px}
+.compact .card strong{font-size:19px}
+.allCard{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+.allCard::after{display:none}
+.allCard small{color:var(--ink-soft);opacity:1}
+.allSquare{width:22px;height:22px;border-radius:6px;margin-bottom:8px;flex:none}
+.on{box-shadow:0 0 0 3px var(--forest),0 6px 14px #382f251c}
+.on strong{padding-right:28px}
+.check{position:absolute;right:10px;top:10px;width:26px;height:26px;border-radius:50%;background:var(--forest) var(--grain);color:var(--cream);display:grid;place-items:center}
+.addCard{background:none;color:var(--forest);border:1.5px dashed var(--forest);box-shadow:none;align-items:center;justify-content:center;gap:6px;font-size:18px;text-align:center}
+.addCard::after{display:none}
+.card:disabled{opacity:.6}
+
+/* 시트(내 방 · 새 장소) */
+.sheet{width:min(540px,100%);max-width:100%;isolation:isolate}
+.sheet :global(.sheet-heading){padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));padding-bottom:4px;gap:8px;align-items:flex-start}
+.sheet :global(.sheet-heading) h2{flex:1;min-width:0;font-size:22px;line-height:1.3;padding-top:8px}
+.sheet :global(.sheet-close-btn){width:44px;height:44px}
+.sheet :global(.sheet-body){padding-bottom:calc(var(--safe-b) + 18px)}
+.sheet :global(.sheet-footer){padding:10px max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));border-top:1px dashed var(--line);display:flex;gap:8px}
+.sheet :global(.sheet-footer) :global(.btn){flex:1;min-width:0;min-height:50px;padding-left:10px;padding-right:10px;font-size:17px}
+.lead{font-size:15px;line-height:1.5;color:var(--ink-soft);margin:0 0 8px;word-break:keep-all}
+.status{font-size:16px;color:var(--ink-soft);margin:10px 0}
+.error{color:var(--accent-ink);font-size:16px;line-height:1.5;margin:8px 0}
+
+/* 새 장소: 방 줄 */
+.roomRow{width:100%;display:flex;align-items:center;gap:12px;min-height:72px;padding:6px 0;border:0;border-top:1px dashed var(--line);background:none;color:var(--ink);font:inherit;text-align:left}
+.roomRow:last-child{border-bottom:1px dashed var(--line)}
+.roomSquare{width:44px;height:44px;border-radius:12px;background:var(--tone) var(--grain);flex:none;box-shadow:0 2px 0 #382f2512}
+.rowCopy{flex:1;min-width:0;display:flex;flex-direction:column}
+.rowCopy strong{display:block;font-size:19px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowCopy small{display:block;font-size:14px;color:var(--ink-soft)}
+.count{flex:none;background:var(--forest) var(--grain);color:var(--cream);border-radius:14px;padding:2px 10px;font-size:15px;line-height:22px;white-space:nowrap}
+.chev{flex:none;color:var(--ink-soft)}
+.backLink{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0;margin:-6px 0 0;font-size:16px;color:var(--forest)}
+
+/* 새 장소: 장소 줄 */
+.placeRow{width:100%;display:flex;align-items:center;gap:12px;min-height:76px;padding:8px 0;border:0;border-top:1px dashed var(--line);background:none;color:var(--ink);font:inherit;text-align:left}
+.placeRow:last-child{border-bottom:1px dashed var(--line)}
+.placeRow :global(.category-icon){width:50px;height:50px}
+.placeRow strong{display:flex;align-items:center;gap:6px;font-size:19px;font-weight:400;line-height:1.3;min-width:0}
+.placeRow strong>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.placeRow strong :global(.new-place-badge){font-size:11px;flex:none}
+.placeRow small{display:block;font-size:14px;color:var(--ink-soft);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 방 꼬리표(리스트 전체 장소 · 장소 상세) */
+.tags{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-width:0}
+.tag{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;font-size:14px;line-height:1.4;color:var(--ink);white-space:nowrap}
+.tag>i{width:9px;height:9px;border-radius:50%;flex:none;background:var(--tone)}
+.tag>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* 장소 상세의 "이 장소가 있는 방" 한 줄 */
+.placeRooms{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:15px;color:var(--ink-soft)}
+
+@media(orientation:landscape) and (max-height:600px){
+  .sheet{max-height:100%!important;border-radius:0;padding-top:max(8px,env(safe-area-inset-top))}
+  .compact .card{min-height:84px}
+}

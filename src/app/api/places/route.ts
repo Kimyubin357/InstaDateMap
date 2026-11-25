@@ -8,7 +8,8 @@ import { savePlace } from "@/lib/pipeline";
 import { boardRevision } from "@/lib/sync-server";
 import { snapshotEtag } from "@/lib/sync-types";
 import { withSavedPlace } from "@/lib/saved-place-server";
-import { actorName, placePeople, type SaveRecord } from "@/lib/people";
+import { actorName } from "@/lib/people";
+import { shapePlaces, type PlaceLink, type PlaceSave } from "@/lib/places-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,21 +68,7 @@ export async function GET(req: Request) {
       leftBySource.set(row.source_id, left);
     }
 
-    type Link = SaveRecord & { place_id: string; sources: { id: string; url: string; media_type: string } };
-    // 저장한 사람·처음 등록한 사람: 원본 연결과 저장 기록을 함께 보고, 이름은 계정 id로 지금 이름을 찾습니다(019).
-    const byPlace = new Map<string, { records: SaveRecord[]; sources: Map<string, { url: string; media_type: string }> }>();
-    const entry = (id: string) => { const e = byPlace.get(id) ?? { records: [] as SaveRecord[], sources: new Map<string, { url: string; media_type: string }>() }; byPlace.set(id, e); return e; };
-    for (const l of (links ?? []) as unknown as Link[]) {
-      const e = entry(l.place_id);
-      e.records.push(l);
-      e.sources.set(l.sources.id, { url: l.sources.url, media_type: l.sources.media_type });
-    }
-    const latest = new Map<string, string>();
-    for (const s of (saveResult.data ?? []) as (SaveRecord & { place_id: string; added_at: string })[]) {
-      entry(s.place_id).records.push(s);
-      if (!latest.has(s.place_id) || s.added_at > latest.get(s.place_id)!) latest.set(s.place_id, s.added_at);
-    }
-
+    const shaped = shapePlaces(places ?? [], (links ?? []) as unknown as PlaceLink[], (saveResult.data ?? []) as PlaceSave[], () => board.members);
     const activeIds = new Set((places ?? []).map((p) => p.id));
     const members = new Map<string, string[]>();
     for (const row of membershipResult.data ?? []) if (activeIds.has(row.place_id)) {
@@ -92,16 +79,7 @@ export async function GET(req: Request) {
       boardId: board.id, authVersion: board.authVersion, revision,
       board: board.name,
       collections: (collectionResult.data ?? []).map((c) => ({ ...c, place_ids: members.get(c.id) ?? [] })),
-      places: (places ?? []).map((p) => {
-        const e = byPlace.get(p.id);
-        return {
-          ...p,
-          kakao_place_id: p.kakao_place_id ?? null,
-          ...placePeople(e?.records ?? [], board.members),
-          sources: e ? [...e.sources.values()] : [],
-          last_saved_at: latest.get(p.id) || p.created_at,
-        };
-      }),
+      places: shaped,
       pending: (pending ?? []).map(({ shared_by_user_id, ...source }) => ({ ...source, shared_by: actorName(board.members, shared_by_user_id, source.shared_by), place_names: [...(namesBySource.get(source.id) ?? [])], missing_count: leftBySource.get(source.id)?.missing ?? 0, choose_count: leftBySource.get(source.id)?.choose ?? 0 })),
     }, { headers: { "Cache-Control": "no-store", ETag: etag } });
     }

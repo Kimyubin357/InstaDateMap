@@ -14,8 +14,10 @@ import styles from "./FolderTransferDialog.module.css";
  * 옮기기 기능은 없습니다(사용자 결정 2026-11-25): 옮기려면 담은 뒤 이 폴더에서 지웁니다.
  * 담을 폴더에 같은 가게가 있으면 그 장소가 그대로 유지되고(원본 링크·상태는 그쪽 것), 메모만 합쳐집니다.
  */
-export default function FolderTransferDialog({ ids, onClose, onDone }: {
+export default function FolderTransferDialog({ ids, from, onClose, onDone }: {
   ids: string[]; onClose: () => void; onDone: (result: CopyResult) => void;
+  /** 장소가 있는 방(전체 보기에서 다른 방의 장소를 담을 때). 없으면 이 기기가 연 방. */
+  from?: string;
 }) {
   const [folders, setFolders] = useState<FolderSummary[] | null>(null);
   const [target, setTarget] = useState("");
@@ -24,14 +26,14 @@ export default function FolderTransferDialog({ ids, onClose, onDone }: {
   const load = () => {
     setError(""); setFolders(null);
     requestJson<FoldersResponse>("/api/folders", { cache: "no-store", notifyBoardChange: false })
-      .then((data) => { const others = data.folders.filter((f) => f.id !== data.current); setFolders(others); if (others.length === 1) setTarget(others[0].id); })
+      .then((data) => { const others = data.folders.filter((f) => f.id !== (from ?? data.current)); setFolders(others); if (others.length === 1) setTarget(others[0].id); })
       .catch((e) => setError(friendlyMessage(e, "방 목록을 불러오지 못했어요. 다시 시도해 주세요.")));
   };
   useEffect(load, []);
   async function send() {
     if (!target || busy) return;
     setBusy(true); setError("");
-    try { onDone(await requestJson<CopyResult>("/api/places/copy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: target, ids }) })); }
+    try { onDone(await requestJson<CopyResult>("/api/places/copy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: target, ids, ...(from ? { from } : {}) }) })); }
     catch (e) { setError(friendlyMessage(e, "장소를 담지 못했어요. 다시 시도해 주세요.")); setBusy(false); }
   }
   const count = ids.length > 1 ? `${ids.length}곳` : "";

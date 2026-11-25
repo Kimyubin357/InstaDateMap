@@ -12,7 +12,8 @@ const memory = new Map<string, PlaceDetails>();
  * 장소 상세의 가게 정보: 사진(가게 등록 사진 우선 최대 5장), 전화, 영업시간, 메뉴, 네이버 지도·예약, 캐치테이블(입점 확인된 곳만).
  * 지도·리스트 상세가 함께 쓰며, 접힘·중간 높이 측정 영역 밖(펼친 본문)에 둡니다.
  */
-export default function PlaceExtras({ placeId }: { placeId: string }) {
+/** room: 전체 보기에서 다른 방의 장소면 그 방(서버가 멤버인지 확인합니다). */
+export default function PlaceExtras({ placeId, room }: { placeId: string; room?: string }) {
   const [details, setDetails] = useState<PlaceDetails | null>(() => memory.get(placeId) ?? null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -20,11 +21,11 @@ export default function PlaceExtras({ placeId }: { placeId: string }) {
     if (memory.has(placeId)) { setDetails(memory.get(placeId)!); return; }
     const abort = new AbortController();
     setDetails(null); setError("");
-    requestJson<PlaceDetails>(`/api/places/${placeId}/details`, { signal: abort.signal, notifyBoardChange: false, timeoutMs: 25000 })
+    requestJson<PlaceDetails>(`/api/places/${placeId}/details${room ? `?room=${encodeURIComponent(room)}` : ""}`, { signal: abort.signal, notifyBoardChange: false, timeoutMs: 25000 })
       .then((d) => { if (d.status !== "error") memory.set(placeId, d); setDetails(d); })
       .catch((e) => { if (!abort.signal.aborted) setError(friendlyMessage(e, "가게 정보를 불러오지 못했어요.")); });
     return () => abort.abort();
-  }, [placeId, attempt]);
+  }, [placeId, room, attempt]);
 
   if (error || details?.status === "error" && !details.phone) return <section className={styles.extras} aria-label="가게 정보">
     <p className={styles.hint}>{error || "가게 정보를 지금 불러오지 못했어요."}</p>
