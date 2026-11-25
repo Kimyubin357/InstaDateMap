@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const member = await listFolders(account.userId);
     let wanted = member.map((f) => f.id);
     if (body && "folders" in body) {
-      if (!Array.isArray(body.folders) || body.folders.some((id) => !isUuid(id))) throw new AccessError("알림을 받을 폴더를 다시 골라 주세요.");
+      if (!Array.isArray(body.folders) || body.folders.some((id) => !isUuid(id))) throw new AccessError("알림을 받을 방을 다시 골라 주세요.");
       wanted = wanted.filter((id) => (body.folders as string[]).includes(id));
     }
     const endpointHash = tokenHash(sub.endpoint);

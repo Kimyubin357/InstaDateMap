@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Params) {
     const account = await requireAccount(req);
     const { token } = await params;
     if (!isInviteToken(token)) throw new AccessError("초대 링크가 올바르지 않아요.", 404);
-    const joined = await folderRpc<{ board_id: string }>("dm_accept_invite", { p_user: account.userId, p_token_hash: tokenHash(token) }, "폴더에 참여하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    const joined = await folderRpc<{ board_id: string }>("dm_accept_invite", { p_user: account.userId, p_token_hash: tokenHash(token) }, "방에 참여하지 못했어요. 잠시 후 다시 시도해 주세요.");
     await openFolder(account, joined.board_id);
     return NextResponse.json({ current: joined.board_id }, noStore);
   } catch (e) { return accessError(e); }

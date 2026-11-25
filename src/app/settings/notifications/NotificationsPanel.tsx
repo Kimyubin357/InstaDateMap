@@ -49,7 +49,7 @@ export default function NotificationsPanel() {
     } catch (e) { notify(friendlyMessage(e, "수신 동의를 바꾸지 못했어요."), "error"); }
     finally { setMarketingBusy(false); }
   }
-  return <main className="form-page settings-page"><ClientReady><PageHeader title="알림 설정" backHref="/settings" />
+  return <main className="form-page settings-page"><PageHeader title="알림 설정" backHref="/settings" /><ClientReady>
     <section className="settings-group" aria-labelledby="notify-device"><h2 id="notify-device" className="settings-label">이 기기</h2>
       <div className="settings-row notify-permission" role="status"><Icon name="bell" /><span className="settings-copy"><span>앱 알림</span><small>{PERMISSION_TEXT[permission]}</small></span></div>
     </section>

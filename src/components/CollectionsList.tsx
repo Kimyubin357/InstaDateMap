@@ -213,7 +213,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     {deletingPlace && <PlaceDeleteDialog place={deletingPlace} onClose={() => closePlaceDeletion()} onDeleted={() => closePlaceDeletion(true)} />}
     {transferIds && <FolderTransferDialog ids={transferIds} onClose={() => setTransferIds(null)} onDone={(result) => {
       setTransferIds(null); setSelecting(false); setSelected([]);
-      notify(`${transferIds.length}곳을 ‘${result.folder}’ 폴더에 담았어요.`);
+      notify(`${transferIds.length}곳을 ‘${result.folder}’ 방에 담았어요.`);
     }} />}
     {deletingPlaces && <PlacesDeleteDialog places={deletingPlaces} onClose={closePlacesDeletion} onDeleted={() => closePlacesDeletion([], true)} />}
     <div className={styles.switch} aria-label="리스트 보기 방식"><button aria-pressed={mode === "all" && !currentId} onClick={() => onNavigate("all")}>전체 장소</button><button aria-pressed={mode === "collections" || !!currentId} onClick={() => onNavigate("collections")}>모음</button></div>

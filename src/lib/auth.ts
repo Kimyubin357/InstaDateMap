@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { tokenHash } from "./token";
 import { AnalysisError } from "./analysis-issue";
+import { roomWord } from "./room-word";
 
 export const SESSION_COOKIE = "datemap_session";
 /** 계정(카카오·구글) 로그인 세션으로 연 폴더. 2026-11-24에 PIN 입장을 없앴습니다. */
@@ -17,14 +18,14 @@ export function checkOrigin(req: Request) {
 const GENERIC_MESSAGE = "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
 /** Only messages written for users reach the client; library, DB and network errors are logged instead. */
 export function publicMessage(e: unknown, fallback = GENERIC_MESSAGE) {
-  if (e instanceof AccessError || e instanceof AnalysisError) return e.message;
-  if (e instanceof Error && e.constructor === Error && /[가-힣]/.test(e.message)) return e.message;
+  if (e instanceof AccessError || e instanceof AnalysisError) return roomWord(e.message);
+  if (e instanceof Error && e.constructor === Error && /[가-힣]/.test(e.message)) return roomWord(e.message);
   console.error("Unhandled server error", e);
   return fallback;
 }
 /** A DB function's own `raise exception` (P0001) with a Korean message is meant for users. */
 export function dbUserError(error: { message: string; code?: string } | null) {
-  return error?.code === "P0001" && /[가-힣]/.test(error.message) ? new AccessError(error.message, 409) : null;
+  return error?.code === "P0001" && /[가-힣]/.test(error.message) ? new AccessError(roomWord(error.message), 409) : null;
 }
 export function accessError(e: unknown) {
   return Response.json({ status: "error", message: publicMessage(e) },

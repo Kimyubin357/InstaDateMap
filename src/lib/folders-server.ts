@@ -20,19 +20,19 @@ export async function folderRpc<T>(name: string, params: Record<string, unknown>
 }
 
 export async function listFolders(userId: string) {
-  return (await folderRpc<FolderSummary[]>("dm_list_folders", { p_user: userId }, "폴더 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")) ?? [];
+  return (await folderRpc<FolderSummary[]>("dm_list_folders", { p_user: userId }, "방 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")) ?? [];
 }
 
 export function folderId(value: string) {
-  if (!isUuid(value)) throw new AccessError("폴더를 찾을 수 없어요.", 404);
+  if (!isUuid(value)) throw new AccessError("방을 찾을 수 없어요.", 404);
   return value;
 }
 
 /** 참여한 폴더의 멤버와 진행 중인 초대 수. 참여하지 않은 폴더는 없는 폴더처럼 다룹니다. */
 export async function folderDetail(account: Account, id: string): Promise<FolderDetail> {
   const folder = (await listFolders(account.userId)).find((f) => f.id === id);
-  if (!folder) throw new AccessError("폴더를 찾을 수 없어요.", 404);
-  const members = await folderRpc<{ user_id: string; member_name: string; role: "owner" | "member"; avatar: string | null }[]>("dm_folder_members", { p_board: id }, "폴더 멤버를 불러오지 못했어요.");
+  if (!folder) throw new AccessError("방을 찾을 수 없어요.", 404);
+  const members = await folderRpc<{ user_id: string; member_name: string; role: "owner" | "member"; avatar: string | null }[]>("dm_folder_members", { p_board: id }, "방 멤버를 불러오지 못했어요.");
   let active = 0;
   if (folder.role === "owner") {
     const { data: invites, error: inviteError } = await db().from("folder_invites").select("id, expires_at, revoked_at").eq("board_id", id);
@@ -45,13 +45,13 @@ export async function folderDetail(account: Account, id: string): Promise<Folder
 
 /** 이 기기가 그 폴더를 열게 합니다(알림 구독은 폴더별이라 그대로, 017). */
 export async function openFolder(account: Account, id: string) {
-  await folderRpc("dm_switch_folder", { p_user: account.userId, p_session: account.sessionHash, p_board: id }, "폴더를 열지 못했어요. 잠시 후 다시 시도해 주세요.");
+  await folderRpc("dm_switch_folder", { p_user: account.userId, p_session: account.sessionHash, p_board: id }, "방을 열지 못했어요. 잠시 후 다시 시도해 주세요.");
 }
 
 /** 삭제·나가기 뒤 이 기기가 보고 있는 폴더(없으면 null) */
 export async function currentFolder(sessionHash: string): Promise<string | null> {
   const { data, error } = await db().from("access_sessions").select("board_id").eq("token_hash", sessionHash).maybeSingle();
-  if (error) { console.error("currentFolder failed", error.code, error.message); throw new Error("지금 보는 폴더를 확인하지 못했어요."); }
+  if (error) { console.error("currentFolder failed", error.code, error.message); throw new Error("지금 보는 방을 확인하지 못했어요."); }
   return data?.board_id ?? null;
 }
 

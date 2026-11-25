@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const account = await requireAccount(req);
     const input = folderInput(await req.json().catch(() => null));
     if (typeof input === "string") throw new AccessError(input);
-    const created = await folderRpc<{ board_id: string }>("dm_create_folder", { p_user: account.userId, p_name: input.name, p_color: input.color, p_icon: input.icon }, "폴더를 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
+    const created = await folderRpc<{ board_id: string }>("dm_create_folder", { p_user: account.userId, p_name: input.name, p_color: input.color, p_icon: input.icon }, "방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
     await openFolder(account, created.board_id);
     return NextResponse.json({ id: created.board_id, current: created.board_id }, noStore);
   } catch (e) { return accessError(e); }

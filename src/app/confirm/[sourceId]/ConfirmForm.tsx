@@ -141,11 +141,10 @@ export default function ConfirmForm({ source, extractions, room }: {
 
   const dismiss = <DismissSource id={source.id} version={source.version} disabled={locked} names={names} className="" onDone={() => { void store.refresh(); returnToMap("/?saved=0"); }}>이 링크 정리하기</DismissSource>;
 
-  if (leaving) return <main className={`confirm ${styles.page}`}><ClientReady><PageHeader title="장소 확인" /><p className="notice" role="status">지도를 여는 중…</p></ClientReady></main>;
+  if (leaving) return <main className={`confirm ${styles.page}`}><PageHeader title="장소 확인" /><ClientReady><p className="notice" role="status">지도를 여는 중…</p></ClientReady></main>;
 
   return (
-    <main className={`confirm ${styles.page}`}><ClientReady>
-      <PageHeader title="장소 확인" />
+    <main className={`confirm ${styles.page}`}><PageHeader title="장소 확인" /><ClientReady>
       <RoomLine name={room.name} room={roomLook} />
       {!session.ready && <p className="notice" role="status">{session.error || "링크 상태를 확인하고 있어요…"} {session.error && <button className="text-btn" disabled={session.checking} onClick={() => { void session.retry(); router.refresh(); }}>다시 확인</button>}</p>}
 

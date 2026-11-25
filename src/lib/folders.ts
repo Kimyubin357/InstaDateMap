@@ -20,9 +20,9 @@ export interface FolderInput { name: string; color: FolderColor; icon: FolderIco
 export function folderInput(body: unknown): FolderInput | string {
   const b = body as Partial<Record<keyof FolderInput, unknown>> | null;
   const name = typeof b?.name === "string" ? b.name.replace(/\s+/g, " ").trim() : "";
-  if (name.length < 1 || name.length > 30) return "폴더 이름을 1~30자로 입력해 주세요.";
-  if (!FOLDER_COLORS.includes(b?.color as FolderColor)) return "폴더 색을 골라 주세요.";
-  if (!FOLDER_ICONS.includes(b?.icon as FolderIcon)) return "폴더 아이콘을 골라 주세요.";
+  if (name.length < 1 || name.length > 30) return "방 이름을 1~30자로 입력해 주세요.";
+  if (!FOLDER_COLORS.includes(b?.color as FolderColor)) return "방 색을 골라 주세요.";
+  if (!FOLDER_ICONS.includes(b?.icon as FolderIcon)) return "방 아이콘을 골라 주세요.";
   return { name, color: b!.color as FolderColor, icon: b!.icon as FolderIcon };
 }
 export const isUuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
