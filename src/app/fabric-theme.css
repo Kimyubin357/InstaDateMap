@@ -418,10 +418,11 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .map-pin-name{max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.2;color:var(--ink);text-shadow:0 0 2px var(--cream),0 0 2px var(--cream),1px 1px 0 var(--cream),-1px -1px 0 var(--cream),1px -1px 0 var(--cream),-1px 1px 0 var(--cream)}
 .map-pin.is-new .map-pin-mark::after{content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:#e8a33a;border:1.5px solid var(--cream)}
 .map-pin:active .map-pin-mark{scale:.92}
-.map-pin.active{transform:translate(-50%,-50px);z-index:1}
-.map-pin.active .map-pin-mark{width:42px;height:42px;border-width:2.5px;box-shadow:0 3px 8px #382f2559}
-.map-pin.active .map-pin-mark svg{width:24px;height:24px}
-.map-pin.active .map-pin-mark::before{content:"";position:absolute;left:calc(50% - 7px);bottom:-10px;width:14px;height:10px;background:var(--pin,var(--accent));clip-path:polygon(0 0,100% 0,50% 100%)}
-.map-pin.active .map-pin-name{margin-top:9px;font-size:15px}
+/* 고른 핀 = 물방울(시안 3번): 46px 원을 -45° 돌린 모양, 뾰족한 끝이 장소 위치. 아이콘은 바로 세웁니다. */
+.map-pin.active{transform:translate(-50%,-55.5px);z-index:1}
+.map-pin.active .map-pin-mark{width:46px;height:46px;border-width:2.5px;border-radius:50% 50% 50% 0;rotate:-45deg;box-shadow:0 3px 8px #382f2559}
+.map-pin.active .map-pin-mark svg{width:24px;height:24px;rotate:45deg}
+.map-pin.active .map-pin-mark::after{rotate:45deg}
+.map-pin.active .map-pin-name{margin-top:13px;font-size:15px}
 .map-pin-count{display:grid;place-items:center;min-width:36px;height:36px;box-sizing:border-box;padding:0 8px;border-radius:18px;border:2px solid var(--cream);background:var(--grain),var(--pin,var(--accent));color:var(--cream);font-size:17px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px #382f2552;transform:translate(-50%,-50%);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .map-pin-count:active{scale:.94}
