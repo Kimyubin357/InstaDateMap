@@ -261,6 +261,24 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     setJustSaved(null); setFocusedId(id);
     setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true });
   }
+  /**
+   * 지도 핀을 누르면(시안 design-lab/map-pins 3번) 장소 카드 대신 장소 상세를 중간 높이로 엽니다.
+   * 시트가 자리를 잡은 뒤 그 장소가 시트 위 지도 가운데 오도록 옮기고, 시트를 닫으면 핀 고름도 풉니다.
+   */
+  const pinOpened = useRef<string | null>(null);
+  function openFromPin(target: string) {
+    const id = repId(target), place = mapPlaces.find((item) => item.id === id); if (!place) return;
+    setJustSaved(null); setRegionSelection(null); pinOpened.current = id;
+    open("place", id);
+    let frames = 0;
+    const settle = () => {
+      // 중간 높이가 정해질 때까지(첫 몇 프레임) 기다렸다가 옮깁니다.
+      if (++frames < 4 && !root.current?.querySelector(".sheet-place[data-resizable=true]")) { requestAnimationFrame(settle); return; }
+      setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(settle));
+  }
+  useEffect(() => { if (overlay !== "place" && pinOpened.current) { pinOpened.current = null; setFocusedId(null); } }, [overlay]);
   /** Map area left free by search, chips, an open region list and the bottom navigation. */
   function fitPadding(): MapInsets | null {
     const box = root.current?.getBoundingClientRect(); if (!box) return null;
@@ -274,9 +292,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     return inset;
   }
   function focusPadding() {
+    const search = document.querySelector(".unified-search-header")?.getBoundingClientRect();
+    const sheet = document.querySelector<HTMLElement>(".sheet-place")?.getBoundingClientRect();
+    if (sheet && root.current && overlay === "place") return { top: (search?.bottom || 80) + 16, bottom: Math.max(0, root.current.getBoundingClientRect().bottom - sheet.top) + 10 };
     const deck = root.current?.querySelector<HTMLElement>(".place-carousel");
     if (!deck || !root.current) return null;
-    const search = document.querySelector(".unified-search-header")?.getBoundingClientRect();
     return { top: (search?.bottom || 80) + 16, bottom: root.current.clientHeight - deck.offsetTop + 10 };
   }
   // Map states (docs/redesign/map-home-compare.md): portrait = centred modal over a dim screen, landscape = left-column card.
@@ -378,7 +398,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
   const kindTool = <div className="list-tools"><button className={`list-filter kind-chip${category || !all ? " is-active" : ""}`} aria-label={category ? `종류: ${category}. 종류 바꾸기` : "종류로 거르기"} aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>{category || "종류"}</span><Icon name="chevron" width="14" className="list-filter-chevron" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>;
   return <div ref={root} className={`app-root view-${view}${view === "map" && collection && !showPlaceCard ? ` has-collection-sheet collection-sheet-${collectionSheet}` : ""}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas pinsUntil={collection ? 11 : undefined} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={(selectedId && repId(selectedId)) || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => previewPlace(id, null)} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} look={look} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas pinsUntil={collection ? 11 : undefined} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={(selectedId && repId(selectedId)) || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => openFromPin(id)} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} look={look} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
     <h1 className="sr-only">{isAll ? "모든 방" : board}</h1>
     {active && roomButton}
     <div className="map-chip-stack">

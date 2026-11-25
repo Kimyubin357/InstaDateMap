@@ -402,3 +402,5 @@ body:has(.persistent-map:not(.is-away) .has-just-saved) .global-feedback.is-map{
 .has-collection-sheet.collection-sheet-mid .map-controls{bottom:calc(min(46%,420px) + 12px)}
 .has-collection-sheet.collection-sheet-high .map-controls{visibility:hidden}
 .has-collection-sheet .map-controls{transition:bottom .24s cubic-bezier(.2,.8,.2,1)}
+/* 지도에서 연 장소 상세는 지도를 어둡게 덮지 않습니다(시안 design-lab/map-pins 3번). 바깥을 누르면 그대로 닫힙니다. */
+body:has(.app-root.view-map) .modal-root:has(.sheet-place) .sheet-backdrop{background:transparent}
