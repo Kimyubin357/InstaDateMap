@@ -83,12 +83,12 @@
 .faces i{width:22px;height:22px;border-radius:50%;border:1.5px solid #fbf6e8cc;background:var(--cream);color:var(--tone);font-size:11px;font-style:normal;line-height:1;display:grid;place-items:center;margin-right:-8px}
 .faces i:last-child{margin-right:0}
 /* 방 머리띠: 방 안 리스트 맨 위. 방 색 띠 + 이름 + 멤버·장소 수 + ⚙ */
-.band{position:relative;display:flex;align-items:center;gap:8px;min-height:62px;margin:2px 0 10px;padding:8px 4px 8px 16px;border-radius:16px;background:var(--tone) var(--grain);color:var(--cream);box-shadow:var(--print-shadow);-webkit-user-select:none;user-select:none}
+.band{position:relative;display:flex;align-items:center;gap:8px;min-height:62px;margin:2px 0 10px;padding:8px 8px 8px 16px;border-radius:16px;background:var(--tone) var(--grain);color:var(--cream);box-shadow:var(--print-shadow);-webkit-user-select:none;user-select:none}
 .band::after{content:"";position:absolute;inset:4px;border:1px dashed #fbf6e870;border-radius:12px;pointer-events:none}
 .bandCopy{flex:1;min-width:0}
 .bandCopy strong{display:block;font-size:20px;font-weight:400;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bandCopy small{display:block;font-size:13px;line-height:1.4;opacity:.92}
-.band .gear{position:static;flex:none}
+.band .gear{position:static;flex:none} /* ⚙ 동그라미 ↔ 띠 오른쪽 끝 15px(2026-11-26) */
 /* 누름 효과는 카드와 ⚙ 를 한 덩어리로(⚙ 가 따로 놀지 않게). 카드만 줄이던 전역 규칙 대신 칸 전체가 같이 줄어듭니다. */
 .cell{transition:scale .12s ease-out}
 .cell:has(>.card:enabled:active),.cell:has(>.gear:active){scale:.95}

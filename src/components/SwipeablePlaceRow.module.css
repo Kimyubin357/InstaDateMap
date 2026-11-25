@@ -3,7 +3,7 @@
 .swipe .surface:enabled:active{scale:1;background-color:var(--paper)}
 .swipe .surface:focus-visible{outline-offset:-3px}
 .swipe.dragging .surface{transition:none;cursor:grabbing}
-.swipe .action{position:absolute;z-index:0;top:8px;bottom:8px;right:0;width:76px;min-height:44px;padding:8px 6px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:var(--accent) var(--grain);color:var(--cream);font-size:18px;outline:1px dashed var(--cream);outline-offset:-5px}
+.swipe .action{position:absolute;z-index:0;top:8px;bottom:8px;right:0;width:76px;min-height:44px;padding:4px 6px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1.2;background:var(--accent) var(--grain);color:var(--cream);font-size:18px;outline:1px dashed var(--cream);outline-offset:-5px}
 .swipe .action:disabled{opacity:1;cursor:default}
 .swipe .action:enabled:active{scale:1;background-color:var(--accent-ink)}
 .swipe .action:focus-visible{outline:2px solid var(--forest);outline-offset:-2px}
