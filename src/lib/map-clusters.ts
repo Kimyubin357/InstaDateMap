@@ -3,10 +3,13 @@ import type { PlaceStatus } from "./types";
 import type { MapRegion } from "./map-regions";
 import { REGION_NAMES } from "./place-view";
 
-// Kakao levels increase as the map zooms out (scale bar: 9 = 4km, 12 = 32km). Below CLUSTER_MIN_LEVEL every place
-// keeps its own name pin. 도 13–14 · 시 10–12 · 구 7–9 · 동 4–6 (구 kept wide like 직방/다방's 시군구 tier).
-export const CLUSTER_MIN_LEVEL = 4;
-export const DISTRICT_CLUSTER_LEVEL = 7;
+// Kakao levels increase as the map zooms out (scale bar: 7 = 1km, 9 = 4km, 12 = 32km). Below CLUSTER_MIN_LEVEL every place
+// keeps its own pin (작은 원 + 이름) and only pins that overlap on screen merge into a count circle — 1km에서도 겹치지 않으면
+// 이름이 보입니다(2026-11-26, 쏙핀처럼). From 2km on: 도 13–14 · 시 10–12 · 구 8–9 region cards.
+export const CLUSTER_MIN_LEVEL = 8;
+export const DISTRICT_CLUSTER_LEVEL = 8;
+/** 고른 장소·숫자 원을 눌렀을 때 더 가까이 가지 않는 단계(50m) */
+export const PIN_FLOOR_LEVEL = 3;
 export const CITY_CLUSTER_LEVEL = 10;
 export const PROVINCE_CLUSTER_LEVEL = 13;
 export interface ClusterPlace { id: string; status: PlaceStatus }
@@ -103,8 +106,8 @@ export function stackCards<T extends ClusterPlace>(cards: readonly RegionCard<T>
 }
 
 const TIERS: RegionTier[] = ["province", "city", "district", "local"];
-/** The least zoomed-in Kakao level of each tier (도 14 · 시 12 · 구 9 · 동 6). */
-const TIER_TOP: Record<RegionTier, number> = { province: 14, city: 12, district: 9, local: 6 };
+/** The least zoomed-in Kakao level of each tier (도 14 · 시 12 · 구 9 · 핀 7). */
+const TIER_TOP: Record<RegionTier, number> = { province: 14, city: 12, district: 9, local: 7 };
 /**
  * Tapping a card must change what is shown: zoom at least into the next tier, skipping tiers where the
  * card's places are still the very same area under another tier name (서울 도 → 서울 시 → 구,
@@ -115,4 +118,34 @@ export function zoomInLevel<T extends ClusterPlace>(card: RegionCard<T>, region:
   while (index < TIERS.length - 1 && card.area !== null
     && card.places.every((place) => regionArea(region(place), TIERS[index]) === card.area)) index++;
   return TIER_TOP[TIERS[Math.min(index, TIERS.length - 1)]];
+}
+
+/** 핀끼리 겹침: 원 지름(30px)보다 가까우면 한 숫자 원으로 묶습니다. */
+export const PIN_OVERLAP = 30;
+export interface PinCluster<T> extends ScreenPoint { key: string; places: T[] }
+/**
+ * 화면에서 겹치는 핀만 묶습니다(축척과 상관없음). 같은 입력이면 늘 같은 결과가 나오게 id 순서로 처리하고,
+ * 묶음 중심은 들어간 장소들의 평균 위치입니다. 묶음끼리 다시 겹치면 한 번 더 합칩니다.
+ */
+export function overlapClusters<T extends { id: string }>(places: readonly T[], project: (place: T) => ScreenPoint, distance = PIN_OVERLAP): PinCluster<T>[] {
+  const unique = [...new Map(places.map((place) => [place.id, place])).values()].sort((a, b) => a.id.localeCompare(b.id));
+  let groups: { places: T[]; x: number; y: number }[] = [];
+  for (const place of unique) {
+    const point = project(place);
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+    const near = groups.find((g) => Math.hypot(g.x - point.x, g.y - point.y) < distance);
+    if (near) { const n = near.places.length; near.x = (near.x * n + point.x) / (n + 1); near.y = (near.y * n + point.y) / (n + 1); near.places.push(place); }
+    else groups.push({ places: [place], x: point.x, y: point.y });
+  }
+  for (let merged = true; merged;) {
+    merged = false;
+    outer: for (let i = 0; i < groups.length; i++) for (let j = i + 1; j < groups.length; j++) {
+      const a = groups[i], b = groups[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y) >= distance) continue;
+      const n = a.places.length, m = b.places.length;
+      groups[i] = { places: [...a.places, ...b.places], x: (a.x * n + b.x * m) / (n + m), y: (a.y * n + b.y * m) / (n + m) };
+      groups = groups.filter((_, index) => index !== j); merged = true; break outer;
+    }
+  }
+  return groups.map((g) => ({ key: g.places.map((p) => p.id).sort().join("|"), places: g.places, x: g.x, y: g.y }));
 }
