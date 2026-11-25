@@ -171,6 +171,9 @@ export default function Modal({ title, children, onClose, variant = "resizable",
     const keyboard = (e: KeyboardEvent) => {
       if (document.querySelector(".app-recovery")) return;
       if (document.querySelector("dialog[data-app-dialog][open]")) return;
+      // 시트 위에 시트를 연 경우(방 시트 → 동작 시트) 맨 위 시트만 키를 받습니다.
+      const roots = document.querySelectorAll(".modal-root");
+      if (roots[roots.length - 1] !== ref.current?.closest(".modal-root")) return;
       if (e.key === "Escape") { e.preventDefault(); close.current(); }
       if (e.key !== "Tab") return;
       const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, [tabindex="0"]') ?? []).filter((el) => el.getClientRects().length);

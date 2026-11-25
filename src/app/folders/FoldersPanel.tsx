@@ -5,6 +5,8 @@ import ClientReady from "@/components/ClientReady";
 import Icon from "@/components/Icon";
 import ShellLink from "@/components/ShellLink";
 import ActionDialog from "@/components/ActionDialog";
+import ActionSheet, { ActionLead } from "@/components/ActionSheet";
+import { RoomActionSheet, type RoomAction } from "@/components/Rooms";
 import Avatar from "@/components/Avatar";
 import { useBoardSync } from "@/components/BoardProvider";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
@@ -34,7 +36,7 @@ function RoomEditor({ draft, onChange, busy, kicker, meta, note, submitLabel, bu
     <ColorSwatches value={draft.color} disabled={busy} label="방 색" onChange={(color) => onChange({ ...draft, color })} />
     <p className={styles.note}><Icon name="user" width={20} /><span>{note}</span></p>
     {children}
-    <div className={styles.bar}><button className="btn primary" disabled={busy || !trimmed || unchanged}>{busy ? busyLabel : submitLabel}</button></div>
+    <div className={styles.bar}><button className="btn primary green" disabled={busy || !trimmed || unchanged}>{busy ? busyLabel : submitLabel}</button></div>
   </form>;
 }
 
@@ -54,6 +56,13 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   const [edit, setEdit] = useState<Draft | null>(null);
   const [invite, setInvite] = useState<{ url: string; expires_at: string } | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  /** 방 설정은 한 번에 한 화면: 방 수정(이름·색) 또는 멤버 관리(멤버·초대). 나가기·삭제는 ⚙ 시트에서 고릅니다(시안 design-lab/edit-sheets). */
+  const [view, setView] = useState<"edit" | "members">("members");
+  const [sheet, setSheet] = useState<FolderSummary | null>(null);
+  const [memberSheet, setMemberSheet] = useState<FolderMember | null>(null);
+  /** ⚙ 시트에서 고른 초대하기·나가기·삭제: 방 정보를 받은 뒤 한 번 실행합니다. */
+  const pending = useRef<RoomAction | null>(null);
+  const fromSheet = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -69,16 +78,33 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   useEffect(() => { void load(); }, [load]);
   // 내 방 시트·리스트 [방] 칸의 "+ 새 방 만들기"는 /folders?new=1 로 바로 만들기 화면을 엽니다.
   useEffect(() => { if (new URLSearchParams(window.location.search).get("new") === "1") setCreating(true); }, []);
-  // 내 방 시트·방 머리띠·리스트 [방] 칸의 ⚙ 는 /folders?room=<id> 로 그 방 설정을 바로 엽니다. 뒤로 가면 왔던 화면으로 돌아갑니다.
+  // 내 방 시트·방 머리띠·리스트 [방] 칸의 ⚙ 시트는 /folders?room=<id>&view=<할 일> 로 그 화면을 바로 엽니다. 뒤로 가면 왔던 화면으로 돌아갑니다.
   const direct = useRef(false);
-  useEffect(() => { const id = new URLSearchParams(window.location.search).get("room"); if (id && isUuid(id)) { direct.current = true; setSelected(id); } }, []);
+  const openRoom = (id: string, action: RoomAction) => {
+    setError(""); setStatus(""); setSelected(id); setView(action === "edit" ? "edit" : "members");
+    pending.current = action === "edit" || action === "members" ? null : action;
+  };
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search), id = query.get("room"), action = query.get("view") as RoomAction | null;
+    if (id && isUuid(id)) { direct.current = true; openRoom(id, action && ["edit", "members", "invite", "delete", "leave"].includes(action) ? action : "members"); }
+  }, []);
   const loadDetail = useCallback(async (id: string) => {
     setError("");
-    try { const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color } : null); }
+    try {
+      const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color } : null);
+      if (next.folder.role !== "owner") setView("members");
+      const action = pending.current; pending.current = null;
+      const owner = next.folder.role === "owner", others = next.members.length > 1;
+      if (action === "delete" && owner) { fromSheet.current = true; setConfirm({ kind: "delete" }); }
+      else if (action === "leave" && others) { fromSheet.current = true; setConfirm({ kind: "leave" }); }
+      else if (action === "invite" && owner && next.members.length < next.folder.member_limit) inviteSoon.current = true;
+    }
     catch (e) { setError(friendlyMessage(e, "방 정보를 불러오지 못했어요.")); }
   }, []);
   useEffect(() => { if (selected) { setDetail(null); setInvite(null); void loadDetail(selected); } }, [selected, loadDetail]);
-  useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [selected]);
+  useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [selected, view]);
+  // ⚙ 시트의 초대하기: 멤버 관리 화면을 열고 바로 초대 링크를 만듭니다(복사 · 보내기).
+  useEffect(() => { if (detail && inviteSoon.current) { inviteSoon.current = false; void makeInvite(); } });
 
   /** 한 번에 하나의 요청만 보내고, 실패하면 입력을 유지한 채 한국어 안내를 보여줍니다. */
   async function act<T>(task: () => Promise<T>, fallback: string): Promise<T | null> {
@@ -114,6 +140,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     setDetail(next); await load(); say("방을 바꿨어요.");
     if (selected === data?.current && !standalone) sync.store.invalidate();
   }, "방을 바꾸지 못했어요. 다시 시도해 주세요.");
+  const inviteSoon = useRef(false);
   const makeInvite = () => selected && act(async () => {
     const next = await call<{ url: string; expires_at: string }>(`/api/folders/${selected}/invites`, "POST");
     setInvite(next); await loadDetail(selected);
@@ -149,6 +176,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
       ? call<{ current: string | null }>(`/api/folders/${folder.id}`, "DELETE")
       : call<{ current: string | null }>(`/api/folders/${folder.id}/members/${me?.user_id}`, "DELETE"), confirm.kind === "delete" ? "방을 삭제하지 못했어요. 다시 시도해 주세요." : "방에서 나가지 못했어요. 다시 시도해 주세요.");
     if (!res) return;
+    fromSheet.current = false; direct.current = false;
     setConfirm(null); setSelected(null); setDetail(null);
     await follow(res.current, false, confirm.kind === "delete" ? `‘${folder.name}’ 방을 삭제했어요.` : `‘${folder.name}’ 방에서 나왔어요.`);
     await load();
@@ -165,43 +193,44 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     const folder = detail?.folder ?? folders.find((f) => f.id === selected);
     const owner = detail?.folder.role === "owner";
     const others = detail ? detail.members.length - 1 : 0;
-    return <main className={`form-page settings-page ${styles.page}${owner ? ` ${styles.withBar}` : ""}`}>{header(folder?.name ?? "방", () => { if (direct.current) { direct.current = false; if (window.history.length > 1) router.back(); else router.replace("/"); return; } setSelected(null); setError(""); setStatus(""); })}<ClientReady>
+    const editing = owner && view === "edit";
+    const leaveDetail = () => { setConfirm(null); setMemberSheet(null); if (direct.current) { direct.current = false; if (window.history.length > 1) router.back(); else router.replace("/"); return; } setSelected(null); setError(""); setStatus(""); };
+    return <main className={`form-page settings-page ${styles.page}${editing ? ` ${styles.withBar}` : ""}`}>{header(editing ? "방 수정" : owner ? "멤버 관리" : `${folder?.name ?? "방"} 멤버`, leaveDetail)}<ClientReady>
       {feedback}
-      {!detail ? !error && <p className="hint" role="status">방 정보를 불러오고 있어요…</p> : <div className={styles.detail}>
+      {!detail ? !error && <p className="hint" role="status">방 정보를 불러오고 있어요…</p> : editing && edit ? <div className={styles.detail}>
         <section className={styles.about} aria-label="방 이름과 색">
-          {owner && edit ? <RoomEditor draft={edit} onChange={setEdit} busy={busy} kicker="방장 · 나" meta={`${people(detail.members.length)} · 장소 ${detail.folder.place_count}곳`}
+          <RoomEditor draft={edit} onChange={setEdit} busy={busy} kicker="방장 · 나" meta={`${people(detail.members.length)} · 장소 ${detail.folder.place_count}곳`}
             note={<>바꾸면 <b>모든 멤버에게</b> 바뀐 이름과 색으로 보여요.</>} submitLabel="저장" busyLabel="저장하는 중…" onSubmit={() => { void save(); }}
             unchanged={clean(edit.name) === detail.folder.name && edit.color === detail.folder.color} />
-            : <><RoomCard color={detail.folder.color} kicker={`멤버 · 방장 ${detail.members.find((m) => m.role === "owner")?.name ?? ""}`.trim()} name={detail.folder.name} meta={`${people(detail.members.length)} · 장소 ${detail.folder.place_count}곳`} />
-              <p className={styles.note}><Icon name="user" width={20} /><span>이름과 색은 방장이 바꿀 수 있어요.</span></p></>}
         </section>
+      </div> : <div className={styles.detail}>
         <section className="settings-group" aria-labelledby="folder-members"><h2 id="folder-members" className="settings-label">멤버 {detail.members.length}/{detail.folder.member_limit}명</h2>
           <ul className={styles.members}>{detail.members.map((m) => <li key={m.user_id}>
-            <span className={styles.memberName}><Avatar src={m.avatar} size={32} /><span>{m.name}{m.me && <small> (나)</small>}</span>{m.role === "owner" && <span className={styles.badge}>방장</span>}</span>
-            {owner && !m.me && <span className={styles.memberActions}><button type="button" className="text-btn" disabled={busy} onClick={() => setConfirm({ kind: "owner", member: m })}>방장 넘기기</button><button type="button" className="text-btn" disabled={busy} onClick={() => setConfirm({ kind: "kick", member: m })}>내보내기</button></span>}
+            <span className={styles.memberName}><Avatar src={m.avatar} size={40} /><span className={styles.memberCopy}><span>{m.name}</span>{m.me && <small>나</small>}</span>{m.role === "owner" && <span className={styles.badge}>방장</span>}</span>
+            {owner && !m.me && <button type="button" className={styles.memberMore} disabled={busy} aria-haspopup="dialog" aria-label={`${m.name}님 관리`} onClick={() => setMemberSheet(m)}><Icon name="more" width={22} /></button>}
           </li>)}</ul>
         </section>
         <section className="settings-group" aria-labelledby="folder-invite"><h2 id="folder-invite" className="settings-label">초대</h2>
           {owner ? <div className={styles.invite}>
             {invite ? <div className={styles.inviteBox}>
               <label>초대 링크<input readOnly value={invite.url} onFocus={(e) => e.currentTarget.select()} /></label>
-              <div className={styles.editorActions}><button type="button" className="btn" onClick={() => { void copyInvite(); }}><Icon name="copy" width={18} />복사</button>{typeof navigator !== "undefined" && "share" in navigator && <button type="button" className="btn primary" onClick={() => { void shareInvite(); }}><Icon name="link" width={18} />보내기</button>}</div>
+              <div className={styles.editorActions}><button type="button" className="btn" onClick={() => { void copyInvite(); }}><Icon name="copy" width={18} />링크 복사</button>{typeof navigator !== "undefined" && "share" in navigator && <button type="button" className="btn primary green" onClick={() => { void shareInvite(); }}><Icon name="link" width={18} />보내기</button>}</div>
               <p className="hint">{INVITE_DAYS}일 동안 누구든 이 링크로 참여할 수 있어요. 받는 사람은 카카오·구글로 로그인한 뒤 참여해요.</p>
             </div> : <button type="button" className="settings-row" disabled={busy || detail.members.length >= detail.folder.member_limit} onClick={() => { void makeInvite(); }}><Icon name="link" /><span className="settings-copy"><span>{busy ? "링크 만드는 중…" : "초대 링크 만들기"}</span><small>{detail.members.length >= detail.folder.member_limit ? "인원이 가득 찼어요" : `${INVITE_DAYS}일 동안 쓸 수 있는 링크를 만들어요`}</small></span><Icon name="chevron" width="18" /></button>}
             {detail.active_invites > 0 && <button type="button" className="settings-row" disabled={busy} onClick={() => { void revokeInvites(); }}><Icon name="close" /><span className="settings-copy"><span>초대 링크 모두 끊기</span><small>지금 쓸 수 있는 링크 {detail.active_invites}개를 더 이상 쓰지 못하게 해요</small></span></button>}
           </div> : <p className="hint">초대는 방장({detail.members.find((m) => m.role === "owner")?.name ?? "방장"})이 할 수 있어요.</p>}
         </section>
-        <section className={`settings-group ${styles.danger}`} aria-label="방 나가기·삭제">
-          {others > 0 && <button type="button" className="settings-row" disabled={busy} onClick={() => setConfirm({ kind: "leave" })}><Icon name="back" /><span className="settings-copy"><span>방 나가기</span><small>{owner ? "가장 먼저 참여한 멤버가 방장이 돼요" : "다시 들어오려면 초대 링크가 필요해요"}</small></span></button>}
-          {owner && <button type="button" className="settings-row" disabled={busy} onClick={() => setConfirm({ kind: "delete" })}><Icon name="trash" /><span className="settings-copy"><span>방 삭제</span><small>{others > 0 ? "모든 멤버에게서 장소와 메모가 사라져요" : "이 방의 장소와 메모가 모두 사라져요"}</small></span></button>}
-        </section>
       </div>}
+      {memberSheet && detail && <ActionSheet title={memberSheet.name} note="멤버" lead={<ActionLead round photo={memberSheet.avatar}>{Array.from(memberSheet.name.trim())[0] ?? "?"}</ActionLead>} onClose={() => setMemberSheet(null)} items={[
+        { icon: "user", title: "방장 넘기기", note: `${memberSheet.name}님이 방장이 돼요`, chevron: false, onSelect: () => { const member = memberSheet; setMemberSheet(null); setConfirm({ kind: "owner", member }); } },
+        { icon: "close", title: "내보내기", note: `${memberSheet.name}님이 담은 장소는 방에 남아요`, danger: true, onSelect: () => { const member = memberSheet; setMemberSheet(null); setConfirm({ kind: "kick", member }); } },
+      ]} />}
       {confirm && detail && <ActionDialog
         title={confirm.kind === "delete" ? `‘${detail.folder.name}’ 방을 삭제할까요?` : confirm.kind === "leave" ? `‘${detail.folder.name}’ 방에서 나갈까요?` : confirm.kind === "kick" ? `${confirm.member.name}님을 내보낼까요?` : `${confirm.member.name}님에게 방장을 넘길까요?`}
         message={confirm.kind === "delete" ? `장소 ${detail.folder.place_count}곳과 메모·모음이 ${others > 0 ? "모든 멤버에게서 " : ""}사라지고 되돌릴 수 없어요.` : confirm.kind === "leave" ? "내가 저장한 장소는 방에 남아요. 다시 들어오려면 초대 링크가 필요해요." : confirm.kind === "kick" ? "저장한 장소는 방에 남아요. 다시 들어오려면 새 초대 링크가 필요해요." : "이름·색 수정, 초대, 내보내기, 삭제를 새 방장이 하게 돼요."}
         tone={confirm.kind === "owner" ? "info" : "error"} destructive={confirm.kind === "delete" || confirm.kind === "kick"} cancelLabel="취소"
         confirmLabel={confirm.kind === "delete" ? "삭제" : confirm.kind === "leave" ? "나가기" : confirm.kind === "kick" ? "내보내기" : "넘기기"} busy={busy}
-        onClose={() => { if (!busy) { setConfirm(null); setError(""); } }} onConfirm={runConfirm}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
+        onClose={() => { if (busy) return; setError(""); if (fromSheet.current) { fromSheet.current = false; leaveDetail(); } else setConfirm(null); }} onConfirm={runConfirm}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
     </ClientReady></main>;
   }
 
@@ -228,13 +257,14 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
             <span className={styles.rowCopy}><strong>{f.name}</strong><small>{f.role === "owner" ? "방장 · " : ""}{people(f.member_count)} · 장소 {f.place_count}곳</small></span>
             {current && <span className={styles.badge}>보는 중</span>}
           </button>
-          <button type="button" className={styles.manage} disabled={busy} aria-label={`${f.name} 방 관리`} onClick={() => { setError(""); setStatus(""); setSelected(f.id); }}><Icon name="settings" /></button>
+          <button type="button" className={styles.manage} disabled={busy} aria-label={`${f.name} 방 설정`} aria-haspopup="dialog" onClick={() => setSheet(f)}><Icon name="settings" /></button>
         </li>; })}</ul>}
         <button type="button" className={styles.newRow} disabled={busy || full} onClick={() => { setError(""); setStatus(""); setDraft(NEW_DRAFT); setCreating(true); }}>
           <span className={styles.newBand} aria-hidden="true" />
           <span className={styles.rowCopy}><span>새 방 만들기</span><small>{full ? `방은 ${ROOM_LIMIT}개까지예요. 쓰지 않는 방을 정리하면 새로 만들 수 있어요.` : "혼자 모으거나, 둘이·친구들과 함께 쓸 방"}</small></span>
         </button>
       </section>
+      {sheet && <RoomActionSheet room={sheet} onClose={() => setSheet(null)} onGo={(action) => openRoom(sheet.id, action)} />}
       {folders.length > 0 && <p className={styles.note}><Icon name="list" width={20} /><span>같은 사람과 주제만 다르면 방을 새로 만들지 말고 <b>방 안에 모음</b>을 만들어요. 다시 초대할 필요가 없어요.</span></p>}
     </>}
   </ClientReady></main>;

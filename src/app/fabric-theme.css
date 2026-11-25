@@ -407,3 +407,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .new-places-chip.is-open{border-color:var(--forest);box-shadow:0 0 0 2px #244b3722,var(--print-shadow)}
 /* 설정과 하위 화면(방·알림·프로필·약관·삭제한 장소 등)의 머리에는 구분선을 두지 않습니다(2026-11-26 사용자 결정). */
 .page-header,.settings-page .page-header,.form-page .page-header,.confirm .page-header{border-bottom:0}
+
+/* 만들기·저장 버튼은 초록(2026-11-26 사용자 결정): 빨강은 지우기·위험한 일에만 씁니다. */
+.btn.primary.green{background-color:var(--forest);border-color:var(--forest)}

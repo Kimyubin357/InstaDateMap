@@ -77,7 +77,8 @@
 .roomCard .check{right:auto;left:auto;top:auto;bottom:10px;right:10px}
 .gear{position:absolute;right:4px;top:4px;width:44px;height:44px;display:grid;place-items:center;color:var(--cream);z-index:1;-webkit-tap-highlight-color:transparent}
 .gear i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#fbf6e833;border:1px dashed #fbf6e899}
-.gear[aria-disabled="true"]{opacity:.6;pointer-events:none}
+.gear{border:0;background:none;padding:0;cursor:pointer}
+.gear:disabled{opacity:.6;pointer-events:none}
 .faces{display:inline-flex;align-items:center;margin-right:4px}
 .faces i{width:22px;height:22px;border-radius:50%;border:1.5px solid #fbf6e8cc;background:var(--cream);color:var(--tone);font-size:11px;font-style:normal;line-height:1;display:grid;place-items:center;margin-right:-8px}
 .faces i:last-child{margin-right:0}
@@ -97,3 +98,9 @@
 /* 초록 방은 선택 표시(초록 테두리·체크)가 방 색과 같아 안 보이므로 빨강으로 */
 .onRed.on{box-shadow:0 0 0 3px var(--accent),0 6px 14px #382f251c}
 .onRed .check{background:var(--accent) var(--grain)}
+
+/* 방 ⚙ 동작 시트의 멤버 얼굴(› 앞) */
+.sheetFaces{display:inline-flex;align-items:center;flex:none}
+.sheetFaces i{width:26px;height:26px;border-radius:50%;border:2px solid var(--paper);background:var(--cream);color:var(--ink);font-size:12px;font-style:normal;line-height:1;display:grid;place-items:center;margin-left:-8px;overflow:hidden}
+.sheetFaces i:first-child{margin-left:0}
+.sheetFaces i.photo img{width:100%;height:100%;object-fit:cover;display:block}

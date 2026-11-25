@@ -19,6 +19,7 @@ import { usePlaceBriefs } from "./usePlaceBriefs";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import ActionDialog from "./ActionDialog";
+import ActionSheet from "./ActionSheet";
 import SwipeablePlaceRow from "./SwipeablePlaceRow";
 import PlaceDeleteDialog from "./PlaceDeleteDialog";
 import PlacesDeleteDialog from "./PlacesDeleteDialog";
@@ -40,7 +41,7 @@ function randomCover(collections: readonly CollectionView[]) {
 /** 모음 0개일 때 예시(누르면 이 이름·이모지로 만들기) */
 const EXAMPLE_COLLECTIONS = [{ name: "성수 카페 투어", icon: "🍰" }, { name: "비 오는 날", icon: "☔" }];
 type Editor = { id: string; version?: number; name: string; description: string; color: CollectionView["color"]; icon: CollectionView["icon"] };
-type Dialog = "editor" | "picker" | "places" | "delete" | "remove" | null;
+type Dialog = "actions" | "editor" | "picker" | "places" | "delete" | "remove" | null;
 export default function CollectionsList({ places, visible, collections = EMPTY, currentId, mode, loaded, tools, onNavigate, onOpen, onMap, onReset, newPlaceIds, distanceOrigin, who }: {
   who: string; places: PlaceView[]; visible: PlaceView[]; collections?: CollectionView[]; currentId: string | null;
   mode: "all" | "collections"; loaded: boolean; tools: ReactNode; distanceOrigin?: { lat: number; lng: number } | null;
@@ -108,9 +109,10 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     window.addEventListener("beforeunload", prevent); return () => window.removeEventListener("beforeunload", prevent);
   }, [dirty, busy, write.pending]);
   function resetWrite() { pendingWrite.current = null; setWrite(new VerifiedWrite()); setError(""); setConflict(false); }
+  const editorOf = (c: CollectionView): Editor => ({ id: c.id, version: c.version, name: c.name, description: c.description, color: c.color, icon: c.icon });
   function beginEditor(c?: CollectionView, fromPicker = false, preset?: { name: string; icon: string }) {
     resetWrite(); returnToPicker.current = fromPicker;
-    const value: Editor = c ? { id: c.id, version: c.version, name: c.name, description: c.description, color: c.color, icon: c.icon } : { id: crypto.randomUUID(), name: preset?.name ?? "", description: "", color: "red", icon: preset?.icon ?? randomCover(collections) };
+    const value: Editor = c ? editorOf(c) : { id: crypto.randomUUID(), name: preset?.name ?? "", description: "", color: "red", icon: preset?.icon ?? randomCover(collections) };
     setEditor(value); initialEditor.current = JSON.stringify(value); setDialog("editor");
   }
   function dismiss() {
@@ -247,7 +249,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     <div className={current ? styles.detailLayout : undefined}>
     {current && <header className={styles.detail}>
       {/* 방 › 모음 › 이 모음: "방 안의 모음"이라는 관계를 글로 보여 줍니다(방·모음 구분 A안). 방 색은 작은 네모에만. */}
-      <div className={styles.detailNav}><nav className={styles.crumb} aria-label="지금 위치"><span className={styles.crumbRoom}>{room && <RoomBand color={room.color} shape="square" />}<span>{room?.name ?? roomName}</span></span><Icon name="chevron" width={14} /><button className="text-btn" onClick={() => onNavigate("collections")}>모음</button><Icon name="chevron" width={14} /><b aria-current="page">{current.name}</b></nav><button className="text-btn" onClick={() => beginEditor(current)}>편집</button></div>
+      <div className={styles.detailNav}><nav className={styles.crumb} aria-label="지금 위치"><span className={styles.crumbRoom}>{room && <RoomBand color={room.color} shape="square" />}<span>{room?.name ?? roomName}</span></span><Icon name="chevron" width={14} /><button className="text-btn" onClick={() => onNavigate("collections")}>모음</button><Icon name="chevron" width={14} /><b aria-current="page">{current.name}</b></nav><button className="text-btn" aria-haspopup="dialog" onClick={() => { resetWrite(); setDialog("actions"); }}>편집</button></div>
       <div className={styles.detailTitle}><CollectionCover icon={current.icon} size={64} /><div><h2>{current.name}</h2><p className={styles.count}>{current.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(current.id) ?? 0}`}</p></div></div>{current.description && <p className={styles.description}>{current.description}</p>}
       {current.place_ids.length > 0 && <div className={styles.detailActions}><button className={`btn ${styles.mapButton}`} disabled={!current.place_ids.length} onClick={() => onMap(current.id)}><Icon name="fit" width={18} />지도에서 보기</button><button className="btn" disabled={selecting} onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}><Icon name="plus" width={18} />장소 담기</button></div>}
     </header>}
@@ -268,7 +270,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       // 빈 방 리스트(시안 A4): 0인 도구(선택·종류·정렬·미분류)를 숨기고 시작할 일만.
       { icon: <Icon name="plus" width={22} />, title: "인스타 링크로 담기", note: "Copy link → 오른쪽 아래 + 에 붙여넣기", href: "/add" },
       { icon: <Icon name="search" width={22} />, title: "가게 이름으로 찾기", note: "맨 위 검색에서 찾아 바로 저장", href: "/search" },
-      ...(room ? [{ icon: <Icon name="user" width={22} />, title: "친구 초대하기", note: "같이 담을 사람을 이 방에 불러요", href: roomSettingsHref(room.id) }] : []),
+      ...(room ? [{ icon: <Icon name="user" width={22} />, title: "친구 초대하기", note: "같이 담을 사람을 이 방에 불러요", href: roomSettingsHref(room.id, "invite") }] : []),
     ]} /> : current && !current.place_ids.length ? <div className={styles.quickAdd}>
       {/* 빈 모음(시안 A5): 버튼 하나 + 이 방 장소 몇 곳을 바로 넣기 */}
       {places.length > 0 ? <>
@@ -304,7 +306,12 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     </>}
     </div></div>
     {!dialog && dialogError}
-    {dialog === "editor" && editor && <Modal title={editor.version ? "모음 수정" : "새 모음"} initialStop={2} fullScreenAtMax className={`${styles.modal} ${styles.editorModal}`} headerActions={closeButton} onClose={() => { if (!emojiOpen) dismiss(); }} footer={<div className="actions"><button className="btn primary" form="collection-editor" disabled={busy || conflict || !collectionName(editor.name)}>{label || (editor.version ? "저장" : "만들기")}</button></div>}>
+    {/* 모음 "편집" → 동작 시트(시안 design-lab/edit-sheets 1번): 수정하기 · 삭제하기(빨강). 삭제는 수정 화면에 두지 않습니다. */}
+    {dialog === "actions" && current && <ActionSheet title={current.name} note={`모음 · 장소 ${current.place_ids.length}곳`} lead={<CollectionCover icon={current.icon} size={48} />} onClose={() => setDialog(null)} items={[
+      { icon: "edit", title: "수정하기", note: "이름 · 이모지 · 한 줄 소개", onSelect: () => beginEditor(current) },
+      { icon: "trash", title: "삭제하기", note: "담긴 장소는 방에 그대로 남아요", danger: true, onSelect: () => { const value = editorOf(current); resetWrite(); initialEditor.current = JSON.stringify(value); setEditor(value); setDialog("delete"); } },
+    ]} />}
+    {dialog === "editor" && editor && <Modal title={editor.version ? "모음 수정" : "새 모음"} initialStop={2} fullScreenAtMax className={`${styles.modal} ${styles.editorModal}`} headerActions={closeButton} onClose={() => { if (!emojiOpen) dismiss(); }} footer={<div className="actions"><button className="btn primary green" form="collection-editor" disabled={busy || conflict || !collectionName(editor.name)}>{label || (editor.version ? "저장" : "만들기")}</button></div>}>
       <form id="collection-editor" onSubmit={(e) => { e.preventDefault(); saveEditor(); }} className={styles.editor}>
         {roomName && <p className={styles.inRoom}>{roomColor && <RoomBand color={roomColor} shape="square" />}<span>‘<b>{roomName}</b>’ {editor.version ? "안의 모음이에요" : "안에 만들어요"}</span></p>}
         <div className={styles.coverWrap}>
@@ -320,7 +327,6 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         <FieldLabel htmlFor="collection-description" aside={<small>선택</small>}>한 줄 소개</FieldLabel>
         <textarea id="collection-description" className={styles.nameField} disabled={frozen} value={editor.description} maxLength={120} rows={2} placeholder="어떤 날 함께 가고 싶나요?" onChange={(e) => setEditor({ ...editor, description: e.target.value })} />
         {dialogError}
-        {editor.version && <button type="button" className={styles.delete} disabled={frozen} onClick={() => { resetWrite(); setDialog("delete"); }}><Icon name="trash" width={18} />모음 삭제</button>}
       </form>
       {emojiOpen && <EmojiPicker value={collectionEmoji(editor.icon)} suggestions={collections.map((c) => collectionEmoji(c.icon))}
         onPick={(icon) => { setEditor((value) => value && { ...value, icon }); setEmojiOpen(false); }} onClose={() => setEmojiOpen(false)} />}
@@ -335,7 +341,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {places.filter((p) => !current.place_ids.includes(p.id) && `${p.name} ${p.address}`.includes(placeQuery.trim())).map((p) => placeRow(p, true, true))}
       {!places.some((p) => !current.place_ids.includes(p.id) && `${p.name} ${p.address}`.includes(placeQuery.trim())) && <p className={styles.empty}>담을 장소가 없어요.<br />검색어를 바꾸거나 새 장소를 저장해 주세요.</p>}{dialogError}
     </Modal>}
-    {dialog === "delete" && editor && <ActionDialog title="이 모음을 삭제할까요?" message={`‘${editor.name}’ 모음만 삭제해요. 담겨 있던 장소와 메모는 이 방에 그대로 남아요.`} destructive cancelLabel="취소" confirmLabel={label || "모음 삭제"} busy={busy} onClose={() => { if (write.pending) dismiss(); else if (!busy) { resetWrite(); setDialog("editor"); } }} onConfirm={() => mutate({ action: "delete", id: editor.id, version: editor.version! }, () => { setDialog(null); setEditor(null); onNavigate("collections"); notify("모음을 삭제했어요."); })}>{dialogError}</ActionDialog>}
+    {dialog === "delete" && editor && <ActionDialog title="이 모음을 삭제할까요?" message={`‘${editor.name}’ 모음만 삭제해요. 담겨 있던 장소와 메모는 이 방에 그대로 남아요.`} destructive cancelLabel="취소" confirmLabel={label || "모음 삭제"} busy={busy} onClose={() => { if (write.pending) dismiss(); else if (!busy) { resetWrite(); setEditor(null); setDialog(null); } }} onConfirm={() => mutate({ action: "delete", id: editor.id, version: editor.version! }, () => { setDialog(null); setEditor(null); onNavigate("collections"); notify("모음을 삭제했어요."); })}>{dialogError}</ActionDialog>}
     {dialog === "remove" && current && <ActionDialog title={`${chosen.length}곳을 이 모음에서 뺄까요?`} message="이 방과 다른 모음에는 그대로 남아요." cancelLabel="취소" confirmLabel={label || "이 모음에서 빼기"} busy={busy} onClose={dismiss} onConfirm={() => mutate({ action: "remove", collection_ids: [current.id], place_ids: chosen }, (r) => completeMembership(r, "모음에서 뺐어요."))}>{dialogError}</ActionDialog>}
     {discard && <ActionDialog title={write.pending ? "처리 확인을 그만할까요?" : "작성 중인 내용을 닫을까요?"} message={write.pending ? "요청이 이미 처리되었을 수 있어요. 닫은 뒤 목록을 새로 확인해 주세요." : "저장하지 않은 변경 내용은 사라져요."} cancelLabel="계속하기" confirmLabel="닫기" onClose={() => setDiscard(false)} onConfirm={() => { store.invalidate(); finishClose(); }} />}
   </section>;
