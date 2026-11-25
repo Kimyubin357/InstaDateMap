@@ -38,9 +38,9 @@ function PhotoMenu({ providerLabel, hasProvider, hasPhoto, onPick, onClose }: {
     onCancel={(e) => { e.preventDefault(); onClose(); }}
     onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <h2 id="profile-photo-menu">프로필 사진</h2>
-    <button type="button" onClick={() => onPick("upload")}><Icon name="image" width="20" />앨범에서 선택</button>
+    <button type="button" onClick={() => onPick("upload")}><Icon name="image" width="20" />앨범에서 고르기</button>
     {hasProvider && providerLabel && <button type="button" onClick={() => onPick("provider")}><Icon name="user" width="20" />{providerLabel} 사진으로</button>}
-    {hasPhoto && <button type="button" onClick={() => onPick("none")}><Icon name="close" width="20" />사진 없이</button>}
+    {hasPhoto && <button type="button" className={styles.menuDanger} onClick={() => onPick("none")}><Icon name="trash" width="20" />사진 없이</button>}
     <button type="button" className={styles.menuCancel} onClick={onClose} autoFocus>취소</button>
   </dialog>, document.body);
 }
@@ -97,17 +97,16 @@ export default function ProfileEditor({ initial, submitLabel, busyLabel = "저�
         <Avatar src={preview} size={112} />
         <span className={styles.cameraBadge} aria-hidden="true"><Icon name="camera" width="18" /></span>
       </button>
-      <p className={styles.photoHint}>사진을 탭해서 변경</p>
       <input ref={file} type="file" accept="image/*" hidden onChange={pick} />
     </div>
     <div className={styles.fields}>
-      <label className={styles.name}>닉네임
+      {/* 설정 리디자인(시안 design-lab/settings 2번): 라벨 "이름" + 글자 수, 설명 문장 없이. 로그인 계정은 아래 한 줄. */}
+      <label className={styles.name}><span className={styles.nameLabel}><span>이름</span><small>{name.length}/20</small></span>
         <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 유빈" autoComplete="nickname" enterKeyHint="done" disabled={busy} />
-        <small>장소를 저장하거나 메모를 남기면 방 멤버에게 이 이름으로 보여요.</small>
       </label>
-      {initial.provider_name && providerLabel && trimmed !== initial.provider_name && <button type="button" className={`text-btn ${styles.useProviderName}`} disabled={busy} onClick={() => setName(initial.provider_name!.slice(0, 20))}>{providerLabel} 이름으로 바꾸기</button>}
+      {providerLabel && <div className={styles.account}><span className={styles.accountLabel}>로그인 계정</span><div className="set-group"><div className="set-row"><span className={`${styles.providerMark} ${styles[initial.provider ?? "kakao"]}`} aria-hidden="true" /><span className="set-title">{providerLabel}</span></div></div></div>}
       {error && <p className="error" role="alert">{error}</p>}
-      <div className={styles.saveBar}><button className="btn primary large" disabled={busy || !trimmed || (requireChange && unchanged)}>{busy ? busyLabel : submitLabel}</button></div>
+      <div className={styles.saveBar}><button className="btn primary green large" disabled={busy || !trimmed || (requireChange && unchanged)}>{busy ? busyLabel : submitLabel}</button></div>
     </div>
     {menu && <PhotoMenu providerLabel={providerLabel} hasProvider={!!initial.provider_avatar && preview !== initial.provider_avatar} hasPhoto={!!preview}
       onPick={choose} onClose={() => { setMenu(false); photoButton.current?.focus({ preventScroll: true }); }} />}

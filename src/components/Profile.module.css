@@ -124,3 +124,13 @@
 @media (min-width: 760px) and (min-height: 561px) {
   .editor { max-width: 480px; margin: 0 auto; }
 }
+/* 설정 리디자인(2026-11-26): 이름 라벨 + 글자 수, 로그인 계정 줄 */
+.nameLabel { display: flex; justify-content: space-between; font-size: 15px; color: var(--ink-soft); }
+.nameLabel small { font-size: 14px; }
+.account { display: grid; gap: 6px; margin-top: 10px; }
+.accountLabel { font-size: 15px; color: var(--ink-soft); padding: 0 4px; }
+.providerMark { width: 22px; height: 22px; border-radius: 6px; flex: none; }
+.kakao { background: #fee500; }
+.google { background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); border-radius: 50%; }
+.menuDanger { color: var(--accent) !important; }
+.name input { border: 1px solid var(--line); border-radius: 14px; background: #fffaf0; }

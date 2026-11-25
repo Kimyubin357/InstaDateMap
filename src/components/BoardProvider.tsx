@@ -18,6 +18,7 @@ import FoldersPanel from "@/app/folders/FoldersPanel";
 import ProfilePanel from "@/app/settings/profile/ProfilePanel";
 import NotificationsPanel from "@/app/settings/notifications/NotificationsPanel";
 import TrashPlaces from "./TrashPlaces";
+import LeavePanel from "@/app/settings/leave/LeavePanel";
 import ActionDialog from "./ActionDialog";
 import Feedback, { type ToastNotice, type ToastAction } from "./Feedback";
 
@@ -175,6 +176,7 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
       {pathname === "/settings/profile" && <div className="shell-page" key="profile"><ProfilePanel /></div>}
       {pathname === "/settings/notifications" && <div className="shell-page" key="notifications"><NotificationsPanel /></div>}
       {pathname === "/settings/trash" && <div className="shell-page" key="trash"><TrashPlaces /></div>}
+      {pathname === "/settings/leave" && <div className="shell-page" key="leave"><LeavePanel /></div>}
       {notice && <ActionDialog title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
       {accessError && pathname !== "/settings" && <ActionDialog title="입장 정보를 다시 확인해 주세요" message={accessError} tone="error" confirmLabel="입장 정보 다시 확인" onClose={() => { void resetAccess(false); }} />}
       <Feedback toast={toast} onDismiss={dismissToast} onActionComplete={completeToastAction} connection={pathname === "/" && state.snapshot ? state.error : ""} onRetry={() => void store.refresh()} map={pathname === "/"} />
