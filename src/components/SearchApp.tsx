@@ -35,7 +35,9 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
   const scope = useScopePlaces();
   const { saved, fresh } = unifiedResults(scope.grouped, state.query, state.results || []);
   const roomNames = (place: MapPlace) => scope.isAll ? (place.room_ids ?? []).map((id) => scope.roomById.get(id)?.name).filter(Boolean).join(" · ") : "";
-  const placeholder = scope.isAll ? "모든 방에서 검색" : "이 방에서 검색";
+  // 방 안에서는 방 이름을 보여 줘 지금 어느 방인지 알 수 있게 합니다("우리 데이트맵에서 검색"). 긴 이름은 입력칸에서 말줄임합니다.
+  const roomName = scope.openRoom ? scope.roomById.get(scope.openRoom)?.name?.trim() : "";
+  const placeholder = scope.isAll ? "모든 방에서 검색" : roomName ? `${roomName}에서 검색` : "이 방에서 검색";
   useEffect(() => { if (scroll.current) scroll.current.inert = !active; }, [active]);
   useEffect(() => {
     if (!active) { search.pause(); setPicked(null); if (document.activeElement === input.current) input.current?.blur(); return; }

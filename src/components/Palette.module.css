@@ -14,10 +14,11 @@
 .meta{display:flex;align-items:center;gap:6px;font-size:15px;opacity:.9;margin-top:6px}
 
 /* 모음 표지 */
-.cover{--size:44px;width:var(--size);height:var(--size);border-radius:calc(var(--size) * .3);background:var(--tone) var(--grain);display:grid;place-items:center;flex:none;position:relative;box-shadow:var(--print-shadow)}
+/* 모음 표지: 색 없이 크림 원단 + 점선 + 이모지(색은 방에만, 방·모음 구분 A안 2026-11-25) */
+.cover{--size:44px;width:var(--size);height:var(--size);border-radius:calc(var(--size) * .3);background:var(--cream) var(--weave);border:1.5px dashed var(--line);display:grid;place-items:center;flex:none;position:relative;box-shadow:var(--print-shadow)}
 .cover .emoji{font-size:calc(var(--size) * .5)}
 .coverBig{box-shadow:0 2px 0 #382f2512,0 10px 22px #382f2524}
-.coverBig::after{content:"";position:absolute;inset:6px;border:1px dashed #fbf6e873;border-radius:calc(var(--size) * .25);pointer-events:none}
+.coverBig::after{display:none}
 
 /* 색 10칸 */
 .swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}

@@ -12,8 +12,8 @@ export default function SelectedPlacesBar({ workspace, count, onCollect, onTrans
   if (!host) return null;
   return createPortal(<div className={styles.bar} data-selection-actions role="group" aria-label="선택한 장소 작업">
     <div className={styles.actions}>
-      <button type="button" className={`btn ${styles.collect}`} disabled={!count} onClick={onCollect}><Icon name="bag" width={20} />모음에 담기</button>
-      <button type="button" className={`btn ${styles.transfer}`} disabled={!count} onClick={onTransfer}><Icon name="map" width={20} />방으로</button>
+      <button type="button" className={`btn ${styles.collect}`} disabled={!count} onClick={onCollect}><Icon name="collection" width={20} />모음에 담기</button>
+      <button type="button" className={`btn ${styles.transfer}`} disabled={!count} onClick={onTransfer}><Icon name="moveRoom" width={20} />옮기기</button>
       <button type="button" className={`btn ${styles.remove}`} disabled={!count} onClick={onDelete}><Icon name="trash" width={20} />삭제</button>
     </div>
   </div>, host);

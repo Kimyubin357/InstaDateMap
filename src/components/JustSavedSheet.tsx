@@ -8,13 +8,13 @@ import { placeMeta, type PlaceView } from "@/lib/place-view";
 import styles from "./Registration.module.css";
 
 /**
- * 저장 뒤 지도 위 '방금 담은 N곳'(시안 9번). 잘못 고른 방은 여기서 바로 [다른 방에 담기]로 고칩니다.
+ * 저장 뒤 지도 위 '방금 담은 N곳'(시안 9번). 잘못 고른 방은 여기서 바로 [다른 방으로 옮기기]로 고칩니다.
  * 지도 도구(전체 보기·내 위치·+)와 하단 탭은 그대로 두고, 이 시트의 높이만큼 위로 올립니다(--just-saved-height).
  */
 export default function JustSavedSheet({ room, places, url, onOpen, onClose }: {
   room: string; places: PlaceView[]; url: string | null; onOpen: (id: string) => void; onClose: () => void;
 }) {
-  const { notify } = useBoardSync();
+  const { notify, store } = useBoardSync();
   const [transferring, setTransferring] = useState(false);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -38,11 +38,13 @@ export default function JustSavedSheet({ room, places, url, onOpen, onClose }: {
       </button>)}
     </div>
     <div className={styles.justActions}>
-      <button type="button" className={`btn ${styles.forestText}`} onClick={() => setTransferring(true)}><Icon name="copy" width={18} />다른 방에 담기</button>
+      <button type="button" className={`btn ${styles.forestText}`} onClick={() => setTransferring(true)}><Icon name="moveRoom" width={18} />다른 방으로 옮기기</button>
       {url && <a className="btn" href={url} target="_blank" rel="noreferrer"><Icon name="instagram" width={18} />원본 보기</a>}
     </div>
     {transferring && <FolderTransferDialog ids={places.map((p) => p.id)} onClose={() => setTransferring(false)} onDone={(result) => {
-      setTransferring(false); notify(`‘${result.folder}’에도 담았어요.`);
+      // 방금 담은 곳은 내가 등록했으니 모두 옮겨지고, 이 방에서는 빠집니다.
+      for (const id of result.moved_ids) store.removePlace(id);
+      setTransferring(false); notify(`‘${result.folder}’ 방으로 옮겼어요.`); onClose();
     }} />}
   </section>;
 }

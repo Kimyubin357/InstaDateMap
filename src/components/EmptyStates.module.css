@@ -1,0 +1,55 @@
+/* 빈 상태 · 로딩(시안 design-lab/empty-loading A안). 원단·점선·잉크 토큰만, 포커스 표시 없음. */
+
+/* A1 지도 로딩 칩 */
+.chip{align-self:center;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:20px;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow);font-size:16px;color:var(--ink);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;animation:es-in .18s ease-out}
+.spin{width:16px;height:16px;flex:none;border-radius:50%;border:2px solid var(--line);border-top-color:var(--forest);animation:es-spin .8s linear infinite}
+@keyframes es-spin{to{transform:rotate(360deg)}}
+@keyframes es-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* A2 뼈대 줄 */
+.skeleton{padding:4px 0 24px}
+.skRow{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px dashed var(--line)}
+.skRow:first-child{border-top:0}
+.skDot{width:50px;height:50px;border-radius:50%;background:#e8dfca;flex:none}
+.skLines{flex:1;display:flex;flex-direction:column;gap:8px}
+.skLines i{display:block;height:14px;border-radius:7px;background:#e8dfca}
+.skLines i:nth-child(1){width:55%;height:18px}.skLines i:nth-child(2){width:75%}.skLines i:nth-child(3){width:35%}
+.skDot,.skLines i{animation:es-pulse 1.4s ease-in-out infinite}
+@keyframes es-pulse{50%{opacity:.55}}
+
+/* 두 단계 안내 */
+.steps{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.steps li{display:flex;align-items:center;gap:10px;font-size:16px;line-height:1.35;color:var(--ink)}
+.steps b{width:26px;height:26px;flex:none;border-radius:50%;background:var(--forest) var(--grain);color:var(--cream);font-weight:400;font-size:14px;display:grid;place-items:center}
+.ig{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:#2b2b31;color:#f2f2f2;font-size:13px;vertical-align:1px;white-space:nowrap}
+.plusMini{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--cream);vertical-align:-6px}
+
+/* A3 빈 방 지도 카드: 하단 탭 위, 오른쪽 지도 도구 열은 비워 둡니다 */
+.mapCard{position:absolute;z-index:11;left:max(16px,env(safe-area-inset-left));right:calc(16px + 56px + 12px);bottom:var(--map-bottom);max-width:420px;background:var(--cream) var(--weave);border:1px dashed var(--line);border-radius:20px;box-shadow:0 8px 24px #382f2526;padding:16px 14px 12px 16px;color:var(--ink);animation:es-in .2s ease-out}
+.mapCard h2{display:flex;align-items:center;gap:8px;margin:0;padding-right:36px;font-size:21px;font-weight:400;line-height:1.3;word-break:keep-all}
+.mapCard>p{margin:4px 0 0;font-size:15px;line-height:1.5;color:var(--ink-soft)}
+.roomDot{width:14px;height:14px;flex:none;border-radius:5px;background:var(--tone)}
+.close{position:absolute;right:4px;top:4px;width:44px;height:44px;border:0;background:none;color:var(--ink-soft);display:grid;place-items:center}
+.links{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.link{min-height:44px;border-radius:14px;border:1px dashed var(--line);background:#fffaf0;display:flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:15px;color:var(--forest);text-decoration:none}
+
+/* A4·A6 같은 틀 */
+.start{padding:6px 0 24px;color:var(--ink);-webkit-user-select:none;user-select:none}
+.head{text-align:center}
+.art{width:56px;height:56px;margin:0 auto;border-radius:18px;border:1.5px dashed var(--line);background:var(--cream) var(--weave);display:grid;place-items:center;color:var(--forest);box-shadow:var(--print-shadow);font-size:28px}
+.head h2{margin:14px 0 0;font-size:23px;font-weight:400;line-height:1.3;word-break:keep-all}
+.head p{margin:6px 0 0;font-size:15px;line-height:1.55;color:var(--ink-soft);word-break:keep-all}
+.label{margin:18px 0 0;font-size:15px;color:var(--ink-soft)}
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;padding:10px 0;border:0;border-top:1px dashed var(--line);background:none;color:var(--ink);font:inherit;text-align:left;text-decoration:none}
+.row:first-child{border-top:0}
+.row>svg:last-child{flex:none;color:var(--ink-soft)}
+.tile{width:52px;height:52px;flex:none;border-radius:16px;background:var(--cream) var(--weave);border:1.5px dashed var(--line);box-shadow:var(--print-shadow);display:grid;place-items:center;color:var(--forest);font-size:26px;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",inherit}
+.tile.first{border-color:var(--forest);box-shadow:none}
+.copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.copy strong{font-size:19px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.copy small{font-size:14px;line-height:1.4;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addCircle{width:44px;height:44px;flex:none;display:grid;place-items:center;color:var(--ink)}
+.addCircle i{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+
+@media (prefers-reduced-motion:reduce){.chip,.mapCard{animation:none}.spin{animation-duration:2s}.skDot,.skLines i{animation:none}}

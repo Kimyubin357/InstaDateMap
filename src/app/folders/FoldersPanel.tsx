@@ -8,7 +8,7 @@ import ActionDialog from "@/components/ActionDialog";
 import Avatar from "@/components/Avatar";
 import { useBoardSync } from "@/components/BoardProvider";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import { FOLDER_COLOR_LABEL, INVITE_DAYS, ROOM_LIMIT, ROOM_NAME_MAX, type FolderColor, type FolderDetail, type FolderMember, type FolderSummary, type FoldersResponse } from "@/lib/folders";
+import { FOLDER_COLOR_LABEL, INVITE_DAYS, isUuid, ROOM_LIMIT, ROOM_NAME_MAX, type FolderColor, type FolderDetail, type FolderMember, type FolderSummary, type FoldersResponse } from "@/lib/folders";
 import { ColorSwatches, FieldLabel, RoomBand, RoomCard } from "@/components/Palette";
 import styles from "./Folders.module.css";
 
@@ -69,6 +69,9 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   useEffect(() => { void load(); }, [load]);
   // 내 방 시트·리스트 [방] 칸의 "+ 새 방 만들기"는 /folders?new=1 로 바로 만들기 화면을 엽니다.
   useEffect(() => { if (new URLSearchParams(window.location.search).get("new") === "1") setCreating(true); }, []);
+  // 내 방 시트·방 머리띠·리스트 [방] 칸의 ⚙ 는 /folders?room=<id> 로 그 방 설정을 바로 엽니다. 뒤로 가면 왔던 화면으로 돌아갑니다.
+  const direct = useRef(false);
+  useEffect(() => { const id = new URLSearchParams(window.location.search).get("room"); if (id && isUuid(id)) { direct.current = true; setSelected(id); } }, []);
   const loadDetail = useCallback(async (id: string) => {
     setError("");
     try { const next = await call<FolderDetail>(`/api/folders/${id}`); setDetail(next); setEdit(next.folder.role === "owner" ? { name: next.folder.name, color: next.folder.color } : null); }
@@ -162,7 +165,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     const folder = detail?.folder ?? folders.find((f) => f.id === selected);
     const owner = detail?.folder.role === "owner";
     const others = detail ? detail.members.length - 1 : 0;
-    return <main className={`form-page settings-page ${styles.page}${owner ? ` ${styles.withBar}` : ""}`}>{header(folder?.name ?? "방", () => { setSelected(null); setError(""); setStatus(""); })}<ClientReady>
+    return <main className={`form-page settings-page ${styles.page}${owner ? ` ${styles.withBar}` : ""}`}>{header(folder?.name ?? "방", () => { if (direct.current) { direct.current = false; if (window.history.length > 1) router.back(); else router.replace("/"); return; } setSelected(null); setError(""); setStatus(""); })}<ClientReady>
       {feedback}
       {!detail ? !error && <p className="hint" role="status">방 정보를 불러오고 있어요…</p> : <div className={styles.detail}>
         <section className={styles.about} aria-label="방 이름과 색">

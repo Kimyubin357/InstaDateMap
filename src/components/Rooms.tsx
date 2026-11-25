@@ -17,16 +17,27 @@ export function RoomDot({ colors, shape = "dot", className = "" }: { colors: rea
   return <i className={`${shape === "dot" ? styles.dot : shape === "all" ? styles.allSquare : styles.square}${className ? ` ${className}` : ""}`} style={{ background: splitColors(colors) }} aria-hidden="true" />;
 }
 
-/** 필터 버튼 자리의 동그란 방 버튼(글자 없음, 가운데 색 동그라미). 지도와 리스트 맨 위 줄에 같은 모양으로 둡니다. */
-export function RoomScopeButton({ name, colors, open, onClick }: { name: string; colors: readonly (string | null | undefined)[]; open: boolean; onClick: () => void }) {
+/** 필터 버튼 자리의 동그란 방 바꾸기 버튼(네 칸 아이콘 = 방 카드 2열, 2026-11-25 사용자 결정). 지금 어느 방인지는 검색칸("[방 이름]에서 검색")과 방 머리띠가 보여 줍니다. */
+export function RoomScopeButton({ name, open, onClick }: { name: string; open: boolean; onClick: () => void }) {
   return <button type="button" className={`icon-btn bordered search-filter-btn room-scope-btn${open ? " is-open" : ""}`} aria-haspopup="dialog" aria-expanded={open} aria-label={`보는 방: ${name}. 방 바꾸기`} onClick={onClick}>
-    <RoomDot colors={colors} />
+    <Icon name="rooms" width={21} />
   </button>;
 }
 
 const roomMeta = (r: RoomSummary) => `장소 ${r.place_count}곳 · ${r.collection_count ? `모음 ${r.collection_count}개` : "모음 없음"}`;
 
-/** 방 색 카드 2열. withAll: 맨 앞 전체 카드(내 방 시트). 지금 보는 카드에 초록 테두리 + 체크. */
+/** 멤버 이름 첫 글자 동그라미(최대 3개) + "2명"/"나만" */
+export function MemberFaces({ names, count }: { names: readonly string[]; count: number }) {
+  return <span className={styles.who}><span className={styles.faces} aria-hidden="true">{names.slice(0, 3).map((n, i) => <i key={`${n}-${i}`}>{Array.from(n.trim())[0] ?? "?"}</i>)}</span>{membersLabel(count)}</span>;
+}
+
+/** 그 방 설정(이름·색·멤버·초대)으로 바로 가는 주소 */
+export const roomSettingsHref = (id: string) => `/folders?room=${encodeURIComponent(id)}`;
+
+/**
+ * 방 색 카드 2열. withAll: 맨 앞 전체 카드(내 방 시트). 지금 보는 카드에 초록 테두리 + 체크.
+ * 방 카드마다 오른쪽 위 ⚙ 로 그 방 설정을 바로 엽니다(방·모음 구분 A안, 2026-11-25). 카드와 ⚙ 는 서로 다른 버튼입니다(겹친 버튼 없음).
+ */
 export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick }: {
   rooms: readonly RoomSummary[]; selected?: "all" | string | null; withAll?: boolean; compact?: boolean; disabled?: boolean; onPick: (target: "all" | string) => void;
 }) {
@@ -36,12 +47,24 @@ export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick 
     {withAll && <button type="button" role="radio" aria-checked={selected === "all"} disabled={disabled} className={`${styles.card} ${styles.allCard}${selected === "all" ? ` ${styles.on}` : ""}`} onClick={() => onPick("all")}>
       <RoomDot colors={rooms.map((r) => r.color)} shape="all" /><strong>전체</strong><small>방 {rooms.length}개 · 장소 {total}곳</small>{selected === "all" && check}
     </button>}
-    {rooms.map((r) => <button type="button" key={r.id} role={withAll ? "radio" : undefined} aria-checked={withAll ? selected === r.id : undefined} disabled={disabled}
-      aria-label={`${r.name}, ${roomMeta(r)}, ${membersLabel(r.member_count)}${withAll ? "" : ". 이 방으로 들어가기"}`}
-      className={`${styles.card}${selected === r.id ? ` ${styles.on}` : ""}`} style={toneStyle(r.color)} onClick={() => onPick(r.id)}>
-      <strong>{r.name}</strong><small>{roomMeta(r)}</small><span className={styles.who}><Icon name="user" width={15} />{membersLabel(r.member_count)}</span>{selected === r.id && check}
-    </button>)}
+    {rooms.map((r) => <div key={r.id} className={styles.cell}>
+      <button type="button" role={withAll ? "radio" : undefined} aria-checked={withAll ? selected === r.id : undefined} disabled={disabled}
+        aria-label={`${r.name}, ${roomMeta(r)}, ${membersLabel(r.member_count)}${withAll ? "" : ". 이 방으로 들어가기"}`}
+        className={`${styles.card} ${styles.roomCard}${selected === r.id ? ` ${styles.on}` : ""}`} style={toneStyle(r.color)} onClick={() => onPick(r.id)}>
+        <strong>{r.name}</strong><small>{roomMeta(r)}</small><MemberFaces names={r.member_names} count={r.member_count} />{selected === r.id && check}
+      </button>
+      <ShellLink href={roomSettingsHref(r.id)} className={styles.gear} aria-label={`${r.name} 방 설정`} aria-disabled={disabled} onClick={(e) => { if (disabled) e.preventDefault(); }}><i><Icon name="settings" width={17} /></i></ShellLink>
+    </div>)}
     <ShellLink href={NEW_ROOM_HREF} className={`${styles.card} ${styles.addCard}`} aria-disabled={disabled}><Icon name="plus" width={26} />새 방 만들기</ShellLink>
+  </div>;
+}
+
+/** 방 안 리스트 맨 위 방 머리띠: 지금 어느 방인지(방 색 · 이름 · 멤버 · 장소 수) + ⚙ 방 설정(방·모음 구분 A안) */
+export function RoomHeader({ room, fallbackName }: { room?: RoomSummary; fallbackName: string }) {
+  const name = room?.name ?? fallbackName;
+  return <div className={styles.band} style={toneStyle(room?.color)}>
+    <span className={styles.bandCopy}><strong>{name}</strong>{room && <small>방 · {membersLabel(room.member_count)} · 장소 {room.place_count}곳</small>}</span>
+    {room && <ShellLink href={roomSettingsHref(room.id)} className={styles.gear} aria-label={`${name} 방 설정`}><i><Icon name="settings" width={18} /></i></ShellLink>}
   </div>;
 }
 

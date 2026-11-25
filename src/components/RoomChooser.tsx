@@ -73,7 +73,7 @@ export default function RoomChooser({ disabled = false, onRoom }: { disabled?: b
       </div>}
       {busy && <p className={styles.status} role="status">방을 바꾸는 중…</p>}
       {error && <div role="alert"><p className="error">{error}</p>{!data && <button className="text-btn" onClick={() => void load()}>다시 불러오기</button>}</div>}
-      <p className={styles.note}>잘못 담아도 괜찮아요. 장소 상세의 ‘다른 방에 담기’로 옮겨 담을 수 있어요.</p>
+      <p className={styles.note}>잘못 담아도 괜찮아요. 장소 상세의 ‘다른 방으로 옮기기’로 옮길 수 있어요.</p>
     </Modal>}
   </>;
 }

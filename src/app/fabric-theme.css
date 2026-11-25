@@ -72,7 +72,8 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 }
 .unified-search-header form:focus-within{box-shadow:0 0 0 3px #244b371a,var(--print-shadow)}
 .unified-search-header input{font-size:19px}
-.unified-search-header input::placeholder{color:var(--ink-soft)}
+.unified-search-header input{text-overflow:ellipsis}
+.unified-search-header input::placeholder{color:var(--ink-soft);text-overflow:ellipsis}
 .unified-search-header form .icon-btn{color:var(--ink-soft)}
 .floating-settings.icon-btn{background:var(--forest) var(--grain);color:var(--cream);box-shadow:var(--print-shadow);outline:1px dashed #fbf6e873;outline-offset:-4px}
 .search-filter-btn.bordered,.map-controls .saved-places-btn,.map-controls .locate-btn{
@@ -370,9 +371,10 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .region-sheet-head{align-items:center;padding:4px 6px 4px 18px}
 /* 알림 '다시 확인'은 섹션 사이에 떠 있지 않게, 바로 위 줄의 설명 글 아래(아이콘 옆 글자 시작선)에 붙입니다. */
 .push-settings .settings-recheck,.settings-page .push-settings .settings-recheck{margin:-8px 0 6px 38px;min-height:44px;font-size:15px}
-/* 장소 상세: '모음에 담기'·'다른 방에 담기'는 꽉 찬 버튼을 세로로 쌓지 않고 한 줄 두 칸으로(2026-11-25 점검). */
+/* 장소 상세: '모음에 담기'·'다른 방으로 옮기기'는 꽉 찬 버튼을 세로로 쌓지 않고 한 줄 두 칸으로(2026-11-25 점검). */
 .place-organize-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .place-organize-row>.btn{min-height:50px;width:100%;padding:10px 8px;gap:6px;font-size:17px;white-space:nowrap}
+.place-organize-row>.btn:only-child{grid-column:1/-1}
 /* 방 고르기 · 전체 보기(2026-11-25, 시안 design-lab/rooms-view). 방 색은 --palette-* 토큰을 씁니다. */
 /* 방 버튼: 예전 필터 버튼과 같은 동그란 크림 버튼, 글자 없이 가운데 색 동그라미 */
 .room-scope-btn.icon-btn{display:grid;place-items:center}

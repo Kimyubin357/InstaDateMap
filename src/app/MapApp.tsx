@@ -21,7 +21,8 @@ import PlaceCarousel from "@/components/PlaceCarousel";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import useScopePlaces from "@/components/useScopePlaces";
 import AllPlacesList from "@/components/AllPlacesList";
-import { NewPlacesSheet, PlaceRoomsLine, RoomScopeButton, RoomsSheet, type NewRoomEntry } from "@/components/Rooms";
+import { NewPlacesSheet, PlaceRoomsLine, RoomScopeButton, RoomsSheet, roomSettingsHref, type NewRoomEntry } from "@/components/Rooms";
+import { EmptyMapCard, LoadingChip, SkeletonRows, useDelayed } from "@/components/EmptyStates";
 import type { MapRoomLook } from "@/components/MapCanvas";
 import { newPlacesByRoom, type MapPlace, type RoomSummary } from "@/lib/rooms";
 import { friendlyMessage } from "@/lib/client-request";
@@ -280,20 +281,25 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   // Closing hides one occurrence; the same situation arising again (or with another filter) shows it again.
   const statusSignature = statusKind ? `${statusKind}:${statusKind === "filtered" ? `${statuses.join(",")}|${category}|${collectionId ?? ""}` : statusKind === "error" ? error : ""}` : "";
   useEffect(() => { setDismissedStatus(null); }, [statusSignature]);
-  const status: MapStatusContent | null = !statusKind || dismissedStatus === statusSignature ? null
-    : statusKind === "loading" ? { tone: "info", icon: "heart", title: "장소를 불러오는 중…", closable: false }
+  // 로딩·빈 방은 덮개 모달 대신 작은 칩·안내 카드(시안 design-lab/empty-loading A1·A3). 오류·필터 결과 없음만 가운데 창.
+  const quietKind = statusKind === "loading" || statusKind === "map-loading" || statusKind === "empty";
+  const loadingChip = useDelayed(statusKind === "loading" || statusKind === "map-loading");
+  const listSkeleton = useDelayed(active && view === "list" && !loaded && !error, 1000);
+  const status: MapStatusContent | null = !statusKind || quietKind || dismissedStatus === statusSignature ? null
     : statusKind === "error" ? { tone: "error", icon: "close", title: "장소를 불러오지 못했어요", message: "인터넷 연결을 확인한 뒤 다시 시도해 주세요.", closable: true,
       actions: <button type="button" className="btn primary" onClick={refresh}>다시 시도</button> }
-    : statusKind === "map-loading" ? { tone: "info", icon: "pin", title: "지도를 다시 불러오는 중…", closable: false }
     : statusKind === "map-error" ? { tone: "error", icon: "close", title: "지도를 불러오지 못했어요", message: "잠시 후 다시 시도하거나, 저장한 장소를 리스트로 볼 수 있어요.", closable: true,
       actions: <>{mapRecovery?.retry && <button type="button" className="btn primary" onClick={mapRecovery.retry}>다시 시도</button>}<button type="button" className="btn" onClick={() => navigateShell(viewHref("list"))}>리스트로 보기</button></> }
-    : statusKind === "empty" ? { tone: "info", icon: "heart", title: "첫 장소를 담아 봐요", message: "인스타에서 발견한 곳도, 이미 아는 곳도 좋아요.", closable: true,
-      actions: <ShellLink href="/add" className="btn primary">장소 추가</ShellLink> }
-    : { tone: "info", icon: "heart", title: "아직 맞는 장소가 없어요", message: "필터를 조금 바꿔볼까요?", closable: true,
+    : { tone: "info", icon: "search", title: "아직 맞는 장소가 없어요", message: "필터를 조금 바꿔볼까요?", closable: true,
       actions: <button type="button" className="btn primary" onClick={reset}>필터 초기화</button> };
   const regionView = regionSelection && regionPlaces.length > 0 && view === "map" && <RegionPlacesList label={regionSelection.label} places={regionPlaces} newPlaceIds={newPlaceIds}
     onClose={() => setRegionSelection(null)} onPick={(id, order) => { setRegionSelection(null); previewPlace(id, order); }} />;
   const statusView = status && <MapStatus status={status} landscape={landscape} onClose={() => setDismissedStatus(statusSignature)} />;
+  const loadingView = loadingChip && <LoadingChip label={statusKind === "map-loading" ? "지도를 다시 불러오는 중" : isAll ? "모든 방 장소 불러오는 중" : `${currentRoom?.name ?? board} 장소 불러오는 중`} />;
+  const emptyView = statusKind === "empty" && dismissedStatus !== statusSignature && (isAll
+    ? <EmptyMapCard title="아직 담은 장소가 없어요" onClose={() => setDismissedStatus(statusSignature)} />
+    : <EmptyMapCard title={`${currentRoom?.name ?? board} 방이 비어 있어요`} color={currentRoom?.color} inviteHref={currentRoom ? roomSettingsHref(currentRoom.id) : undefined}
+      onRooms={(roomsState.rooms?.length ?? 0) > 1 ? () => open("rooms") : undefined} onClose={() => setDismissedStatus(statusSignature)} />);
   const showPlaceCard = view === "map" && !!focused && !(overlay === "place" && selected);
   const justPlaces = useMemo(() => justSaved ? justSaved.ids.map((id) => flat.find((p) => p.id === id)).filter((p): p is (typeof flat)[number] => !!p) : [], [justSaved, flat]);
   const showJustSaved = active && view === "map" && !overlay && !regionSelection && justPlaces.length > 0;
@@ -321,7 +327,6 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     roomsOf: (place) => (place as MapPlace).room_ids ?? [(place as MapPlace).board_id || openRoom || ""],
   } : undefined, [roomsState.rooms, isAll, roomOrder, roomById, openRoom]);
   const scopeName = isAll ? "전체" : currentRoom?.name ?? board;
-  const scopeColors = isAll ? (roomsState.rooms ?? []).map((r) => r.color) : [currentRoom?.color];
   // 새 장소 시트: 새 장소가 있는 방(방 안에서는 이 방 하나)
   const roomFor = (id: string): RoomSummary => roomById.get(id) ?? { id, name: id === openRoom ? board : "방", color: "red", role: "member", member_name: who, member_count: 1, member_limit: 8, place_count: flat.filter((p) => p.board_id === id).length, collection_count: 0, member_ids: [], member_names: [] };
   const newEntries: NewRoomEntry[] = useMemo(() => newPlacesByRoom(flat, newFlatIds, isAll ? roomsState.rooms ?? [] : openRoom ? [{ id: openRoom }] : [])
@@ -360,7 +365,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     tour.finish();
     if (reason === "add") navigateShell("/add");
   }
-  const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} colors={scopeColors} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
+  const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
   const kindTool = <div className="list-tools"><button className={`list-filter kind-chip${category || !all ? " is-active" : ""}`} aria-label={category ? `종류: ${category}. 종류 바꾸기` : "종류로 거르기"} aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>{category || "종류"}</span><Icon name="chevron" width="14" className="list-filter-chevron" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>;
   return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
     <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={(selectedId && repId(selectedId)) || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => previewPlace(id, null)} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} look={look} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
@@ -370,9 +375,11 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {view === "map" && newCount > 0 && <button type="button" className={`new-places-chip${overlay === "new" ? " is-open" : ""}`} aria-haspopup="dialog" aria-expanded={overlay === "new"} aria-label={`새 장소 ${newCount}곳 보기`} onClick={() => open("new")}><span className="new-place-badge" aria-hidden="true">NEW</span><span>새 장소 {newCount}</span></button>}
     {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><CollectionCover color={collection.color} icon={collection.icon} size={28} /><span>{collection.name} · {mapVisible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
+    {loadingView}
     {landscape && statusView}
     {landscape && regionView}
     </div>
+    {emptyView}
     {!landscape && regionView}
     {!landscape && statusView}
     {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
@@ -381,12 +388,13 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
       : <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode === "collections" ? "collections" : "all"} loaded={loaded} distanceOrigin={sort === "near" ? origin : null} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
         onMap={(id) => { setFocusedId(null); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}
         tools={kindTool} />}
+      {/* 리스트 로딩: 1초가 넘을 때만 뼈대 줄(시안 A2). 짧은 로딩은 아무것도 안 띄웁니다. */}
+      {!loaded && !error && listSkeleton && <SkeletonRows />}
     </div>}
-    {view === "list" && !loaded && !error && <div className="loading-state" role="status">장소를 불러오는 중…</div>}
     {view === "list" && error && !loaded && <div className="app-error" role="alert"><p>{error}</p><button className="btn" onClick={refresh}>다시 불러오기</button></div>}
     {showJustSaved && <JustSavedSheet room={board} places={justPlaces} url={justSaved?.url ?? null} onOpen={(id) => open("place", id)} onClose={() => setJustSaved(null)} />}
     {view === "map" && focused && <PlaceCarousel hidden={!showPlaceCard} newPlaceIds={newPlaceIds} places={deckPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
-    <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!mapVisible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved", closer: true }); }}><Icon name="map" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
+    <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!mapVisible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved", closer: true }); }}><Icon name="fit" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
     <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} view={view} onClose={close} onShowMap={() => showPlaceOnMap(selected)}
       room={selectedRoom ? { id: selectedRoom.id, who: selectedRoom.member_name, memberNames: selectedRoom.member_names, memberIds: selectedRoom.member_ids } : undefined}
