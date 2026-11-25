@@ -14,8 +14,23 @@ export type RowState = "ready" | "choose" | "missing" | "excluded";
 export interface RowInput { id: string; name: string; candidates: KakaoPlace[]; excluded?: boolean }
 export interface RowChoice { excluded: boolean; pickedId: string | null; extra: KakaoPlace[]; queries: Record<string, string> }
 
+/** 띄어쓰기·기호·대소문자를 빼고 비교합니다("고로고로 성수" = "고로고로성수"). */
+const nameKey = (s: string) => s.normalize("NFC").toLowerCase().replace(/[\s·.,'"()\[\]_-]/g, "");
+
+/**
+ * 처음 고를 지점: 후보가 하나면 그곳, 여러 곳이면 캡션에서 읽은 이름과 이름이 똑같은 후보가 딱 하나일 때 그곳.
+ * 예) 캡션 "고로고로 성수" → 후보 '고로고로 성수'·'고로고로'(의류)·'고로고로 용산' 중 '고로고로 성수'를 바로 고름.
+ * 업종으로는 거르지 않습니다(식당만 담는 게 아니라서, 2026-11-25 사용자 결정).
+ */
+export function autoPick(row: RowInput): string | null {
+  if (row.candidates.length === 1) return row.candidates[0].kakao_place_id;
+  const key = nameKey(row.name);
+  const same = key ? row.candidates.filter((p) => nameKey(p.name) === key) : [];
+  return same.length === 1 ? same[0].kakao_place_id : null;
+}
+
 export function initialChoice(row: RowInput): RowChoice {
-  return { excluded: !!row.excluded, pickedId: row.candidates.length === 1 ? row.candidates[0].kakao_place_id : null, extra: [], queries: {} };
+  return { excluded: !!row.excluded, pickedId: autoPick(row), extra: [], queries: {} };
 }
 
 /** 저장된 후보 + 이름으로 찾아 고른 곳(같은 카카오 장소는 한 번만) */

@@ -97,18 +97,6 @@ export default function AddForm({ initialUrl, initialRetry = false }: { initialU
   }
   useEffect(() => { if (initialUrl && !started.current) { started.current = true; void submit(initialUrl, initialRetry); } }, []);
 
-  async function paste() {
-    setHint("");
-    try {
-      if (!navigator.clipboard?.readText) throw new Error("clipboard unavailable");
-      const link = instagramLinkIn(await navigator.clipboard.readText());
-      if (!link) { setHint("복사한 인스타 링크가 없어요. 인스타에서 ‘링크 복사’를 누른 뒤 다시 눌러 주세요."); return; }
-      setText(link); void submit(link);
-    } catch {
-      input.current?.focus();
-      setHint("여기서는 바로 붙여넣을 수 없어요. 입력칸을 길게 눌러 붙여넣어 주세요.");
-    }
-  }
   function another() { setResult(null); setText(""); setHint(""); requestAnimationFrame(() => input.current?.focus()); }
 
   const source = sent && instagramLinkIn(sent) ? <div className={styles.source}>
@@ -159,7 +147,6 @@ export default function AddForm({ initialUrl, initialRetry = false }: { initialU
       <div className={styles.linkField}>
         <Icon name="link" width={18} />
         <input ref={input} id="instagram-link" inputMode="url" autoCapitalize="none" autoCorrect="off" autoComplete="off" enterKeyHint="go" value={text} onChange={(e) => { setText(e.target.value); setHint(""); }} placeholder="복사한 링크를 넣어 주세요" disabled={busy} />
-        <button type="button" className={styles.paste} disabled={busy} onClick={() => void paste()}><Icon name="copy" width={17} />붙여넣기</button>
       </div>
       {hint && <p className={styles.fieldHint} role="status">{hint}</p>}
       <button className={`btn primary ${styles.block}`} disabled={busy || !text.trim()}>장소 찾기</button>
