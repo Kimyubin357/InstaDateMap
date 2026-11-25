@@ -25,10 +25,17 @@ import FolderTransferDialog from "./FolderTransferDialog";
 import { canDeletePlace } from "@/lib/place-view";
 import SelectedPlacesBar from "./SelectedPlacesBar";
 import EmojiPicker from "./EmojiPicker";
-import { CollectionCover, Emoji, FieldLabel, RoomBand } from "./Palette";
+import { CollectionCover, FieldLabel, RoomBand } from "./Palette";
 import styles from "./CollectionsList.module.css";
 
 const EMPTY: CollectionView[] = [];
+/** 새 모음 표지: 자주 쓰는 이모지 중 무작위. 같은 방 모음이 이미 쓰는 이모지는 피합니다(다 쓰였으면 아무거나). */
+function randomCover(collections: readonly CollectionView[]) {
+  const used = new Set(collections.map((c) => collectionEmoji(c.icon)));
+  const free = FREQUENT_EMOJI.filter((e) => !used.has(e));
+  const pool = free.length ? free : FREQUENT_EMOJI;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 /** 모음 0개일 때 예시(누르면 이 이름·이모지로 만들기) */
 const EXAMPLE_COLLECTIONS = [{ name: "성수 카페 투어", icon: "🍰" }, { name: "비 오는 날", icon: "☔" }];
 type Editor = { id: string; version?: number; name: string; description: string; color: CollectionView["color"]; icon: CollectionView["icon"] };
@@ -102,7 +109,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
   function resetWrite() { pendingWrite.current = null; setWrite(new VerifiedWrite()); setError(""); setConflict(false); }
   function beginEditor(c?: CollectionView, fromPicker = false, preset?: { name: string; icon: string }) {
     resetWrite(); returnToPicker.current = fromPicker;
-    const value: Editor = c ? { id: c.id, version: c.version, name: c.name, description: c.description, color: c.color, icon: c.icon } : { id: crypto.randomUUID(), name: preset?.name ?? "", description: "", color: "red", icon: preset?.icon ?? "💞" };
+    const value: Editor = c ? { id: c.id, version: c.version, name: c.name, description: c.description, color: c.color, icon: c.icon } : { id: crypto.randomUUID(), name: preset?.name ?? "", description: "", color: "red", icon: preset?.icon ?? randomCover(collections) };
     setEditor(value); initialEditor.current = JSON.stringify(value); setDialog("editor");
   }
   function dismiss() {
@@ -253,9 +260,9 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     {showCollections ? <>
       {collections.length > 4 && <label className={styles.search}><Icon name="search" width={18} /><input aria-label="모음 이름 검색" placeholder="모음 이름으로 찾기" value={query} maxLength={40} onChange={(e) => setQuery(e.target.value)} /></label>}
       {/* 모음 = 색 없는 이모지 타일 줄 목록(방은 색 카드). 장소 이름 몇 개를 미리 보여 줍니다. */}
-      <div className={styles.mlist}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.mrow} key={c.id} onClick={() => onNavigate("collections", c.id)}>
+      {collections.length > 0 && <div className={styles.mlist}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.mrow} key={c.id} onClick={() => onNavigate("collections", c.id)}>
         <CollectionCover icon={c.icon} size={52} /><span className={styles.mcopy}><strong>{c.name}</strong><small>{c.place_ids.length}곳{c.place_ids.length ? ` · ${c.place_ids.map((id) => nameOf.get(id)).filter(Boolean).slice(0, 3).join(" · ")}` : ""}</small></span><Icon name="chevron" width={18} />
-      </button>)}{loaded && collections.length > 0 && <button className={`${styles.mrow} ${styles.mrowAdd}`} onClick={() => beginEditor()}><span className={styles.addTile}><Icon name="plus" width={22} /></span><span className={styles.mcopy}><strong>새 모음</strong><small>이 방 안에 만들어요</small></span></button>}</div>
+      </button>)}{loaded && collections.length > 0 && <button className={`${styles.mrow} ${styles.mrowAdd}`} onClick={() => beginEditor()}><span className={styles.addTile}><Icon name="plus" width={22} /></span><span className={styles.mcopy}><strong>새 모음</strong><small>이 방 안에 만들어요</small></span></button>}</div>}
       {/* 모음 0개(시안 A6): 빈 방 리스트와 같은 틀. 예시 줄은 그 이름·이모지로 만들기를 바로 엽니다. */}
       {loaded && !collections.length && <EmptyStart icon={<Icon name="collection" width={26} />} title="장소를 골라 묶어 봐요" note="‘성수 데이트’처럼 이름을 붙여 이 방 장소를 모아 둬요." rows={[
         { icon: <Icon name="plus" width={22} />, title: "새 모음 만들기", note: "이름과 이모지만 정하면 돼요", onClick: () => beginEditor() },
@@ -315,10 +322,6 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         <FieldLabel htmlFor="collection-name" aside={<small>{editor.name.length}/40</small>}>모음 이름</FieldLabel>
         <input id="collection-name" className={styles.nameField} autoFocus={!editor.version} disabled={frozen} value={editor.name} maxLength={40} placeholder="예: 성수 카페 투어" enterKeyHint="done" onChange={(e) => setEditor({ ...editor, name: e.target.value })} />
         {duplicate && <p className={styles.dupNote} role="status">{duplicate}</p>}
-        <FieldLabel>자주 쓰는 이모지</FieldLabel>
-        <div className={styles.frequent} role="group" aria-label="자주 쓰는 이모지">
-          {FREQUENT_EMOJI.map((emoji) => <button key={emoji} type="button" disabled={frozen} aria-pressed={collectionEmoji(editor.icon) === emoji} aria-label={`${emoji} 표지로 쓰기`} onClick={() => setEditor({ ...editor, icon: emoji })}><Emoji value={emoji} /></button>)}
-        </div>
         <FieldLabel htmlFor="collection-description" aside={<small>선택</small>}>한 줄 소개</FieldLabel>
         <textarea id="collection-description" className={styles.nameField} disabled={frozen} value={editor.description} maxLength={120} rows={2} placeholder="어떤 날 함께 가고 싶나요?" onChange={(e) => setEditor({ ...editor, description: e.target.value })} />
         {dialogError}

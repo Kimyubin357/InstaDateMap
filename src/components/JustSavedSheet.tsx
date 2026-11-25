@@ -28,7 +28,7 @@ export default function JustSavedSheet({ room, places, url, onOpen, onClose }: {
   return <section ref={ref} className={`${styles.justSheet} just-saved-sheet`} aria-labelledby="just-saved-title">
     <header className={styles.justHead}>
       <div><h2 id="just-saved-title">방금 담은 {places.length}곳</h2><p>{room} · 방금 · 인스타 게시물</p></div>
-      <button type="button" className={styles.close} aria-label="방금 담은 장소 닫기" onClick={onClose}><span><Icon name="close" width={18} /></span></button>
+      <button type="button" className="close-x" aria-label="방금 담은 장소 닫기" onClick={onClose}><Icon name="close" width={18} /></button>
     </header>
     <div className={styles.justBody}>
       {places.map((place) => <button key={place.id} type="button" className={styles.justRow} onClick={() => onOpen(place.id)}>

@@ -48,7 +48,7 @@ export function EmptyMapCard({ title, color, inviteHref, onRooms, onClose }: {
   title: string; color?: string | null; inviteHref?: string; onRooms?: () => void; onClose: () => void;
 }) {
   return <section className={styles.mapCard} aria-labelledby="empty-map-title" style={color ? toneStyle(color) : undefined}>
-    <button type="button" className={styles.close} aria-label="안내 닫기" onClick={onClose}><Icon name="close" width={18} /></button>
+    <button type="button" className={`close-x ${styles.close}`} aria-label="안내 닫기" onClick={onClose}><Icon name="close" width={18} /></button>
     <h2 id="empty-map-title">{color && <i className={styles.roomDot} aria-hidden="true" />}{title}</h2>
     <p>인스타에서 본 곳을 링크로 담아요.</p>
     <AddSteps />
