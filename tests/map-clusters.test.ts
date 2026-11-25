@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { regionCards, regionTier, shortRegionName, stackCards, zoomInLevel, type ScreenPoint } from "@/lib/map-clusters";
+import { overlapClusters, regionCards, regionTier, shortRegionName, stackCards, zoomInLevel, type ScreenPoint } from "@/lib/map-clusters";
 import type { MapRegion } from "@/lib/map-regions";
 import type { PlaceStatus } from "@/lib/types";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
@@ -17,12 +17,12 @@ const cards = (places: P[], level: number, extra: { isNew?: (p: P) => boolean; a
 const labels = (list: { label: string | null }[]) => list.map((c) => c.label).sort();
 
 describe("지역 집계 카드", () => {
-  it("확대 단계에 따라 도(13~14) → 시(10~12) → 구(7~9) → 동(4~6) 단위로 나눔", () => {
-    expect([14, 13, 12, 10, 9, 7, 6, 4].map(regionTier)).toEqual(["province", "province", "city", "city", "district", "district", "local", "local"]);
+  it("확대 단계에 따라 도(13~14) → 시(10~12) → 구(8~9) 카드, 1km(7) 이하는 핀", () => {
+    expect([14, 13, 12, 10, 9, 8, 7, 4].map(regionTier)).toEqual(["province", "province", "city", "city", "district", "district", "local", "local"]);
     const places = [place("a", seongsu), place("b", oksu), place("c", mapo), place("d", gwacheon), place("e", suwon)];
     expect(labels(cards(places, 13))).toEqual(["경기", "서울"]);
     expect(labels(cards(places, 10))).toEqual(["과천시", "서울", "수원시"]);
-    expect(labels(cards(places, 7))).toEqual(["과천시", "마포구", "성동구", "장안구"]);
+    expect(labels(cards(places, 8))).toEqual(["과천시", "마포구", "성동구", "장안구"]);
     expect(labels(cards(places, 6))).toEqual(["성수1가1동", "연남동", "옥수동", "정자1동", "중앙동"]);
   });
   it("같은 지역이면 화면에서 떨어져 있어도 카드 한 장으로 묶음", () => {
@@ -94,15 +94,31 @@ describe("카드를 누를 때 확대 목표", () => {
   it("적어도 다음 단계(도→시 12, 시→구 9, 구→동 6)까지 확대함", () => {
     expect(target([place("a", gwacheon), place("b", suwon)], 13)).toBe(12);
     expect(target([place("a", suwon), place("b", { ...suwon, district: "경기도 수원시 팔달구", local: "경기도 수원시 팔달구 행궁동" })], 10)).toBe(9);
-    expect(target([place("a", seongsu), place("b", oksu)], 8)).toBe(6);
+    expect(target([place("a", seongsu), place("b", oksu)], 8)).toBe(7);
   });
   it("이름만 같은 단계는 건너뜀: 서울 도→구, 세종 도→동, 과천시 시→동", () => {
     expect(target([place("a", seongsu), place("b", mapo)], 13)).toBe(9);
-    expect(target([place("a", sejong), place("b", sejong)], 13)).toBe(6);
-    expect(target([place("a", gwacheon), place("b", gwacheon)], 10)).toBe(6);
+    expect(target([place("a", sejong), place("b", sejong)], 13)).toBe(7);
+    expect(target([place("a", gwacheon), place("b", gwacheon)], 10)).toBe(7);
   });
   it("지역을 모르는 장소가 섞이면 건너뛰지 않음", () => {
     const [card] = cards([place("a", seongsu), place("b", { ...seongsu, city: null })], 13);
     expect(zoomInLevel(card, (p) => p.region)).toBe(12);
+  });
+});
+
+describe("겹칠 때만 묶는 핀", () => {
+  const at = (id: string, x: number, y: number) => ({ id, x, y });
+  const project = (p: { x: number; y: number }) => p;
+  it("떨어져 있으면 따로, 원 지름보다 가까우면 숫자 원 하나", () => {
+    const list = overlapClusters([at("a", 0, 0), at("b", 100, 0), at("c", 110, 10)], project);
+    expect(list.map((c) => c.places.map((p) => p.id).join(""))).toEqual(["a", "bc"]);
+    expect(list[1].x).toBe(105);
+  });
+  it("묶음끼리 다시 겹치면 합치고, 같은 입력이면 같은 결과", () => {
+    const places = [at("d", 20, 0), at("a", 0, 0), at("b", 31, 0), at("c", 45, 0)];
+    const list = overlapClusters(places, project);
+    expect(list).toHaveLength(1); expect(list[0].places).toHaveLength(4);
+    expect(overlapClusters([...places].reverse(), project)).toEqual(list);
   });
 });

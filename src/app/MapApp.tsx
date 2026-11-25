@@ -13,6 +13,7 @@ import { CollectionCover } from "@/components/Palette";
 import Modal from "@/components/Modal";
 import MapCanvas, { type MapInsets, type MapPosition, type MapRecovery, type MapViewRequest, type RegionSelection } from "@/components/MapCanvas";
 import RegionPlacesList from "@/components/RegionPlacesList";
+import CollectionMapSheet, { type SheetHeight } from "@/components/CollectionMapSheet";
 import MapStatus, { useLandscape, type MapStatusContent } from "@/components/MapStatus";
 import PlaceSheet from "@/components/PlaceSheet";
 import BottomNav from "@/components/BottomNav";
@@ -90,6 +91,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
   // 리스트 거리: 위치 권한을 이미 허락했으면 조용히 받은 현재 위치(새로 묻지 않음)
+  const [collectionSheet, setCollectionSheet] = useState<SheetHeight>("mid");
   const quietOrigin = useQuietLocation(); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
@@ -264,7 +266,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     const box = root.current?.getBoundingClientRect(); if (!box) return null;
     const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
     const stackTop = [...(root.current?.querySelectorAll(".map-chip-stack>:not(.region-sheet):not(.map-status-card)") ?? [])].reduce((bottom, el) => Math.max(bottom, el.getBoundingClientRect().bottom), rect(".unified-search-header")?.bottom ?? box.top + 80);
-    const sheet = root.current?.querySelector<HTMLElement>(".region-sheet, .just-saved-sheet")?.getBoundingClientRect();
+    const sheet = root.current?.querySelector<HTMLElement>(".region-sheet, .just-saved-sheet, .collection-map-sheet")?.getBoundingClientRect();
     const nav = rect(".bottom-nav");
     const inset = { top: stackTop - box.top + 24, right: 72, bottom: box.bottom - (nav?.top ?? box.bottom) + 24, left: 40 };
     if (sheet && landscape) inset.left = sheet.right - box.left + 24;
@@ -375,26 +377,34 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const faceOf = (name: string) => faces.get(name);
   const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
   const kindTool = <div className="list-tools"><button className={`list-filter kind-chip${category || !all ? " is-active" : ""}`} aria-label={category ? `종류: ${category}. 종류 바꾸기` : "종류로 거르기"} aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>{category || "종류"}</span><Icon name="chevron" width="14" className="list-filter-chevron" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>;
-  return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
-    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={(selectedId && repId(selectedId)) || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => previewPlace(id, null)} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} look={look} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
+  return <div ref={root} className={`app-root view-${view}${view === "map" && collection && !showPlaceCard ? ` has-collection-sheet collection-sheet-${collectionSheet}` : ""}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
+    <div className={`map-surface ${view === "list" ? "hidden-map" : ""}${mapRecovery && !mapRecovery.loading ? " is-map-failed" : ""}`} aria-hidden={view !== "map"}>{restored && <MapCanvas pinsUntil={collection ? 11 : undefined} newPlaceIds={newPlaceIds} places={mapPlaces} selectedId={(selectedId && repId(selectedId)) || focusedId} apiKey={kakaoKey} active={active && view === "map"} initialPosition={initialMap} onPosition={(p) => { mapPosition.current = p; }} onPick={(id) => previewPlace(id, null)} onBlank={() => { if (!overlay) setFocusedId(null); }} location={mapLocation} viewRequest={mapRequest} focusPadding={focusPadding} onShowList={() => navigateShell(viewHref("list"))} onRecovery={setMapRecovery} allPlaces={places} fitPadding={fitPadding} look={look} onRegionOpen={(selection) => { setFocusedId(null); setJustSaved(null); setRegionSelection(selection); }} />}</div>
     <h1 className="sr-only">{isAll ? "모든 방" : board}</h1>
     {active && roomButton}
     <div className="map-chip-stack">
     {pending.length > 0 && <button className="pending-map-badge" onClick={() => open("pending")} aria-label={`마저 확인할 링크 ${pending.length}개`}><Icon name="link" width="16" /><span>확인 대기 {pending.length}</span></button>}
     {view === "map" && newCount > 0 && <button type="button" className={`new-places-chip${overlay === "new" ? " is-open" : ""}`} aria-haspopup="dialog" aria-expanded={overlay === "new"} aria-label={`새 장소 ${newCount}곳 보기`} onClick={() => open("new")}><span className="new-place-badge" aria-hidden="true">NEW</span><span>새 장소 {newCount}</span></button>}
-    {view === "map" && collection && <div className="collection-map-scope"><button onClick={() => navigateCollections("collections", collection.id)}><CollectionCover color={collection.color} icon={collection.icon} size={28} /><span>{collection.name} · {mapVisible.length}곳</span></button><button aria-label="모음 지도 필터 해제" onClick={() => { const q = new URLSearchParams(window.location.search); q.delete("collection"); q.delete("section"); navigateShell(`/?${q}`, true); }}><Icon name="close" width={18} /></button></div>}
     {loadingView}
     {landscape && statusView}
     {landscape && regionView}
     </div>
     {emptyView}
+    {/* 모음 "지도에서 보기": 지도 위 모음 시트(시안 design-lab/map-pins 4번). 장소를 고르면 장소 카드가 대신 보입니다. */}
+    {view === "map" && collection && !showPlaceCard && <CollectionMapSheet name={collection.name} icon={collection.icon} roomName={currentRoom?.name ?? board} roomColor={currentRoom?.color}
+      places={mapVisible} origin={origin ?? quietOrigin} faceOf={faceOf} newPlaceIds={newPlaceIds} height={collectionSheet} onHeight={setCollectionSheet}
+      onOpen={(id) => previewPlace(id, mapVisible.map((p) => p.id))} onClose={() => navigateCollections("collections", collection.id)} />}
     {!landscape && regionView}
     {!landscape && statusView}
     {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
       {isAll ? <AllPlacesList mode={listMode === "rooms" ? "rooms" : "all"} places={visible} total={places.length} rooms={roomsState.rooms} roomsError={roomsState.roomsError} loaded={loaded} tools={kindTool} newPlaceIds={newPlaceIds} distanceOrigin={origin ?? quietOrigin}
         onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onEnterRoom={enterRoom} onReset={reset} />
       : <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode === "collections" ? "collections" : "all"} loaded={loaded} distanceOrigin={origin ?? quietOrigin} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
-        onMap={(id) => { setFocusedId(null); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}
+        onMap={(id) => {
+          setFocusedId(null); setCollectionSheet("mid"); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`);
+          // 모음 장소가 시트 위 지도 영역에 다 들어오게 맞춥니다(가까우면 200m 근처까지).
+          const ids = new Set(data?.collections?.find((c) => c.id === id)?.place_ids ?? []), points = places.filter((p) => ids.has(p.id)).map((p) => ({ lat: p.lat, lng: p.lng }));
+          setMapRequest(points.length ? { sequence: ++requestSequence.current, kind: "bounds", points } : { sequence: ++requestSequence.current, kind: "saved" });
+        }}
         tools={kindTool} />}
       {/* 리스트 로딩: 1초가 넘을 때만 뼈대 줄(시안 A2). 짧은 로딩은 아무것도 안 띄웁니다. */}
       {!loaded && !error && listSkeleton && <SkeletonRows />}

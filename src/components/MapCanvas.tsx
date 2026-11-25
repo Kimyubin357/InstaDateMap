@@ -6,7 +6,8 @@ import { STATUS_LABEL } from "@/lib/types";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import type { PlaceView } from "@/lib/place-view";
 import { animateMapCenter } from "@/lib/map-motion";
-import { CLUSTER_MIN_LEVEL, regionCards, stackCards, zoomInLevel, type RegionCard } from "@/lib/map-clusters";
+import { CLUSTER_MIN_LEVEL, overlapClusters, PIN_FLOOR_LEVEL, regionCards, stackCards, zoomInLevel, type PinCluster, type RegionCard } from "@/lib/map-clusters";
+import { mapGlyph, mapGlyphSvg } from "@/lib/map-glyphs";
 import { administrativeRegion, MapRegionCache, regionPointKey, type RegionDocument, type RegionPoint } from "@/lib/map-regions";
 import { paletteVar } from "@/lib/palette";
 import { roomShares, splitColors } from "@/lib/rooms";
@@ -88,6 +89,38 @@ function placeButton(p: PlaceView, interactive: boolean, isNew = false, look?: M
   return button;
 }
 
+/** 방 색 배경(여러 방이면 나눈 색). 방 정보가 없으면 빨강. */
+function roomBackground(place: PlaceView, look?: MapRoomLook) {
+  const rooms = look?.roomsOf(place) ?? [];
+  return rooms.length ? splitColors(rooms.map((room) => look!.colorOf(room))) : "var(--accent)";
+}
+/**
+ * 지도 핀(시안 design-lab/map-pins, 2026-11-26): 30px 방 색 원 안에 분류 아이콘, 아래에 바탕 없는 이름.
+ * 크기는 확대·축소와 상관없이 같고, 고르면 꼬리 달린 큰 원이 됩니다. 두 방에 있는 가게는 원을 방 색으로 나누고 "· 2".
+ */
+function mapPinButton(p: PlaceView, isNew: boolean, look?: MapRoomLook) {
+  const button = document.createElement("button"); button.type = "button"; button.className = "map-pin";
+  const rooms = look?.roomsOf(p) ?? [];
+  button.id = `map-place-${p.id}`;
+  button.style.setProperty("--pin", roomBackground(p, look));
+  button.setAttribute("aria-label", `${p.name}${rooms.length > 1 ? `, 방 ${rooms.length}곳에 있음` : ""}${isNew ? ", 새로 등록한 장소" : ""}`);
+  const mark = document.createElement("span"); mark.className = "map-pin-mark"; mark.innerHTML = mapGlyphSvg(mapGlyph(p.category, p.name));
+  const name = document.createElement("span"); name.className = "map-pin-name"; name.textContent = rooms.length > 1 ? `${p.name} · ${rooms.length}` : p.name;
+  button.append(mark, name);
+  if (isNew) button.classList.add("is-new");
+  for (const node of button.children) node.setAttribute("aria-hidden", "true");
+  return button;
+}
+/** 겹친 핀 묶음: 숫자 원(36px). 한 방이면 그 방 색, 여러 방이 섞이면 잉크색. */
+function pinClusterButton(cluster: PinCluster<PlaceView>, look?: MapRoomLook) {
+  const button = document.createElement("button"); button.type = "button"; button.className = "map-pin-count";
+  const rooms = new Set(cluster.places.flatMap((place) => [...(look?.roomsOf(place) ?? [])]));
+  button.style.setProperty("--pin", rooms.size > 1 ? "var(--ink)" : rooms.size === 1 ? paletteVar(look!.colorOf([...rooms][0])) : "var(--accent)");
+  button.textContent = String(cluster.places.length);
+  button.setAttribute("aria-label", `장소 ${cluster.places.length}곳이 모여 있어요. 지도 확대`);
+  return button;
+}
+
 function lookupRegion(services: any, point: RegionPoint) {
   return new Promise<ReturnType<typeof administrativeRegion>>((resolve) => {
     const timer = setTimeout(() => resolve(null), 5000);
@@ -99,7 +132,7 @@ function lookupRegion(services: any, point: RegionPoint) {
   });
 }
 
-export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds, onRecovery, allPlaces, onRegionOpen, fitPadding, look }: {
+export default function MapCanvas({ places, selectedId, apiKey, active, initialPosition, onPosition, onPick, onBlank, location, viewRequest, interactive = true, focusPadding, onShowList, newPlaceIds, onRecovery, allPlaces, onRegionOpen, fitPadding, look, pinsUntil = CLUSTER_MIN_LEVEL }: {
   places: PlaceView[]; selectedId: string | null; apiKey: string; active: boolean; initialPosition?: MapPosition;
   onPosition: (p: MapPosition) => void; onPick: (id: string) => void; location: { lat: number; lng: number } | null;
   viewRequest: MapViewRequest | null;
@@ -113,6 +146,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
   fitPadding?: () => MapInsets | null;
   /** 핀·지역 카드의 방 색(없으면 예전 한 가지 색) */
   look?: MapRoomLook;
+  /** 이 단계부터 지역 카드(모음 지도는 장소가 적어 더 넓게까지 핀으로 둡니다) */
+  pinsUntil?: number;
 }) {
   const el = useRef<HTMLDivElement>(null); const map = useRef<any>(null);
   const markers = useRef<{ ids: string[]; button: HTMLButtonElement; overlay: any; z: number }[]>([]); const me = useRef<any>(null);
@@ -197,12 +232,12 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     const k = window.kakao.maps, insets = fitInsets.current?.() ?? { top: 120, right: 90, bottom: 125, left: 90 };
     const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
     if (Math.max(...lats) - Math.min(...lats) < 1e-6 && Math.max(...lngs) - Math.min(...lngs) < 1e-6) {
-      map.current.setLevel(CLUSTER_MIN_LEVEL - 1); map.current.setCenter(new k.LatLng(points[0].lat, points[0].lng));
+      map.current.setLevel(PIN_FLOOR_LEVEL); map.current.setCenter(new k.LatLng(points[0].lat, points[0].lng));
     } else {
       const bounds = new k.LatLngBounds(); points.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)));
       map.current.setBounds(bounds, insets.top, insets.right, insets.bottom, insets.left);
-      // A few places a street apart must not dive to Kakao's closest level; name pins (level 3) are enough.
-      if (map.current.getLevel() < CLUSTER_MIN_LEVEL - 1) map.current.setLevel(CLUSTER_MIN_LEVEL - 1);
+      // A few places a street apart must not dive to Kakao's closest level; 50m (level 3) is enough.
+      if (map.current.getLevel() < PIN_FLOOR_LEVEL) map.current.setLevel(PIN_FLOOR_LEVEL);
     }
     if (atMost !== undefined && map.current.getLevel() > atMost && el.current) {
       // Wide areas (서울 전체) would otherwise refit to the same or a wider level and look unresponsive.
@@ -263,7 +298,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     setLoadAttempt((attempt) => attempt + 1);
   }, [ready, loading, error, apiKey, active, onlineVersion]);
   useEffect(() => {
-    if (!ready || !interactive || !active || level < CLUSTER_MIN_LEVEL) return;
+    if (!ready || !interactive || !active || level < pinsUntil) return;
     let cancelled = false; let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const points = [...new Map(regionSource.map((p) => [regionPointKey(p), { lat: p.lat, lng: p.lng }])).values()];
     async function run() {
@@ -281,7 +316,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     const retry = () => setLookupRetry((v) => v + 1);
     window.addEventListener("online", retry);
     return () => { cancelled = true; clearTimeout(retryTimer); window.removeEventListener("online", retry); };
-  }, [ready, interactive, active, coordinateKey, level, lookupRetry, regions]);
+  }, [ready, interactive, active, coordinateKey, level, lookupRetry, regions, pinsUntil]);
   useEffect(() => {
     let cancelled = false;
     void document.fonts.ready.then(() => { if (!cancelled) setRegionVersion((v) => v + 1); });
@@ -294,7 +329,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     markers.current.forEach((m) => m.overlay.setMap(null));
     const projection = map.current.getProjection();
     const displayLevel = interactive ? map.current.getLevel() : 0;
-    if (displayLevel >= CLUSTER_MIN_LEVEL) {
+    if (displayLevel >= pinsUntil) {
       // Zoomed out: one card per administrative area (docs/redesign/map-home-compare.md).
       const cards = regionCards(places, (p) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng)), {
         level: displayLevel, region: (p) => regions.get(p), isNew: (p) => !!newPlaceIds?.has(p.id), allPlaces,
@@ -315,6 +350,34 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
         const overlay = new k.CustomOverlay({ position: point, content: button, xAnchor: 0, yAnchor: 0, zIndex: ids.includes(focused.current || "") ? SELECTED_Z : z });
         overlay.setMap(map.current); return { ids, button, overlay, z };
       });
+    } else if (interactive) {
+      // 1km 이하: 장소마다 작은 원 핀. 화면에서 겹치는 것만 숫자 원으로 묶습니다(고른 장소는 늘 따로).
+      const project = (p: PlaceView) => projection.containerPointFromCoords(new k.LatLng(p.lat, p.lng));
+      const chosen = places.find((p) => p.id === focused.current);
+      const clusters = overlapClusters(places.filter((p) => p.id !== chosen?.id), project);
+      if (chosen) clusters.push({ key: chosen.id, places: [chosen], ...project(chosen) });
+      markers.current = clusters.map((cluster) => {
+        const ids = cluster.places.map((p) => p.id);
+        if (cluster.places.length === 1) {
+          const p = cluster.places[0], button = mapPinButton(p, !!newPlaceIds?.has(p.id), look);
+          button.classList.toggle("active", p.id === focused.current);
+          button.onclick = () => { k.event.preventMap(); pick.current(p.id); };
+          const overlay = new k.CustomOverlay({ position: new k.LatLng(p.lat, p.lng), content: button, xAnchor: 0, yAnchor: 0, zIndex: p.id === focused.current ? SELECTED_Z : 3 });
+          overlay.setMap(map.current); return { ids, button, overlay, z: 3 };
+        }
+        const button = pinClusterButton(cluster, look);
+        button.onclick = (event) => {
+          k.event.preventMap(); cancelMotion.current?.(); moving.current = false; framedPlace.current = undefined;
+          const before = map.current.getLevel();
+          // 이미 가장 가까운 단계면(같은 건물 등) 더 확대하지 않고 목록으로 보여 줍니다.
+          if (before <= PIN_FLOOR_LEVEL) { if (openRegion.current) openRegion.current({ label: null, ids }); else pick.current(ids[0]); return; }
+          if (event.detail === 0) pendingMarkerFocus.current = ids;
+          fitPoints(cluster.places);
+          if (map.current.getLevel() >= before) { map.current.setLevel(before - 1, { anchor: projection.coordsFromContainerPoint(new k.Point(cluster.x, cluster.y)) }); rememberPosition(); }
+        };
+        const overlay = new k.CustomOverlay({ position: projection.coordsFromContainerPoint(new k.Point(cluster.x, cluster.y)), content: button, xAnchor: 0, yAnchor: 0, zIndex: 4 });
+        overlay.setMap(map.current); return { ids, button, overlay, z: 4 };
+      });
     } else {
       markers.current = [...new Map(places.map((p) => [p.id, p])).values()].sort((a, b) => a.id.localeCompare(b.id)).map((p) => {
         const button = placeButton(p, interactive, newPlaceIds?.has(p.id), look);
@@ -326,12 +389,12 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
     }
     if (previousFocus) markers.current.find((marker) => marker.ids.some((id) => previousFocus.includes(id)))?.button.focus({ preventScroll: true });
     pendingMarkerFocus.current = undefined;
-  }, [places, allPlaces, ready, level, interactive, regions, regionVersion, newPlaceIds, look]);
+  }, [places, allPlaces, ready, level, interactive, regions, regionVersion, newPlaceIds, look, selectedId, pinsUntil]);
   useEffect(() => {
     for (const marker of markers.current) {
       const selected = marker.ids.includes(selectedId || "");
       marker.button.classList.toggle("active", selected);
-      marker.overlay.setZIndex(selected ? (marker.z > 1 ? SELECTED_Z : 5) : marker.z);
+      marker.overlay.setZIndex(selected ? (marker.z > 4 ? SELECTED_Z : marker.z === 1 ? 5 : SELECTED_Z) : marker.z);
     }
   }, [selectedId, places, ready, level]);
   useEffect(() => {
@@ -376,7 +439,7 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       const k = window.kakao.maps;
       framedPlace.current = viewRequest;
       // Selecting one place must leave the count-marker range, including when already at level 4.
-      const targetLevel = viewRequest.level ?? (CLUSTER_MIN_LEVEL - 1);
+      const targetLevel = viewRequest.level ?? PIN_FLOOR_LEVEL + 1;
       if (viewRequest.smooth) {
         const center = map.current.getCenter();
         if (map.current.getLevel() > targetLevel) map.current.setLevel(targetLevel);

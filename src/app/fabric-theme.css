@@ -410,3 +410,18 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 
 /* 만들기·저장 버튼은 초록(2026-11-26 사용자 결정): 빨강은 지우기·위험한 일에만 씁니다. */
 .btn.primary.green{background-color:var(--forest);border-color:var(--forest)}
+
+/* 지도 핀(시안 design-lab/map-pins, 2026-11-26): 30px 방 색 원 + 분류 아이콘, 아래에 바탕 없는 이름. 확대·축소해도 크기는 같습니다. */
+.map-pin{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0;border:0;background:none;color:var(--ink);transform:translate(-50%,-15px);cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.map-pin-mark{position:relative;width:30px;height:30px;box-sizing:border-box;border-radius:50%;background:var(--grain),var(--pin,var(--accent));border:2px solid var(--cream);box-shadow:0 1px 3px #382f2547;display:grid;place-items:center;color:var(--cream)}
+.map-pin-mark svg{width:19px;height:19px;fill:currentColor}
+.map-pin-name{max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.2;color:var(--ink);text-shadow:0 0 2px var(--cream),0 0 2px var(--cream),1px 1px 0 var(--cream),-1px -1px 0 var(--cream),1px -1px 0 var(--cream),-1px 1px 0 var(--cream)}
+.map-pin.is-new .map-pin-mark::after{content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:#e8a33a;border:1.5px solid var(--cream)}
+.map-pin:active .map-pin-mark{scale:.92}
+.map-pin.active{transform:translate(-50%,-50px);z-index:1}
+.map-pin.active .map-pin-mark{width:42px;height:42px;border-width:2.5px;box-shadow:0 3px 8px #382f2559}
+.map-pin.active .map-pin-mark svg{width:24px;height:24px}
+.map-pin.active .map-pin-mark::before{content:"";position:absolute;left:calc(50% - 7px);bottom:-10px;width:14px;height:10px;background:var(--pin,var(--accent));clip-path:polygon(0 0,100% 0,50% 100%)}
+.map-pin.active .map-pin-name{margin-top:9px;font-size:15px}
+.map-pin-count{display:grid;place-items:center;min-width:36px;height:36px;box-sizing:border-box;padding:0 8px;border-radius:18px;border:2px solid var(--cream);background:var(--grain),var(--pin,var(--accent));color:var(--cream);font-size:17px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px #382f2552;transform:translate(-50%,-50%);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.map-pin-count:active{scale:.94}
