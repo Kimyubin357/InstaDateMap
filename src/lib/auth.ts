@@ -2,10 +2,13 @@ import { db } from "./db";
 import { tokenHash } from "./token";
 import { AnalysisError } from "./analysis-issue";
 import { roomWord } from "./room-word";
+import type { Member } from "./people";
 
 export const SESSION_COOKIE = "datemap_session";
 /** 계정(카카오·구글) 로그인 세션으로 연 폴더. 2026-11-24에 PIN 입장을 없앴습니다. */
-export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[]; authVersion: number; expiresAt: string; userId: string }
+export interface Board { id: string; name: string; who: string; sessionHash: string; remember: boolean; memberNames: string[]; authVersion: number; expiresAt: string; userId: string;
+  /** 지금 이 방 멤버(계정 id와 지금 이름). 기록의 "누가"를 지금 이름으로 보여 줄 때 씁니다(019, src/lib/people.ts). */
+  members: Member[] }
 export function cookieValue(req: Request, name: string) {
   return req.headers.get("cookie")?.split(";").map((s) => s.trim()).find((s) => s.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
 }
@@ -61,7 +64,8 @@ export async function boardFromRequest(req: Request): Promise<Board | null> {
   if (!me) return null;
   const memberNames = [...new Set([...(board.member_names ?? []), ...(members ?? []).map((m) => m.member_name as string)])];
   return { id: board.id, name: board.name, who: me.member_name, sessionHash: session.token_hash, remember: session.remember,
-    memberNames, authVersion: board.auth_version, expiresAt: session.expires_at, userId: session.user_id };
+    memberNames, authVersion: board.auth_version, expiresAt: session.expires_at, userId: session.user_id,
+    members: (members ?? []).map((m) => ({ userId: m.user_id as string, name: m.member_name as string })) };
 }
 export function requireIdentity(board: Board) {
   if (!board.who) throw new AccessError("이 기기에서 사용할 이름을 먼저 골라 주세요.", 409);

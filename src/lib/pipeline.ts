@@ -17,6 +17,8 @@ export interface ShareInput {
   owner: string;
   text: string; // 공유 시트에서 넘어온 텍스트(링크 포함)
   who: string;
+  /** 공유한 사람의 계정 id(019). 같은 사람이 이름을 바꾼 뒤 다시 공유해도 저장 기록이 겹치지 않게 합니다. */
+  userId?: string;
   caption?: string | null;
   images?: SourceContext["images"];
   retry?: boolean;
@@ -81,19 +83,33 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
       // 연인이 이미 공유한 링크면 "둘 다 저장함"이 되도록 내 공유 기록도 남깁니다.
       const { data: links, error: linksError } = await db()
         .from("source_places")
-        .select("place_id, extraction_id, places!inner(deleted_at)")
+        .select("place_id, extraction_id, added_by_user_id, places!inner(deleted_at)")
         .is("places.deleted_at", null).eq("source_id", existing.id);
       checkDb(linksError, "공유 기록 조회 실패");
       if (links?.length) {
-        const { error } = await db()
-          .from("source_places")
-          .upsert(
-            links.map((l) => ({ place_id: l.place_id, extraction_id: l.extraction_id, source_id: existing.id, added_by: input.who })),
-            { onConflict: "source_id,place_id,added_by", ignoreDuplicates: true },
-          );
-        checkDb(error, "공유 기록 저장 실패");
-        const { error: saveError } = await db().from("place_saves").upsert(links.map((l) => ({ board_id: input.boardId, place_id: l.place_id, added_by: input.who })), { onConflict: "place_id,added_by", ignoreDuplicates: true });
-        checkDb(saveError, "저장자 기록 실패");
+        // 이미 같은 계정(이름을 바꿨어도)으로 남긴 기록은 다시 만들지 않습니다.
+        const linkedByMe = new Set(input.userId ? links.filter((l) => l.added_by_user_id === input.userId).map((l) => l.place_id) : []);
+        const newLinks = [...new Map(links.filter((l) => !linkedByMe.has(l.place_id)).map((l) => [l.place_id, l])).values()];
+        if (newLinks.length) {
+          const { error } = await db()
+            .from("source_places")
+            .upsert(
+              newLinks.map((l) => ({ place_id: l.place_id, extraction_id: l.extraction_id, source_id: existing.id, added_by: input.who, ...(input.userId ? { added_by_user_id: input.userId } : {}) })),
+              { onConflict: "source_id,place_id,added_by", ignoreDuplicates: true },
+            );
+          checkDb(error, "공유 기록 저장 실패");
+        }
+        const placeIds = [...new Set(links.map((l) => l.place_id as string))];
+        const { data: mySaves, error: mySavesError } = input.userId
+          ? await db().from("place_saves").select("place_id").eq("board_id", input.boardId).eq("added_by_user_id", input.userId).in("place_id", placeIds)
+          : { data: [], error: null };
+        checkDb(mySavesError, "저장자 기록 조회 실패");
+        const savedByMe = new Set((mySaves ?? []).map((r) => r.place_id as string));
+        const newSaves = placeIds.filter((id) => !savedByMe.has(id));
+        if (newSaves.length) {
+          const { error: saveError } = await db().from("place_saves").upsert(newSaves.map((id) => ({ board_id: input.boardId, place_id: id, added_by: input.who, ...(input.userId ? { added_by_user_id: input.userId } : {}) })), { onConflict: "place_id,added_by", ignoreDuplicates: true });
+          checkDb(saveError, "저장자 기록 실패");
+        }
         return { status: "duplicate", message: "이미 지도에 있는 링크예요.", source_id: existing.id, place_url: `/?place=${links[0].place_id}` };
       }
       // 핀을 삭제했거나 이전 저장이 끝나지 않았다면 다시 처리합니다.

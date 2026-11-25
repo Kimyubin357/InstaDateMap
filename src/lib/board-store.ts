@@ -24,7 +24,7 @@ export class BoardStore {
     if (new Date(access.expiresAt).getTime() <= Date.now()) { this.onUnauthorized(); return; }
     this.paused = false;
     if (this.state.access && cacheScope(this.state.access) === cacheScope(access)) {
-      if (this.state.access.who !== access.who || this.state.access.expiresAt !== access.expiresAt) this.set({ access });
+      if (this.state.access.who !== access.who || this.state.access.expiresAt !== access.expiresAt || String(this.state.access.memberIds) !== String(access.memberIds)) this.set({ access });
       if (!this.state.snapshot) void this.refresh();
       return;
     }

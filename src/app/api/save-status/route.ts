@@ -29,7 +29,7 @@ export async function GET(req: Request) {
       const place = await db().from("places").select("id").is("deleted_at", null).eq("board_id", board.id).eq("kakao_place_id", kakaoId).maybeSingle();
       check(place.error);
       if (!place.data) return reply(empty);
-      const save = await db().from("place_saves").select("place_id").eq("board_id", board.id).eq("place_id", place.data.id).eq("added_by", board.who).maybeSingle();
+      const save = await db().from("place_saves").select("place_id").eq("board_id", board.id).eq("place_id", place.data.id).eq("added_by_user_id", board.userId).limit(1).maybeSingle();
       check(save.error);
       if (!save.data) return reply(empty);
       const result = await withSavedPlace(board, { status: "saved", message: "저장한 장소를 확인했어요.", place_url: `/?place=${encodeURIComponent(place.data.id)}` });
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
     const [extractions, links] = await Promise.all([
       db().from("extractions").select("id, excluded").eq("source_id", source.data.id),
-      db().from("source_places").select("place_id, extraction_id").eq("source_id", source.data.id).eq("added_by", board.who),
+      db().from("source_places").select("place_id, extraction_id").eq("source_id", source.data.id).eq("added_by_user_id", board.userId),
     ]);
     check(extractions.error); check(links.error);
     const ids = [...new Set((links.data ?? []).map((link) => link.place_id as string))];

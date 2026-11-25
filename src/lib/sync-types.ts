@@ -1,11 +1,15 @@
 import { isCollection, type CollectionView } from "./collections";
 import type { PlaceView } from "./place-view";
-/** account: 카카오·구글 계정 세션(이름이 고정됨). 2026-11-24 PIN 입장을 없앤 뒤 항상 true입니다. */
-export interface SyncAccess { boardId: string; authVersion: number; who: string; memberNames: string[]; kakaoKey: string; expiresAt: string; account?: boolean }
+/**
+ * account: 카카오·구글 계정 세션(이름이 고정됨). 2026-11-24 PIN 입장을 없앤 뒤 항상 true입니다.
+ * userId·memberIds: 내 계정 id와 지금 방 멤버들의 계정 id(삭제 권한을 이름 대신 id로 비교, 019).
+ */
+export interface SyncAccess { boardId: string; authVersion: number; who: string; memberNames: string[]; kakaoKey: string; expiresAt: string; account?: boolean; userId?: string; memberIds?: string[] }
 export interface PendingSource { id: string; url: string; status: string; shared_by: string; shared_at?: string; place_names?: string[]; analysis_version?: string; recovery_reason?: string | null; missing_count?: number; choose_count?: number }
 export interface BoardSnapshot { boardId: string; authVersion: number; revision: string; board: string; places: PlaceView[]; pending: PendingSource[]; collections?: CollectionView[] }
 export const cacheScope = (access: Pick<SyncAccess, "boardId" | "authVersion">) => `${access.boardId}:${access.authVersion}`;
-export const SNAPSHOT_SCHEMA = 4;
+// 5: 장소에 처음 등록한 사람의 계정 id(registrant_id)와 지금 이름(019)
+export const SNAPSHOT_SCHEMA = 5;
 export const snapshotEtag = (data: Pick<BoardSnapshot, "boardId" | "authVersion" | "revision">) => `"dm${SNAPSHOT_SCHEMA}:${data.boardId}:${data.authVersion}:${data.revision}"`;
 export function isSnapshot(value: unknown): value is BoardSnapshot {
   const s = value as BoardSnapshot;

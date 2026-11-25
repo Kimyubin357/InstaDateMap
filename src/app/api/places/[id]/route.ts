@@ -1,6 +1,7 @@
 import { boardFromRequest, unauthorized, requireIdentity, accessError, dbUserError } from "@/lib/auth";
 import { schedulePlacePushes } from "@/lib/push-server";
 import { db } from "@/lib/db";
+import { actorName } from "@/lib/people";
 
 export const runtime = "nodejs";
 
@@ -16,10 +17,10 @@ export async function GET(req: Request, { params: route }: { params: Promise<{ i
       return response;
     }
     requireIdentity(board);
-    const { data, error } = await db().from("places").select("id, status, memo, memo_version, memo_updated_by").is("deleted_at", null).eq("id", params.id).eq("board_id", board.id).maybeSingle();
+    const { data, error } = await db().from("places").select("id, status, memo, memo_version, memo_updated_by, memo_updated_by_user_id").is("deleted_at", null).eq("id", params.id).eq("board_id", board.id).maybeSingle();
     if (error) return Response.json({ message: "장소의 최신 내용을 확인하지 못했어요. 다시 시도해 주세요." }, { status: 500, headers: { "Cache-Control": "no-store" } });
     if (!data) return Response.json({ code: "PLACE_NOT_FOUND", message: "이미 삭제된 장소예요." }, { status: 404, headers: { "Cache-Control": "no-store" } });
-    return Response.json({ place: { id: data.id, status: data.status, memo: data.memo, memo_version: data.memo_version, memo_updated_by: data.memo_updated_by } }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ place: { id: data.id, status: data.status, memo: data.memo, memo_version: data.memo_version, memo_updated_by: data.memo_updated_by == null ? null : actorName(board.members, data.memo_updated_by_user_id, data.memo_updated_by) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return accessError(e);
   }

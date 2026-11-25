@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       owner: workOwner(board, body.work_id),
       text,
       who: board.who,
+      userId: board.userId,
       retry: body.retry === true,
     };
     if (body.stream === true) {

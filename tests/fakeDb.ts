@@ -26,6 +26,16 @@ function legacyAccounts() {
     .map((name: string, i: number) => { const row = { board_id: id, user_id: `u:${name}`, member_name: name, role: i === 0 ? "owner" : "member", joined_at: `2026-01-0${i + 1}` }; AUTO.add(row); return row; }));
   tables.board_members = [...real, ...auto];
 }
+/** 019 트리거(dm_fill_actor_id)처럼: 이름만 넣은 기록에 그 방 멤버의 계정 id를 채웁니다. */
+const ACTOR: Record<string, [string, string]> = { place_saves: ["added_by", "added_by_user_id"], source_places: ["added_by", "added_by_user_id"], sources: ["shared_by", "shared_by_user_id"], place_push_events: ["added_by", "added_by_user_id"] };
+function fillActor(table: string, row: Row) {
+  const pair = ACTOR[table];
+  if (!pair || row[pair[1]] !== undefined || typeof row[pair[0]] !== "string") return row;
+  legacyAccounts();
+  const boardId = table === "source_places" ? tables.sources?.find((x) => x.id === row.source_id)?.board_id : row.board_id;
+  row[pair[1]] = tables.board_members?.find((m) => m.board_id === boardId && m.member_name === row[pair[0]])?.user_id ?? null;
+  return row;
+}
 class Q {
   private filters: ((r: Row) => boolean)[] = []; private op = "select"; private patch: Row = {}; private result: Row[] | null = null;
   private failure: { message: string } | null = null; private selection = ""; private max = Infinity; private offset = 0; private sortKey = ""; private ascending = true;
@@ -41,14 +51,14 @@ class Q {
   limit(n: number) { this.max = n; return this; }
   update(p: Row) { this.op = "update"; this.failed("update"); this.patch = p; return this; }
   delete() { this.op = "delete"; this.failed("delete"); return this; }
-  insert(input: Row | Row[]) { if (this.failed("insert")) return this; this.result = (Array.isArray(input) ? input : [input]).map((r) => { const row = { id: `id${++seq}`, ...r }; tables[this.t].push(row); return row; }); return this; }
+  insert(input: Row | Row[]) { if (this.failed("insert")) return this; this.result = (Array.isArray(input) ? input : [input]).map((r) => { const row = fillActor(this.t, { id: `id${++seq}`, ...r }); tables[this.t].push(row); return row; }); return this; }
   upsert(input: Row | Row[], opts: { ignoreDuplicates?: boolean } = {}) {
     if (this.failed("upsert")) return this;
     const keys = this.t === "push_subscriptions" ? ["endpoint_hash", "board_id"] : uniq[this.t] || ["id"];
     this.result = (Array.isArray(input) ? input : [input]).map((r) => {
       const found = tables[this.t].find((x) => keys.every((k) => x[k] === r[k]));
       if (found) { if (!opts.ignoreDuplicates) Object.assign(found, r); return found; }
-      const row = { id: `id${++seq}`, ...(this.t === "places" ? { status: "wish", memo: null } : {}), ...r }; tables[this.t].push(row); return row;
+      const row = fillActor(this.t, { id: `id${++seq}`, ...(this.t === "places" ? { status: "wish", memo: null } : {}), ...r }); tables[this.t].push(row); return row;
     }); return this;
   }
   private run(): Row[] {
@@ -82,8 +92,11 @@ async function rpc(name: string, p: Row): Promise<{ data: any; error: { message:
       if (!me) throw Error("참여한 방의 장소만 지울 수 있어요.");
       const row = tables.places?.find((r) => r.id === p.p_place && r.board_id === p.p_board && !r.deleted_at);
       if (!row) return { data: { ok: true, already_deleted: true, deleted_id: p.p_place }, error: null };
-      const first = [...(tables.place_saves ?? []).filter((x) => x.place_id === row.id)].sort((a, b) => String(a.added_at ?? "").localeCompare(String(b.added_at ?? "")))[0]?.added_by;
-      if (first && first !== me && tables.board_members?.some((m) => m.board_id === p.p_board && m.member_name === first)) throw Error(`${first}님이 등록한 장소라 지울 수 없어요.`);
+      // 019: 처음 등록한 사람은 계정 id로 비교하고, id가 없는 예전 기록만 이름으로 비교합니다.
+      const first = [...(tables.place_saves ?? []).filter((x) => x.place_id === row.id)].sort((a, b) => String(a.added_at ?? "").localeCompare(String(b.added_at ?? "")))[0];
+      const owner = first?.added_by_user_id ? tables.board_members?.find((m) => m.board_id === p.p_board && m.user_id === first.added_by_user_id) : null;
+      if (owner && owner.user_id !== p.p_user) throw Error(`${owner.member_name}님이 등록한 장소라 지울 수 없어요.`);
+      if (first && !first.added_by_user_id && first.added_by !== me && tables.board_members?.some((m) => m.board_id === p.p_board && m.member_name === first.added_by)) throw Error(`${first.added_by}님이 등록한 장소라 지울 수 없어요.`);
       (tables.place_trash_log ??= []).push({ id: `log${++seq}`, user_id: p.p_user, board_id: p.p_board, place: { name: row.name }, deleted_at: new Date().toISOString() });
       check(await new Q("places").delete().eq("id", row.id));
       return { data: { ok: true, deleted_id: row.id }, error: null };

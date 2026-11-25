@@ -12,8 +12,8 @@ function seed(status = "done") {
   tables.sources = [{ id: sourceId, board_id: "b1", url: sourceUrl, media_type: "reel", status }];
   tables.extractions = [{ id: "e1", source_id: sourceId, excluded: false }, { id: "e2", source_id: sourceId, excluded: true }];
   tables.places = [{ id: "p1", board_id: "b1", kakao_place_id: "123", name: "식당", lat: 37, lng: 127, status: "wish", created_at: "2026-01-01" }];
-  tables.place_saves = [{ board_id: "b1", place_id: "p1", added_by: "유빈", added_at: "2026-01-01" }];
-  tables.source_places = [{ source_id: sourceId, place_id: "p1", extraction_id: "e1", added_by: "유빈" }];
+  tables.place_saves = [{ board_id: "b1", place_id: "p1", added_by: "유빈", added_by_user_id: "u:유빈", added_at: "2026-01-01" }];
+  tables.source_places = [{ source_id: sourceId, place_id: "p1", extraction_id: "e1", added_by: "유빈", added_by_user_id: "u:유빈" }];
 }
 beforeEach(() => {
   reset();
@@ -41,9 +41,9 @@ describe("응답을 놓친 저장 결과 읽기", () => {
   it("직접 저장은 내 저장자 기록이 있어야 확인되고 다른 사람의 저장만 있으면 성공으로 안내하지 않음", async () => {
     seed();
     expect((await (await GET(req("kakao_place_id=123"))).json()).result).toMatchObject({ status: "saved", place_url: "/?place=p1" });
-    tables.place_saves[0].added_by = "수민";
+    Object.assign(tables.place_saves[0], { added_by: "수민", added_by_user_id: "u:수민" });
     expect((await (await GET(req("kakao_place_id=123"))).json()).result).toBeNull();
-    tables.place_saves[0].added_by = "유빈"; tables.place_saves[0].board_id = "other";
+    Object.assign(tables.place_saves[0], { added_by: "유빈", added_by_user_id: "u:유빈", board_id: "other" });
     expect((await (await GET(req("kakao_place_id=123"))).json()).result).toBeNull();
   });
   it("다른 보드의 링크·장소를 노출하지 않음", async () => {
@@ -63,14 +63,14 @@ describe("응답을 놓친 저장 결과 읽기", () => {
     expect((await (await GET(req(`source_id=${sourceId}`))).json()).result).toMatchObject({ status: status === "pending_confirm" ? "confirm" : status, confirm_url: `/confirm/${sourceId}` });
   });
   it("완료 링크도 내 연결이 없거나 장소가 삭제되면 저장됐다고 안내하지 않음", async () => {
-    seed(); tables.source_places[0].added_by = "수민";
+    seed(); Object.assign(tables.source_places[0], { added_by: "수민", added_by_user_id: "u:수민" });
     expect(await (await GET(req(`source_id=${sourceId}`))).json()).toMatchObject({ result: null, source: { status: "done" }, linked: [] });
-    tables.source_places[0].added_by = "유빈"; tables.places = [];
+    Object.assign(tables.source_places[0], { added_by: "유빈", added_by_user_id: "u:유빈" }); tables.places = [];
     expect(await (await GET(req(`source_id=${sourceId}`))).json()).toMatchObject({ result: null, linked: [] });
   });
   it("다른 사람의 추가 지점은 내 확인 결과에 포함하지 않음", async () => {
     seed(); tables.places.push({ id: "p2", board_id: "b1", kakao_place_id: "456" });
-    tables.source_places.push({ source_id: sourceId, place_id: "p2", extraction_id: "e2", added_by: "수민" });
+    tables.source_places.push({ source_id: sourceId, place_id: "p2", extraction_id: "e2", added_by: "수민", added_by_user_id: "u:수민" });
     expect((await (await GET(req(`source_id=${sourceId}`))).json()).linked).toEqual([{ kakao_place_id: "123", extraction_id: "e1" }]);
   });
   it.each(["sources", "extractions", "source_places", "places"])("%s 조회 오류를 성공으로 처리하지 않음", async (table) => {
