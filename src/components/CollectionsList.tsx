@@ -249,17 +249,21 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     <div className={current ? styles.detailLayout : undefined}>
     {current && <header className={styles.detail}>
       {/* 방 › 모음 › 이 모음: "방 안의 모음"이라는 관계를 글로 보여 줍니다(방·모음 구분 A안). 방 색은 작은 네모에만. */}
-      <div className={styles.detailNav}><nav className={styles.crumb} aria-label="지금 위치"><span className={styles.crumbRoom}>{room && <RoomBand color={room.color} shape="square" />}<span>{room?.name ?? roomName}</span></span><Icon name="chevron" width={14} /><button className="text-btn" onClick={() => onNavigate("collections")}>모음</button><Icon name="chevron" width={14} /><b aria-current="page">{current.name}</b></nav><button className="text-btn" aria-haspopup="dialog" onClick={() => { resetWrite(); setDialog("actions"); }}>편집</button></div>
-      <div className={styles.detailTitle}><CollectionCover icon={current.icon} size={64} /><div><h2>{current.name}</h2><p className={styles.count}>{current.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(current.id) ?? 0}`}</p></div></div>{current.description && <p className={styles.description}>{current.description}</p>}
+      {/* 모음 안 뒤로 가기(시안 design-lab/collection-back A안): 왼쪽 위 "‹ 모음" 버튼. 어느 방의 모음인지는 제목 아래 줄에 둡니다. */}
+      <div className={styles.detailNav}><button type="button" className={styles.back} onClick={() => onNavigate("collections")}><Icon name="back" width={20} />모음</button><button className="text-btn" aria-haspopup="dialog" onClick={() => { resetWrite(); setDialog("actions"); }}>편집</button></div>
+      <div className={styles.detailTitle}><CollectionCover icon={current.icon} size={64} /><div><h2>{current.name}</h2><p className={styles.count}>{room && <RoomBand color={room.color} shape="square" />}{(room?.name ?? roomName) && <>{room?.name ?? roomName} · </>}장소 {current.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(current.id) ?? 0}`}</p></div></div>{current.description && <p className={styles.description}>{current.description}</p>}
       {current.place_ids.length > 0 && <div className={styles.detailActions}><button className={`btn ${styles.mapButton}`} disabled={!current.place_ids.length} onClick={() => onMap(current.id)}><Icon name="fit" width={18} />지도에서 보기</button><button className="btn" disabled={selecting} onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}><Icon name="plus" width={18} />장소 담기</button></div>}
     </header>}
     <div className={styles.content}>
     {showCollections ? <>
       {collections.length > 4 && <label className={styles.search}><Icon name="search" width={18} /><input aria-label="모음 이름 검색" placeholder="모음 이름으로 찾기" value={query} maxLength={40} onChange={(e) => setQuery(e.target.value)} /></label>}
-      {/* 모음 = 색 없는 이모지 타일 줄 목록(방은 색 카드). 장소 이름 몇 개를 미리 보여 줍니다. */}
-      {collections.length > 0 && <div className={styles.mlist}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.mrow} key={c.id} onClick={() => onNavigate("collections", c.id)}>
+      {/* 모음 = 색 없는 이모지 타일 줄 목록(방은 색 카드). 장소 이름 몇 개를 미리 보여 줍니다.
+          장소 줄처럼 왼쪽으로 밀면 빨간 삭제(시안 design-lab/collection-swipe). 끝까지 밀어도 바로 지우지 않고 한 번 더 묻습니다. */}
+      {collections.length > 0 && <div className={styles.mlist}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <SwipeablePlaceRow key={c.id} placeId={c.id} name={`${c.name} 모음`} className={styles.mrow} open={revealedId === c.id}
+        onReveal={(open) => setRevealedId(open ? c.id : null)} onOpen={() => onNavigate("collections", c.id)}
+        onDelete={() => { if (frozen) return; const value = editorOf(c); setRevealedId(null); resetWrite(); initialEditor.current = JSON.stringify(value); setEditor(value); setDialog("delete"); }}>
         <CollectionCover icon={c.icon} size={52} /><span className={styles.mcopy}><strong>{c.name}</strong><small>{c.place_ids.length}곳{c.place_ids.length ? ` · ${c.place_ids.map((id) => nameOf.get(id)).filter(Boolean).slice(0, 3).join(" · ")}` : ""}</small></span><Icon name="chevron" width={18} />
-      </button>)}{loaded && collections.length > 0 && <button className={`${styles.mrow} ${styles.mrowAdd}`} onClick={() => beginEditor()}><span className={styles.addTile}><Icon name="plus" width={22} /></span><span className={styles.mcopy}><strong>새 모음</strong><small>이 방 안에 만들어요</small></span></button>}</div>}
+      </SwipeablePlaceRow>)}{loaded && collections.length > 0 && <button className={`${styles.mrow} ${styles.mrowAdd}`} onClick={() => beginEditor()}><span className={styles.addTile}><Icon name="plus" width={22} /></span><span className={styles.mcopy}><strong>새 모음</strong><small>이 방 안에 만들어요</small></span></button>}</div>}
       {/* 모음 0개(시안 A6): 빈 방 리스트와 같은 틀. 예시 줄은 그 이름·이모지로 만들기를 바로 엽니다. */}
       {loaded && !collections.length && <EmptyStart icon={<Icon name="collection" width={26} />} title="장소를 골라 묶어 봐요" note="‘성수 데이트’처럼 이름을 붙여 이 방 장소를 모아 둬요." rows={[
         { icon: <Icon name="plus" width={22} />, title: "새 모음 만들기", note: "이름과 이모지만 정하면 돼요", onClick: () => beginEditor() },
