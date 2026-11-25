@@ -3,18 +3,20 @@ import { UnconfirmedWriteError } from "./verified-write";
 import type { ShareResult } from "./share-stream";
 import type { PlaceStatus } from "./types";
 
-export async function verifyPlacePatch<T extends { memo?: string; status?: PlaceStatus }>(id: string, patch: T): Promise<T | null> {
-  const { place } = await requestJson<{ place: { memo: string | null; status: PlaceStatus } }>(`/api/places/${id}`, { cache: "no-store" });
+/** 장소 하나의 주소. room: 전체 보기에서 다른 방의 장소면 그 방(?room=, 서버가 멤버인지 확인). */
+export const placeUrl = (id: string, room?: string | null, suffix = "") => `/api/places/${id}${suffix}${room ? `?room=${encodeURIComponent(room)}` : ""}`;
+export async function verifyPlacePatch<T extends { memo?: string; status?: PlaceStatus }>(id: string, patch: T, room?: string | null): Promise<T | null> {
+  const { place } = await requestJson<{ place: { memo: string | null; status: PlaceStatus } }>(placeUrl(id, room), { cache: "no-store" });
   return Object.entries(patch).every(([key, value]) => (key === "memo" ? place.memo || "" : place.status) === value) ? patch : null;
 }
-export async function verifyMemoSave(id: string, memo: string, expected: number): Promise<{ memo: string; memo_version: number } | null> {
-  const { place } = await requestJson<{ place: { memo: string | null; memo_version: number; memo_updated_by: string | null } }>(`/api/places/${id}`, { cache: "no-store" });
+export async function verifyMemoSave(id: string, memo: string, expected: number, room?: string | null): Promise<{ memo: string; memo_version: number } | null> {
+  const { place } = await requestJson<{ place: { memo: string | null; memo_version: number; memo_updated_by: string | null } }>(placeUrl(id, room), { cache: "no-store" });
   if ((place.memo || "") === memo && place.memo_version > expected) return { memo, memo_version: place.memo_version };
   if (place.memo_version !== expected) throw new RequestError("메모가 먼저 바뀌었어요.", 409, "MEMO_CONFLICT", { ...place });
   return null;
 }
-export async function verifyDeletedPlace(id: string): Promise<{ ok: boolean; deleted_id: string } | null> {
-  try { await requestJson(`/api/places/${id}`, { cache: "no-store" }); return null; }
+export async function verifyDeletedPlace(id: string, room?: string | null): Promise<{ ok: boolean; deleted_id: string } | null> {
+  try { await requestJson(placeUrl(id, room), { cache: "no-store" }); return null; }
   catch (error) { if (error instanceof RequestError && error.status === 404 && error.code === "PLACE_NOT_FOUND") return { ok: true, deleted_id: id }; throw error; }
 }
 interface SaveStatus {

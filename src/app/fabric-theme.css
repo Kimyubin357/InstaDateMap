@@ -373,3 +373,34 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 /* 장소 상세: '모음에 담기'·'다른 방에 담기'는 꽉 찬 버튼을 세로로 쌓지 않고 한 줄 두 칸으로(2026-11-25 점검). */
 .place-organize-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .place-organize-row>.btn{min-height:50px;width:100%;padding:10px 8px;gap:6px;font-size:17px;white-space:nowrap}
+/* 방 고르기 · 전체 보기(2026-11-25, 시안 design-lab/rooms-view). 방 색은 --palette-* 토큰을 씁니다. */
+/* 방 버튼: 예전 필터 버튼과 같은 동그란 크림 버튼, 글자 없이 가운데 색 동그라미 */
+.room-scope-btn.icon-btn{display:grid;place-items:center}
+.room-scope-btn.is-open{box-shadow:0 0 0 3px #fbf6e8,var(--print-shadow)}
+/* 지역 카드: 방 안 = 그 방 색, 전체 = 크림 카드 + 방 비율 막대 */
+.region-card{background:var(--region-tone,var(--accent)) var(--grain)}
+.region-card::after{background:var(--region-tone,var(--accent))}
+.region-card.is-all{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);padding-bottom:12px}
+.region-card.is-all::after{background:var(--cream);bottom:-8px}
+.region-card.is-all .region-card-count{color:var(--ink)}
+.region-card-share{position:absolute;left:9px;right:9px;bottom:4px;height:4px;border-radius:2px;overflow:hidden;display:flex;gap:1px}
+.region-card-share>i{display:block;height:100%;min-width:3px}
+/* 여러 방에 있는 같은 가게: 이름 옆 점 대신 방 수, 꼬리는 방 색을 나눈 동그라미 */
+.pin.is-multi{--wish:var(--ink-soft)}
+.pin.is-multi::after{background:var(--pin-dot,var(--wish))}
+.pin-rooms{flex:none;font-size:12px;line-height:18px;padding:0 5px;border-radius:9px;border:1px dashed var(--line);color:var(--ink-soft)}
+.pin.active .pin-rooms{color:var(--cream);border-color:#fbf6e880}
+/* 리스트 두 칸 전환의 수 */
+.switch-count{font-size:15px;opacity:.75;margin-left:4px}
+/* 리스트 · 전체: 방 꼬리표 + 저장한 사람 */
+.all-row-rooms{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;min-width:0;max-width:100%}
+.all-row-rooms .row-sharer{margin-top:0}
+.rooms-label{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--ink-soft);margin-top:4px}
+.rooms-quiet{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:1.5;color:var(--ink-soft);margin:14px 0 0;word-break:keep-all}
+.rooms-quiet svg{color:var(--forest);flex:none;margin-top:1px}
+.rooms-quiet b{font-weight:400;color:var(--ink)}
+/* 종류 칩(리스트에만): 고른 종류 이름을 그대로 보여 줍니다 */
+.kind-chip{max-width:160px}.kind-chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 새 장소 칩: 누르면 새 장소 시트 */
+.new-places-chip{pointer-events:auto;cursor:pointer}
+.new-places-chip.is-open{border-color:var(--forest);box-shadow:0 0 0 2px #244b3722,var(--print-shadow)}
