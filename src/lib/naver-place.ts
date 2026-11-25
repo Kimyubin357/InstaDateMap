@@ -14,6 +14,10 @@ const text = (v: unknown, max = 200) => typeof v === "string" && v.trim() ? v.tr
 const https = (v: unknown) => { const s = text(v, 1000); return s && /^https:\/\/[a-z0-9.-]+\.(pstatic\.net|naver\.com|naver\.net)\//i.test(s) ? s : null; };
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const stripTags = (s: string) => s.replace(/<[^>]*>/g, "");
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+/** 검색 결과 이름의 HTML 문자(&amp; 등)를 원래 글자로: "씨랄라워터파크&amp;찜질방" → "씨랄라워터파크&찜질방" */
+export const decodeEntities = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) =>
+  e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITIES[e.toLowerCase()] ?? m);
 
 /** `"Prefix:id":{...}` 형태의 객체를 문자열 안의 괄호까지 고려해 꺼냅니다. */
 export function apolloObjects(html: string, prefix: string): Record<string, unknown>[] {
@@ -43,7 +47,7 @@ export function apolloObjects(html: string, prefix: string): Record<string, unkn
 export function parseSearch(html: string): NaverCandidate[] {
   const list = apolloObjects(html, "PlaceListBusinessesItem").flatMap((o) => {
     const id = text(o.id, 20);
-    return id && /^\d+$/.test(id) ? [{ id, name: text(stripTags(String(o.name ?? ""))), lat: num(o.y), lng: num(o.x) }] : [];
+    return id && /^\d+$/.test(id) ? [{ id, name: text(decodeEntities(stripTags(String(o.name ?? "")))), lat: num(o.y), lng: num(o.x) }] : [];
   });
   const linked = [...html.matchAll(/place\.naver\.com\/(?:restaurant|place|cafe|hairshop|accommodation|hospital|attraction)\/(\d{1,15})/g)].map((m) => m[1]);
   const seen = new Set(list.map((c) => c.id));
@@ -112,7 +116,7 @@ export function distance(a: { lat: number; lng: number }, b: { lat: number; lng:
 const compact = (s: string) => s.normalize("NFC").toLowerCase().replace(/[\s()[\]{}·.,'"&\-_/]|점$/g, "");
 export function similarName(a: string | null, b: string) {
   if (!a) return false;
-  const x = compact(a), y = compact(b);
+  const x = compact(decodeEntities(a)), y = compact(decodeEntities(b));
   return !!x && !!y && (x.includes(y) || y.includes(x));
 }
 /** 같은 가게로 볼 후보: 150m 안에서 이름이 비슷하거나, 30m 안. 가장 가까운 후보를 고릅니다. */
@@ -120,6 +124,15 @@ export function pickCandidate(candidates: NaverCandidate[], place: { name: strin
   const scored = candidates.flatMap((c) => c.lat == null || c.lng == null ? [] : [{ c, d: distance(place, { lat: c.lat, lng: c.lng }) }])
     .filter(({ c, d }) => d <= 30 || (d <= 150 && similarName(c.name, place.name))).sort((a, b) => a.d - b.d);
   return scored[0]?.c ?? null;
+}
+/**
+ * 첫 검색이 비었을 때 다시 물을 검색어들: 지점 이름("본점", "성수점")을 뺀 상호 + 구 → 상호만.
+ * 네이버는 "숲속한방랜드 본점 서대문구"처럼 지점·지역을 붙이면 결과를 하나도 주지 않기도 합니다(2026-11-26).
+ */
+export function fallbackQueries(name: string, address: string | null) {
+  const bare = name.replace(/\s+\S*점$/, "").trim();
+  const area = address?.match(/\S+[구군]\b/)?.[0] ?? address?.split(/\s+/)[1] ?? "";
+  return [...new Set([bare !== name ? `${bare} ${area}`.trim() : "", bare].filter((q) => q && q !== searchQuery(name, address)))].map((q) => q.slice(0, 80));
 }
 /** 검색어: 상호 + 주소의 구·시(동명이 많은 체인점 구분용) */
 export function searchQuery(name: string, address: string | null) {
