@@ -14,6 +14,12 @@ export class BoardStore {
   private paused = false;
   private confirmedRevision = "0";
   onUnauthorized: () => void = () => {};
+  /**
+   * 서버가 다른 방(또는 다른 버전)의 장소를 돌려줬을 때. 뒤로 가기로 예전 화면이 되살아나 옛 방의 입장 정보가
+   * 다시 들어온 경우 등입니다. 같은 입장 정보로는 한 번만 부르고(무한 반복 방지), 다시 같으면 오류로 보여 줍니다.
+   */
+  onStaleAccess: () => void = () => {};
+  private staleScope = "";
   constructor(private cache: SnapshotCache = new DeviceBoardCache(), private fetcher: typeof fetch = (...args) => fetch(...args)) {}
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getSnapshot = () => this.state;
@@ -75,7 +81,12 @@ export class BoardStore {
         if (generation !== this.generation || abort.signal.aborted) return;
         if (mutation !== this.mutation) { this.dirty = true; continue; }
         if (!res.ok) throw new Error((data as { message?: string })?.message || "변경 내용을 확인하지 못했어요.");
-        if (!isSnapshot(data) || cacheScope(data) !== cacheScope(access)) throw new Error("장소 응답을 확인하지 못했어요.");
+        if (!isSnapshot(data)) throw new Error("장소 응답을 확인하지 못했어요.");
+        if (cacheScope(data) !== cacheScope(access)) {
+          if (this.staleScope !== cacheScope(access)) { this.staleScope = cacheScope(access); this.onStaleAccess(); return; }
+          throw new Error("장소 응답을 확인하지 못했어요.");
+        }
+        this.staleScope = "";
         const previous = this.state.snapshot;
         if (previous && BigInt(data.revision) < BigInt(previous.revision)) throw new Error("서버의 변경 순서를 다시 확인해야 해요. 기존 내용을 유지할게요.");
         if (BigInt(data.revision) < BigInt(this.confirmedRevision)) throw new Error("저장 결과를 맞추는 중이에요. 저장한 장소는 그대로 보여드려요.");

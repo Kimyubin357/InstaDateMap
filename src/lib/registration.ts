@@ -93,8 +93,11 @@ export function searchSuggestions(rawName: string, branch: string | null, areaHi
   return [...new Set(values)].filter((v) => v && v !== now).slice(0, 3);
 }
 
-/** /add에서 결과를 어디에 보여 줄지. 이동하지 않는 결과는 원인별 실패 화면(시안 10·11)으로. */
-export type AddFailure = "unreadable" | "not_instagram" | "ai_wait" | "ai_limit" | "busy" | "failed";
+/**
+ * /add에서 결과를 어디에 보여 줄지. 이동하지 않는 결과는 원인별 실패 화면(시안 10·11)으로.
+ * server: 링크는 문제없는데 서버·연결이 잠시 실패한 경우(분석 전이라 source_id가 없음). 링크 형식 오류(not_instagram)와 구분합니다.
+ */
+export type AddFailure = "unreadable" | "not_instagram" | "trashed" | "ai_wait" | "ai_limit" | "busy" | "server" | "failed";
 export function addFailure(result: ShareResult): AddFailure | null {
   if (["saved", "duplicate", "confirm", "needs_review"].includes(result.status)) return null;
   if (result.status === "needs_caption") return "unreadable";
@@ -102,7 +105,9 @@ export function addFailure(result: ShareResult): AddFailure | null {
   const code = result.code ?? "";
   if (code === "gemini_rate_limit" || code === "gemini_unavailable") return "ai_wait";
   if (code.startsWith("gemini_")) return "ai_limit";
-  if (!result.source_id) return "not_instagram";
+  if (code === "not_instagram") return "not_instagram";
+  if (code === "trashed") return "trashed";
+  if (!result.source_id) return "server";
   return "failed";
 }
 

@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import ActionSheet, { ActionLead, type ActionItem } from "./ActionSheet";
+import ActionDialog from "./ActionDialog";
+import { useBoardSync } from "./BoardProvider";
+import { friendlyMessage, requestJson } from "@/lib/client-request";
+import { navigateShell } from "@/lib/shell-navigation";
 import ShellLink from "./ShellLink";
 import { toneStyle } from "./Palette";
 import { categoryIcon } from "@/lib/place-presentation";
@@ -43,13 +48,51 @@ export type RoomAction = "edit" | "members" | "invite" | "delete" | "leave";
 export const roomSettingsHref = (id: string, view: RoomAction = "members") => `/folders?room=${encodeURIComponent(id)}&view=${view}`;
 
 type ActionRoom = FolderSummary & Partial<Pick<RoomSummary, "member_names" | "member_avatars">>;
+
+/**
+ * ⚙ 시트에서 바로 방 삭제·나가기(설정 화면으로 이동하지 않음, 2026-11-26).
+ * 끝나면 방 목록을 바로 다시 받고, 지금 연 방이었으면 서버가 옮겨 준 방으로 다시 접속해 전체 보기로 돌아갑니다.
+ * 남은 방이 없으면 방 화면(/folders)으로 갑니다.
+ */
+function useRoomRemoval() {
+  const { store, rooms, resetAccess, notify } = useBoardSync();
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  async function remove(room: ActionRoom, kind: "delete" | "leave") {
+    const access = store.getSnapshot().access;
+    if (busy) return false;
+    if (kind === "leave" && !access?.userId) { setError("다시 로그인한 뒤 해 주세요."); return false; }
+    setBusy(true); setError("");
+    try {
+      const url = kind === "delete" ? `/api/folders/${encodeURIComponent(room.id)}` : `/api/folders/${encodeURIComponent(room.id)}/members/${encodeURIComponent(access!.userId!)}`;
+      const res = await requestJson<{ current: string | null }>(url, { method: "DELETE", cache: "no-store", notifyBoardChange: false });
+      if (!res.current) { window.location.assign("/folders"); return true; }
+      if (access?.boardId === room.id) {
+        // 지금 연 방이 사라지면 서버가 다른 방으로 옮겨 둡니다. 그 방으로 다시 접속하고 전체 보기로 돌아갑니다.
+        rooms.setScope("all");
+        await resetAccess();
+      }
+      rooms.schedule(0);
+      notify(kind === "delete" ? `‘${room.name}’ 방을 삭제했어요.` : `‘${room.name}’ 방에서 나왔어요.`);
+      return true;
+    } catch (e) {
+      setError(friendlyMessage(e, kind === "delete" ? "방을 삭제하지 못했어요. 다시 시도해 주세요." : "방에서 나가지 못했어요. 다시 시도해 주세요."));
+      return false;
+    } finally { setBusy(false); }
+  }
+  return { remove, busy, error, clearError: () => setError("") };
+}
 /**
  * 방 ⚙ → 동작 시트(시안 design-lab/edit-sheets 3·4번).
  * 방장: 수정하기 · 멤버 관리 · 초대하기 · 이 방 알림 · (멤버가 있으면 방 나가기) · 방 삭제하기(빨강, 맨 아래).
  * 멤버: 멤버 보기 · 이 방 알림 · 방 나가기(빨강). 초대 링크는 방장만 만들 수 있어 멤버에게는 초대하기를 두지 않습니다.
  * onGo가 있으면 그 자리에서 화면을 바꾸고(방 설정 목록), 없으면 방 설정 화면으로 이동합니다.
  */
-export function RoomActionSheet({ room, onClose, onGo }: { room: ActionRoom; onClose: () => void; onGo?: (action: RoomAction) => void }) {
+export function RoomActionSheet({ room, onClose, onGo, onRemoved }: { room: ActionRoom; onClose: () => void; onGo?: (action: RoomAction) => void;
+  /** 삭제·나가기가 끝난 뒤. 없으면 홈(지도)으로 갑니다. */
+  onRemoved?: () => void;
+}) {
+  const [confirm, setConfirm] = useState<"delete" | "leave" | null>(null);
+  const removal = useRoomRemoval(), router = useRouter(), pathname = usePathname();
   const owner = room.role === "owner", others = room.member_count > 1, full = room.member_count >= room.member_limit;
   const names = room.member_names ?? [], avatars = room.member_avatars ?? [];
   const faces = names.length > 0 ? <span className={styles.sheetFaces} aria-hidden="true">{names.slice(0, 3).map((n, i) => avatars[i]
@@ -63,13 +106,22 @@ export function RoomActionSheet({ room, onClose, onGo }: { room: ActionRoom; onC
     { icon: "user", title: "멤버 관리", note: others ? `${count} · 방장 넘기기 · 내보내기` : `${count} · 아직 나만 있어요`, side: faces, ...go("members") },
     { icon: "link", title: "초대하기", note: full ? "인원이 가득 찼어요" : `${INVITE_DAYS}일 동안 쓸 수 있는 링크 보내기`, ...go(full ? "members" : "invite") },
     { icon: "bell", title: "이 방 알림", note: "새 장소 · 메모", href: "/settings/notifications" },
-    ...(others ? [{ icon: "back", title: "방 나가기", note: "가장 먼저 참여한 멤버가 방장이 돼요", danger: true, ...go("leave") } satisfies ActionItem] : []),
-    { icon: "trash", title: "방 삭제하기", note: others ? "모든 멤버에게서 장소·모음이 사라져요" : "이 방의 장소·모음이 모두 사라져요", danger: true, ...go("delete") },
+    ...(others ? [{ icon: "back", title: "방 나가기", note: "가장 먼저 참여한 멤버가 방장이 돼요", danger: true, onSelect: () => setConfirm("leave") } satisfies ActionItem] : []),
+    { icon: "trash", title: "방 삭제하기", note: others ? "모든 멤버에게서 장소·모음이 사라져요" : "이 방의 장소·모음이 모두 사라져요", danger: true, onSelect: () => setConfirm("delete") },
   ] : [
     { icon: "user", title: "멤버 보기", note: count, side: faces, ...go("members") },
     { icon: "bell", title: "이 방 알림", note: "새 장소 · 메모", href: "/settings/notifications" },
-    { icon: "back", title: "방 나가기", note: "내가 담은 장소는 방에 남아요", danger: true, ...go("leave") },
+    { icon: "back", title: "방 나가기", note: "내가 담은 장소는 방에 남아요", danger: true, onSelect: () => setConfirm("leave") },
   ];
+  if (confirm) {
+    const done = () => { onClose(); if (onRemoved) onRemoved(); else if (pathname !== "/" && !navigateShell("/", true)) router.replace("/"); };
+    return <ActionDialog
+      title={confirm === "delete" ? `‘${room.name}’ 방을 삭제할까요?` : `‘${room.name}’ 방에서 나갈까요?`}
+      message={confirm === "delete" ? `장소 ${room.place_count}곳과 메모·모음이 ${others ? "모든 멤버에게서 " : ""}사라지고 되돌릴 수 없어요.` : owner ? "가장 먼저 참여한 멤버가 방장이 돼요. 내가 담은 장소는 방에 남아요." : "내가 담은 장소는 방에 남아요. 다시 들어오려면 초대 링크가 필요해요."}
+      tone="error" destructive cancelLabel="취소" confirmLabel={confirm === "delete" ? "삭제" : "나가기"} busy={removal.busy}
+      onClose={() => { if (!removal.busy) { removal.clearError(); setConfirm(null); } }}
+      onConfirm={async () => { if (await removal.remove(room, confirm)) done(); }}>{removal.error && <p className="error" role="alert">{removal.error}</p>}</ActionDialog>;
+  }
   return <ActionSheet title={room.name} note={`${owner ? "방장" : "멤버"} · ${membersLabel(room.member_count)} · 장소 ${room.place_count}곳`} lead={<ActionLead tone={room.color} />} items={items} onClose={onClose} />;
 }
 
@@ -77,8 +129,10 @@ export function RoomActionSheet({ room, onClose, onGo }: { room: ActionRoom; onC
  * 방 색 카드 2열. withAll: 맨 앞 전체 카드(내 방 시트). 지금 보는 카드에 초록 테두리 + 체크.
  * 방 카드마다 오른쪽 위 ⚙ 로 그 방 설정을 바로 엽니다(방·모음 구분 A안, 2026-11-25). 카드와 ⚙ 는 서로 다른 버튼입니다(겹친 버튼 없음).
  */
-export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick }: {
+export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick, onRoomRemoved }: {
   rooms: readonly RoomSummary[]; selected?: "all" | string | null; withAll?: boolean; compact?: boolean; disabled?: boolean; onPick: (target: "all" | string) => void;
+  /** ⚙ 시트에서 방을 지우거나 나간 뒤(내 방 시트는 닫힘) */
+  onRoomRemoved?: () => void;
 }) {
   const total = rooms.reduce((sum, r) => sum + r.place_count, 0);
   const check = <span className={styles.check} aria-hidden="true"><Icon name="check" width={15} strokeWidth={2.6} /></span>;
@@ -96,7 +150,7 @@ export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick 
       <button type="button" className={styles.gear} aria-label={`${r.name} 방 설정`} aria-haspopup="dialog" disabled={disabled} onClick={() => setActions(r)}><i><Icon name="settings" width={17} /></i></button>
     </div>)}
     <ShellLink href={NEW_ROOM_HREF} className={`${styles.card} ${styles.addCard}`} aria-disabled={disabled}><Icon name="plus" width={26} />새 방 만들기</ShellLink>
-    {actions && <RoomActionSheet room={actions} onClose={() => setActions(null)} />}
+    {actions && <RoomActionSheet room={actions} onClose={() => setActions(null)} onRemoved={onRoomRemoved} />}
   </div>;
 }
 
@@ -119,7 +173,7 @@ export function RoomsSheet({ rooms, scope, current, error, onPick, onClose }: {
   const close = <button className="icon-btn sheet-close-btn" aria-label="내 방 닫기" disabled={busy} onClick={onClose}><Icon name="close" width={18} /></button>;
   return <Modal title="내 방" variant="compact" className={styles.sheet} headerActions={close} onClose={() => { if (!busy) onClose(); }}>
     {!rooms && !error && <p className={styles.status} role="status">방 목록을 불러오고 있어요…</p>}
-    {rooms && <RoomCards rooms={rooms} compact withAll disabled={busy} selected={scope === "all" ? "all" : current}
+    {rooms && <RoomCards rooms={rooms} compact withAll disabled={busy} selected={scope === "all" ? "all" : current} onRoomRemoved={onClose}
       onPick={(target) => { if (busy) return; setBusy(true); void onPick(target).finally(() => setBusy(false)); }} />}
     {busy && <p className={styles.status} role="status">방을 바꾸는 중…</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}

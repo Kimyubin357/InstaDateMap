@@ -193,7 +193,8 @@ describe("기기 조회 캐시와 서버 일치", () => {
   it("다른 보드·인증 버전의 캐시를 표시하지 않음", async () => {
     const pending = deferred<Response>(), store = new BoardStore(cache(snapshot()), vi.fn(() => pending.promise) as typeof fetch);
     await store.authorize({ ...access, boardId: "b2", authVersion: 2 }); expect(store.getSnapshot().snapshot).toBeNull();
-    pending.resolve(response()); await store.refresh(); expect(store.getSnapshot().snapshot).toBeNull(); expect(store.getSnapshot().error).not.toBe("");
+    const stale = vi.fn(); store.onStaleAccess = stale;
+    pending.resolve(response()); await store.refresh(); expect(store.getSnapshot().snapshot).toBeNull(); expect(stale).toHaveBeenCalledTimes(1);
   });
   it("손상된 캐시 구조와 만료된 세션을 거절", async () => {
     const old = snapshot(); delete (old.places[0] as Partial<typeof old.places[0]>).kakao_place_id;
@@ -221,4 +222,18 @@ it("locally removing a confirmed trashed place also clears its visible collectio
 it("invalid collection cache data is rejected before rendering icons or membership",()=>{
  expect(isSnapshot({...snapshot(),collections:[{id:"c",name:"모음",description:"",color:"red",icon:"script",version:1,created_at:"2026-01-01",place_ids:[]}]})).toBe(false);
  expect(isSnapshot({...snapshot(),collections:[{id:"c",name:"모음",description:"",color:"plum",icon:"🍷",version:1,created_at:"2026-01-01",place_ids:[]}]})).toBe(true);
+});
+
+describe("다른 방의 장소 응답(뒤로 가기로 옛 입장 정보가 되살아난 경우)", () => {
+  it("한 번은 입장 정보를 다시 받게 알리고 오류로 막지 않음, 같은 정보로 또 오면 오류", async () => {
+    const other = { ...snapshot(), boardId: "b2" };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => response(other));
+    const store = new BoardStore(cache(), fetcher); const stale = vi.fn(); store.onStaleAccess = stale;
+    await store.authorize(access); await store.refresh();
+    expect(stale).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().snapshot).toBeNull();
+    await store.refresh();
+    expect(stale).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().error).toBe("장소 응답을 확인하지 못했어요.");
+  });
 });

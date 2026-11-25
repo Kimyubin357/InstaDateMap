@@ -114,6 +114,8 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
     return task;
   };
   store.onUnauthorized = () => { void lock(); };
+  // 뒤로 가기로 예전 화면의 옛 방 입장 정보가 되살아나면, 서버에서 지금 입장 정보를 다시 받아 맞춥니다.
+  store.onStaleAccess = () => { void resetAccess(); };
   const chooseScope = async (target: "all" | string) => {
     if (target === "all") { rooms.setScope("all"); return true; }
     if (target === store.getSnapshot().access?.boardId) { rooms.setScope("room"); return true; }

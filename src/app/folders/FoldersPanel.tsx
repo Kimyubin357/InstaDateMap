@@ -137,7 +137,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
   }, "방을 만들지 못했어요. 다시 시도해 주세요.");
   const save = () => selected && edit && act(async () => {
     const next = await call<FolderDetail>(`/api/folders/${selected}`, "PATCH", edit);
-    setDetail(next); await load(); say("방을 바꿨어요.");
+    setDetail(next); await load(); sync.rooms.schedule(0); say("방을 바꿨어요.");
     if (selected === data?.current && !standalone) sync.store.invalidate();
   }, "방을 바꾸지 못했어요. 다시 시도해 주세요.");
   const inviteSoon = useRef(false);
@@ -164,12 +164,12 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     const me = detail.members.find((m) => m.me);
     if (confirm.kind === "owner") {
       const next = await act(() => call<FolderDetail>(`/api/folders/${folder.id}/owner`, "POST", { userId: confirm.member.user_id }), "방장을 넘기지 못했어요. 다시 시도해 주세요.");
-      if (next) { setDetail(next); setEdit(null); setConfirm(null); await load(); say(`${confirm.member.name}님이 방장이 됐어요.`); }
+      if (next) { setDetail(next); setEdit(null); setConfirm(null); await load(); sync.rooms.schedule(0); say(`${confirm.member.name}님이 방장이 됐어요.`); }
       return;
     }
     if (confirm.kind === "kick") {
       const ok = await act(() => call(`/api/folders/${folder.id}/members/${confirm.member.user_id}`, "DELETE"), "내보내지 못했어요. 다시 시도해 주세요.");
-      if (ok) { setConfirm(null); await loadDetail(folder.id); await load(); say(`${confirm.member.name}님을 내보냈어요.`); }
+      if (ok) { setConfirm(null); await loadDetail(folder.id); await load(); sync.rooms.schedule(0); say(`${confirm.member.name}님을 내보냈어요.`); }
       return;
     }
     const res = await act(() => confirm.kind === "delete"
@@ -179,7 +179,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
     fromSheet.current = false; direct.current = false;
     setConfirm(null); setSelected(null); setDetail(null);
     await follow(res.current, false, confirm.kind === "delete" ? `‘${folder.name}’ 방을 삭제했어요.` : `‘${folder.name}’ 방에서 나왔어요.`);
-    await load();
+    await load(); sync.rooms.schedule(0);
   }
 
   const folders = data?.folders ?? [];
@@ -264,7 +264,7 @@ export default function FoldersPanel({ standalone = false }: { standalone?: bool
           <span className={styles.rowCopy}><span>새 방 만들기</span><small>{full ? `방은 ${ROOM_LIMIT}개까지예요. 쓰지 않는 방을 정리하면 새로 만들 수 있어요.` : "혼자 모으거나, 둘이·친구들과 함께 쓸 방"}</small></span>
         </button>
       </section>
-      {sheet && <RoomActionSheet room={sheet} onClose={() => setSheet(null)} onGo={(action) => openRoom(sheet.id, action)} />}
+      {sheet && <RoomActionSheet room={sheet} onClose={() => setSheet(null)} onGo={(action) => openRoom(sheet.id, action)} onRemoved={() => { void load(); }} />}
       {folders.length > 0 && <p className={styles.note}><Icon name="list" width={20} /><span>같은 사람과 주제만 다르면 방을 새로 만들지 말고 <b>방 안에 모음</b>을 만들어요. 다시 초대할 필요가 없어요.</span></p>}
     </>}
   </ClientReady></main>;
