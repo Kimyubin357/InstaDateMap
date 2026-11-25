@@ -149,3 +149,15 @@ describe("링크 입력 미리 확인(2026-11-25 점검 엣지 케이스)", () =
     expect(postLinkIn("안녕하세요")).toEqual({ problem: "not_instagram" });
   });
 });
+
+describe("지점 자동 선택(2026-11-25 실사용 테스트)", () => {
+  const k = (id: string, name: string, category = "음식점"): KakaoPlace => ({ kakao_place_id: id, name, address: "", lat: 37.5, lng: 127, category, kakao_url: "" });
+  it("캡션 이름과 똑같은 후보가 하나면 바로 고르고, 업종으로는 거르지 않는다", async () => {
+    const { autoPick } = await import("@/lib/registration");
+    expect(autoPick({ id: "1", name: "고로고로 성수", candidates: [k("a", "고로고로 성수"), k("b", "고로고로", "의류판매"), k("c", "고로고로 용산")] })).toBe("a");
+    expect(autoPick({ id: "2", name: "고로고로성수", candidates: [k("a", "고로고로 성수"), k("c", "고로고로 용산")] })).toBe("a");
+    expect(autoPick({ id: "3", name: "규엔당", candidates: [k("a", "규엔당 성수본점"), k("b", "규엔당 선릉점")] })).toBeNull();
+    expect(autoPick({ id: "4", name: "오츠", candidates: [k("a", "오츠", "의류판매"), k("b", "오츠", "음식점")] })).toBeNull();
+    expect(autoPick({ id: "5", name: "카페", candidates: [k("a", "다른 곳")] })).toBe("a");
+  });
+});
