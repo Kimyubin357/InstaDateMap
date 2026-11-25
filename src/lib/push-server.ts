@@ -9,6 +9,7 @@ export function pushConfiguration() {
   if (!publicKey || !privateKey || !subject) return null;
   try { webpush.setVapidDetails(subject, publicKey, privateKey); return { publicKey, privateKey, subject }; } catch { return null; }
 }
+/** added_by: 알림 제목에 쓸 이름. DB(019)가 저장한 사람의 지금 방 멤버 이름을 찾아 보냅니다(멤버가 아니면 기록된 이름). */
 interface Delivery { event_id: string; subscription_id: string; lease: string; endpoint: string; p256dh: string; auth: string; added_by: string; place_id: string; place_name: string; event_kind?: "place_added" | "memo_added" | "memo_updated"; folder_id?: string; folder_name?: string }
 /** 폴더별 알림(017): 어느 폴더의 소식인지 제목에 붙이고, 누르면 그 폴더를 열어 장소로 갑니다. */
 export function placeNotification(job: Pick<Delivery, "event_id" | "added_by" | "place_id" | "place_name" | "event_kind" | "folder_id" | "folder_name">) {

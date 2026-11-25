@@ -8,6 +8,7 @@ import { savePlace } from "@/lib/pipeline";
 import { boardRevision } from "@/lib/sync-server";
 import { snapshotEtag } from "@/lib/sync-types";
 import { withSavedPlace } from "@/lib/saved-place-server";
+import { actorName, placePeople, type SaveRecord } from "@/lib/people";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,15 +32,15 @@ export async function GET(req: Request) {
         .order("created_at", { ascending: false }),
       db()
         .from("source_places")
-        .select("place_id, added_by, added_at, sources!inner(id, url, media_type, board_id)")
+        .select("place_id, added_by, added_by_user_id, added_at, sources!inner(id, url, media_type, board_id)")
         .eq("sources.board_id", board.id),
       db()
         .from("sources")
-        .select("id, url, status, shared_by, shared_at, analysis_version, recovery_reason")
+        .select("id, url, status, shared_by, shared_by_user_id, shared_at, analysis_version, recovery_reason")
         .eq("board_id", board.id)
         .in("status", ["pending_confirm", "needs_review", "needs_caption"])
         .order("shared_at", { ascending: false }),
-      db().from("place_saves").select("place_id, added_by, added_at").eq("board_id", board.id),
+      db().from("place_saves").select("place_id, added_by, added_by_user_id, added_at").eq("board_id", board.id),
       db().from("collections").select("id,name,description,color,icon,version,created_at").eq("board_id", board.id).order("created_at", { ascending: false }),
       collectionMemberships(board.id),
     ]);
@@ -66,23 +67,18 @@ export async function GET(req: Request) {
       leftBySource.set(row.source_id, left);
     }
 
-    type Link = { place_id: string; added_by: string; added_at?: string; sources: { id: string; url: string; media_type: string } };
-    // 처음 등록한 사람: 저장 기록과 원본 연결 중 가장 이른 것(DB의 dm_place_registrant와 같은 기준)
-    const first = new Map<string, { by: string; at: string }>();
-    const noteFirst = (id: string, by: string, at?: string) => { const prev = first.get(id); if (at && (!prev || at < prev.at)) first.set(id, { by, at }); };
-    for (const l of (links ?? []) as unknown as Link[]) noteFirst(l.place_id, l.added_by, l.added_at);
-    for (const s of saveResult.data ?? []) noteFirst(s.place_id, s.added_by, s.added_at);
-    const byPlace = new Map<string, { sharers: Set<string>; sources: Map<string, { url: string; media_type: string }> }>();
+    type Link = SaveRecord & { place_id: string; sources: { id: string; url: string; media_type: string } };
+    // 저장한 사람·처음 등록한 사람: 원본 연결과 저장 기록을 함께 보고, 이름은 계정 id로 지금 이름을 찾습니다(019).
+    const byPlace = new Map<string, { records: SaveRecord[]; sources: Map<string, { url: string; media_type: string }> }>();
+    const entry = (id: string) => { const e = byPlace.get(id) ?? { records: [] as SaveRecord[], sources: new Map<string, { url: string; media_type: string }>() }; byPlace.set(id, e); return e; };
     for (const l of (links ?? []) as unknown as Link[]) {
-      const e = byPlace.get(l.place_id) ?? { sharers: new Set(), sources: new Map() };
-      e.sharers.add(l.added_by);
+      const e = entry(l.place_id);
+      e.records.push(l);
       e.sources.set(l.sources.id, { url: l.sources.url, media_type: l.sources.media_type });
-      byPlace.set(l.place_id, e);
     }
     const latest = new Map<string, string>();
-    for (const s of saveResult.data ?? []) {
-      const e = byPlace.get(s.place_id) ?? { sharers: new Set<string>(), sources: new Map<string, { url: string; media_type: string }>() };
-      e.sharers.add(s.added_by); byPlace.set(s.place_id, e);
+    for (const s of (saveResult.data ?? []) as (SaveRecord & { place_id: string; added_at: string })[]) {
+      entry(s.place_id).records.push(s);
       if (!latest.has(s.place_id) || s.added_at > latest.get(s.place_id)!) latest.set(s.place_id, s.added_at);
     }
 
@@ -101,13 +97,12 @@ export async function GET(req: Request) {
         return {
           ...p,
           kakao_place_id: p.kakao_place_id ?? null,
-          sharers: e ? [...e.sharers] : [],
-          registrant: first.get(p.id)?.by ?? null,
+          ...placePeople(e?.records ?? [], board.members),
           sources: e ? [...e.sources.values()] : [],
           last_saved_at: latest.get(p.id) || p.created_at,
         };
       }),
-      pending: (pending ?? []).map((source) => ({ ...source, place_names: [...(namesBySource.get(source.id) ?? [])], missing_count: leftBySource.get(source.id)?.missing ?? 0, choose_count: leftBySource.get(source.id)?.choose ?? 0 })),
+      pending: (pending ?? []).map(({ shared_by_user_id, ...source }) => ({ ...source, shared_by: actorName(board.members, shared_by_user_id, source.shared_by), place_names: [...(namesBySource.get(source.id) ?? [])], missing_count: leftBySource.get(source.id)?.missing ?? 0, choose_count: leftBySource.get(source.id)?.choose ?? 0 })),
     }, { headers: { "Cache-Control": "no-store", ETag: etag } });
     }
     return Response.json({ status: "error", message: "변경 내용을 맞추는 중이에요. 잠시 후 다시 확인할게요." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "1" } });

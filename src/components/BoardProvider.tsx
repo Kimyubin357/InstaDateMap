@@ -154,6 +154,6 @@ export default function BoardProvider({ children }: { children: ReactNode }) {
 }
 export function MapEntry({ access }: { access: SyncAccess }) {
   const { store } = useBoardSync(); const state = useBoardState();
-  useEffect(() => { void store.authorize(access); }, [store, access.boardId, access.authVersion, access.who, access.expiresAt]);
+  useEffect(() => { void store.authorize(access); }, [store, access.boardId, access.authVersion, access.who, access.expiresAt, String(access.memberIds)]);
   return state.access ? null : <main className="map-opening" role="status">지도를 여는 중…</main>;
 }

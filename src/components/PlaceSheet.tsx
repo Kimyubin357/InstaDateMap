@@ -24,7 +24,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
   const { notify, store, lock } = useBoardSync();
   const [transferring, setTransferring] = useState(false);
   const access = useBoardState().access;
-  const deletable = canDeletePlace(place, access?.who ?? "", access?.memberNames ?? []);
+  const deletable = canDeletePlace(place, access?.who ?? "", access?.memberNames ?? [], { userId: access?.userId, memberIds: access?.memberIds });
   const copy = placeCopyContent(place);
   const organizeHref = `/?view=list&organize=${encodeURIComponent(place.id)}`;
   const [memoWrite] = useState(() => new VerifiedWrite<{ memo: string; memo_version: number }>());

@@ -166,6 +166,18 @@ describe("공유 → 저장 흐름", () => {
     expect(new Set(tables.source_places.map((s) => s.added_by))).toEqual(new Set(["민지", "준호"]));
   });
 
+  it("이름을 바꾼 같은 계정이 같은 링크를 다시 공유해도 저장 기록을 하나 더 만들지 않는다(019)", async () => {
+    await ingestShare({ ...base, userId: "u-minji", text: "https://www.instagram.com/p/AAA/", caption: "어니언" }, llmFor(["어니언"]));
+    for (const t of ["source_places", "place_saves"]) for (const row of tables[t]) row.added_by_user_id = "u-minji";
+    const r = await ingestShare({ ...base, who: "민지2", userId: "u-minji", text: "https://www.instagram.com/p/AAA/" }, llmFor(["어니언"]));
+    expect(r.status).toBe("duplicate");
+    expect(tables.source_places.map((s) => s.added_by)).toEqual(["민지"]);
+    expect(tables.place_saves.map((s) => s.added_by)).toEqual(["민지"]);
+    const other = await ingestShare({ ...base, who: "준호", userId: "u-junho", text: "https://www.instagram.com/p/AAA/" }, llmFor(["어니언"]));
+    expect(other.status).toBe("duplicate");
+    expect(tables.place_saves.map((s) => [s.added_by, s.added_by_user_id])).toEqual([["민지", "u-minji"], ["준호", "u-junho"]]);
+  });
+
   it("장소를 지도에서 못 찾으면 확인 필요", async () => {
     const r = await ingestShare({ ...base, text: "https://www.instagram.com/p/BBB/", caption: "없는집" }, llmFor(["없는집"]));
     expect(r.status).toBe("needs_review");

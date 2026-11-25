@@ -10,7 +10,24 @@ describe("변경 번호와 조건부 지도 조회", () => {
   it("카카오 장소 ID를 포함하고 이전 형식 ETag는 최신 목록으로 교체", async () => {
     tables.places = [{ id: "p1", board_id: "b1", kakao_place_id: "123", name: "식당", created_at: "2026-01-01" }];
     const response = await GET(req('"dm2:b1:1:3"')); expect(response.status).toBe(200);
-    expect((await response.json()).places[0].kakao_place_id).toBe("123"); expect(response.headers.get("etag")).toBe('"dm4:b1:1:3"');
+    expect((await response.json()).places[0].kakao_place_id).toBe("123"); expect(response.headers.get("etag")).toBe('"dm5:b1:1:3"');
+  });
+  it("저장한 사람·처음 등록한 사람·확인 대기의 공유한 사람은 계정 id로 지금 이름을 보여 준다(019)", async () => {
+    tables.board_members = [{ board_id: "b1", user_id: "u:우리", member_name: "새우리", role: "owner", joined_at: "2026-01-01" }, { board_id: "b1", user_id: "u:서로", member_name: "서로", role: "member", joined_at: "2026-01-02" }];
+    tables.access_sessions[0].user_id = "u:우리";
+    tables.places = [{ id: "p1", board_id: "b1", kakao_place_id: "123", name: "식당", created_at: "2026-01-01" }];
+    tables.place_saves = [
+      { board_id: "b1", place_id: "p1", added_by: "우리", added_by_user_id: "u:우리", added_at: "2026-01-01" },
+      { board_id: "b1", place_id: "p1", added_by: "새우리", added_by_user_id: "u:우리", added_at: "2026-01-03" },
+      { board_id: "b1", place_id: "p1", added_by: "떠난 사람", added_by_user_id: null, added_at: "2026-01-02" },
+    ];
+    tables.sources = [{ id: "s1", board_id: "b1", url: "https://www.instagram.com/p/X/", status: "pending_confirm", shared_by: "서로옛이름", shared_by_user_id: "u:서로", shared_at: "2026-01-04" }];
+    const body = await (await GET(req())).json();
+    expect(body.places[0]).toMatchObject({ sharers: ["새우리", "떠난 사람"], registrant: "새우리", registrant_id: "u:우리" });
+    expect(body.pending[0].shared_by).toBe("서로");
+    expect(body.pending[0]).not.toHaveProperty("shared_by_user_id");
+    const access = await (await context(req())).json();
+    expect(access).toMatchObject({ who: "새우리", userId: "u:우리", memberIds: ["u:우리", "u:서로"] });
   });
   it("같은 변경 번호면 304이며 장소 테이블을 조회하지 않음", async () => {
     const first = await GET(req()), etag = first.headers.get("etag")!;

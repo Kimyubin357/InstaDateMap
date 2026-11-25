@@ -37,7 +37,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
 }) {
   const { store, notify, lock } = useBoardSync();
   const boardState = useBoardState(), access = boardState.access;
-  const deletable = (p: PlaceView) => canDeletePlace(p, access?.who ?? "", access?.memberNames ?? []);
+  const deletable = (p: PlaceView) => canDeletePlace(p, access?.who ?? "", access?.memberNames ?? [], { userId: access?.userId, memberIds: access?.memberIds });
   const navigation = useSearchParams().toString();
   const current = collections.find((c) => c.id === currentId);
   const [selecting, setSelecting] = useState(false), [selected, setSelected] = useState<string[]>([]);

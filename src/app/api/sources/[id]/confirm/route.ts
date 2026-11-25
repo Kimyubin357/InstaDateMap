@@ -28,7 +28,7 @@ export async function POST(req: Request, { params: route }: { params: Promise<{ 
       return Response.json({ status: "error", code: "NOTHING_TO_SAVE", message: NOTHING_TO_SAVE }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
     const saved = await confirmSelections(board.id, params.id, board.who, selections, direct, workOwner(board, body.work_id), body.version || "");
-    const { data: links } = saved ? await db().from("source_places").select("place_id").eq("source_id", params.id).eq("added_by", board.who) : { data: [] };
+    const { data: links } = saved ? await db().from("source_places").select("place_id").eq("source_id", params.id).eq("added_by_user_id", board.userId) : { data: [] };
     const placeIds = [...new Set((links ?? []).map((l) => l.place_id as string))];
     return Response.json(await withSavedPlace(board, { status: "ok", saved, place_url: placeIds[0] ? `/?place=${placeIds[0]}` : "/", place_ids: placeIds }), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

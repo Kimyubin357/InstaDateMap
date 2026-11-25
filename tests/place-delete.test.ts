@@ -27,6 +27,14 @@ describe("삭제 권한(처음 등록한 사람)", () => {
     expect(canDeletePlace({ registrant: "떠난 사람" }, "우리", ["우리", "서로"])).toBe(true);
     expect(canDeletePlace({ registrant: null }, "우리", ["우리"])).toBe(true);
   });
+  it("화면 판단(019): 등록한 사람 id가 있으면 이름 대신 id로 비교한다(이름을 바꿔도, 옛 이름을 다른 멤버가 써도)", () => {
+    const me = { userId: "u1", memberIds: ["u1", "u2"] };
+    expect(canDeletePlace({ registrant: "새이름", registrant_id: "u1" }, "새이름", ["새이름", "옛이름"], me)).toBe(true);
+    expect(canDeletePlace({ registrant: "우리", registrant_id: "u2" }, "우리", ["우리"], me)).toBe(false);
+    expect(canDeletePlace({ registrant: "떠난 사람", registrant_id: "u9" }, "우리", ["우리", "떠난 사람"], me)).toBe(true);
+    // id가 없는 예전 기록은 이름으로
+    expect(canDeletePlace({ registrant: "서로", registrant_id: null }, "우리", ["우리", "서로"], me)).toBe(false);
+  });
   it("서버: 지금 방·내 계정으로 dm_delete_place를 부르고, 권한 안내는 한국어로 전한다", async () => {
     const rpc = vi.spyOn(fakeDb, "rpc").mockResolvedValueOnce({ data: { ok: true, deleted_id: "p1", log_id: log }, error: null });
     const res = await DELETE(request(), params("p1"));
