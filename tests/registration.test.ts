@@ -138,3 +138,14 @@ describe("확인 대기: 실제로 저장된 정보로만 남은 이유", () => 
     expect(pendingWhen(undefined, now)).toBe("");
   });
 });
+
+describe("링크 입력 미리 확인(2026-11-25 점검 엣지 케이스)", () => {
+  it("글 속 링크는 골라내고, 인스타가 아니거나 계정 주소면 이유를 돌려준다", async () => {
+    const { postLinkIn } = await import("@/lib/registration");
+    expect(postLinkIn("여기 꼭 가보자!! https://www.instagram.com/p/AbC_1-2/?igsh=xx 진짜")).toEqual({ link: "https://www.instagram.com/p/AbC_1-2/?igsh=xx" });
+    expect(postLinkIn("https://instagram.com/reels/XyZ123/")).toEqual({ link: "https://instagram.com/reels/XyZ123/" });
+    expect(postLinkIn("https://naver.me/5abcdEFG")).toEqual({ problem: "not_instagram" });
+    expect(postLinkIn("https://www.instagram.com/newatdawn/")).toEqual({ problem: "not_post" });
+    expect(postLinkIn("안녕하세요")).toEqual({ problem: "not_instagram" });
+  });
+});

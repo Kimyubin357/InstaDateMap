@@ -61,7 +61,7 @@ export default function PlaceCarousel({ places, selectedId, onSelect, onOpen, on
         <span className="card-badges">{PLACE_STATUS_ENABLED && <span className={`status-tag ${place.status}`}>{STATUS_LABEL[place.status]}</span>}{newPlaceIds?.has(place.id) && <span className="new-place-badge" aria-label="새로 등록한 장소">NEW</span>}</span>
         <strong>{place.name}</strong><span className="card-meta">{placeMeta(place) || place.address || "저장한 장소"}</span>
         {place.memo && <span className="card-memo">{place.memo}</span>}
-        <span className="card-bottom"><span className="card-sharer"><Icon name="user" width="13" />{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "우리의 장소"}</span><span className="card-count">{i + 1} / {places.length}</span></span>
+        <span className="card-bottom"><span className="card-sharer"><Icon name="user" width="13" />{place.sharers.length >= 2 ? `${place.sharers.length}명이 저장` : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "저장한 장소"}</span><span className="card-count">{i + 1} / {places.length}</span></span>
         <span className="card-open"><Icon name="arrow" width="19" /></span>
         </button>
         <button className="icon-btn carousel-dismiss" tabIndex={place.id === selectedId ? 0 : -1} aria-label="장소 카드 닫기" onClick={onDismiss}><Icon name="close" width="18" /></button>

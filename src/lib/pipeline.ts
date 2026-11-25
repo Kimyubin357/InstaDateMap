@@ -65,7 +65,7 @@ export async function savePlace(args: { boardId: string; sourceId: string | null
 export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Promise<ShareResponse> {
   const raw = firstUrl(input.text) ?? input.text;
   const url = normalizeInstagramUrl(raw);
-  if (!url) return { status: "error", message: "인스타그램 게시물이나 릴스 링크가 아닙니다." };
+  if (!url) return { status: "error", message: "인스타그램 게시물이나 릴스 링크가 아니에요." };
 
   const manualCaption = input.caption?.trim() || null;
   const images = input.images ?? [];
@@ -227,7 +227,7 @@ export async function confirmSelections(boardId: string, sourceId: string, who: 
   const result = await db().from("extractions").select("id, candidates").eq("source_id", sourceId);
   checkDb(result.error, "장소 후보 조회 실패");
   const allowed = new Map((result.data ?? []).map((e) => [e.id, e.candidates as KakaoPlace[]]));
-  if (new Set(selections.map((s) => s.extraction_id)).size !== selections.length || selections.some((s) => !allowed.has(s.extraction_id))) throw new AccessError("이 링크의 장소 후보가 아닙니다. 화면을 새로 열어 주세요.", 409);
+  if (new Set(selections.map((s) => s.extraction_id)).size !== selections.length || selections.some((s) => !allowed.has(s.extraction_id))) throw new AccessError("이 링크의 장소 후보가 아니에요. 화면을 새로 열어 주세요.", 409);
   const resolved = await Promise.all(selections.map(async (s) => {
     if (!s.include) return { extraction_id: s.extraction_id, include: false, place: null };
     const stored = allowed.get(s.extraction_id)?.find((p) => p.kakao_place_id === s.place_id);

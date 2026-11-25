@@ -194,7 +194,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
           {PLACE_STATUS_ENABLED && <span className={`status-tag ${p.status}`}>{STATUS_LABEL[p.status]}</span>}
         </span>
         <span className={styles.attribution}>
-          <small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? "둘 다 저장함" : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>
+          <small className="row-sharer"><Icon name="user" width={12} height={12} />{p.sharers.length >= 2 ? `${p.sharers.length}명이 저장` : p.sharers[0] ? `${p.sharers[0]}님이 저장` : `${who}님의 장소`}</small>
           {!current && joined.length > 0 && <small className={styles.membership} title={joined.map((c) => c.name).join(", ")}><span className={styles.membershipName}>모음: {joined[0].name}</span>{joined.length > 1 && <span className={styles.membershipCount}>+{joined.length - 1}</span>}</small>}
         </span>
         {current && p.memo && <small className={styles.memo}>{p.memo}</small>}
@@ -225,7 +225,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
     </header>}
     <div className={styles.content}>
     {showCollections ? <>
-      <div className={styles.heading}><h2>우리 모음 <small>{collections.length}개</small></h2></div>
+      <div className={styles.heading}><h2>모음 <small>{collections.length}개</small></h2></div>
       {collections.length > 4 && <label className={styles.search}><Icon name="search" width={18} /><input aria-label="모음 이름 검색" placeholder="모음 이름으로 찾기" value={query} maxLength={40} onChange={(e) => setQuery(e.target.value)} /></label>}
       <div className={styles.grid}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <button className={styles.card} key={c.id} style={{ "--collection-color": `var(--collection-${c.color})` } as CSSProperties} onClick={() => onNavigate("collections", c.id)}><Icon name={c.icon} width={30} /><strong>{c.name}</strong><span>{c.place_ids.length}곳{PLACE_STATUS_ENABLED && ` · 가고 싶은 곳 ${wishCounts.get(c.id) ?? 0}`}</span></button>)}{loaded && collections.length > 0 && <button className={`${styles.card} ${styles.addCard}`} onClick={() => beginEditor()}><Icon name="plus" width={26} /><span>새 모음</span></button>}</div>
       {loaded && !collections.length && <div className={styles.empty}><Icon name="heart" width={36} /><h3>함께 갈 곳을 모아봐요</h3><p>‘부산 주말’, ‘비 오는 날’처럼<br />다시 찾고 싶은 이름을 붙여보세요.</p><button className="btn primary" onClick={() => beginEditor()}>첫 모음 만들기</button></div>}
@@ -238,7 +238,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       <div className={styles.filters}>{tools}{!current && <button className="chip" aria-pressed={unfiled} onClick={() => setUnfiled(!unfiled)}>미분류 {places.filter((p) => !memberships.has(p.id)).length}</button>}</div>
       {selecting && <div className={styles.selectionHint}><button className="text-btn" disabled={!rows.length} onClick={selectCurrentList}>{rows.length > 0 && rows.every((p) => chosen.includes(p.id)) ? "현재 목록 해제" : "현재 목록 선택"}{rows.length > 200 ? " (최대 200곳)" : ""}</button>{current && <button className="text-btn" disabled={!chosen.length} onClick={() => { resetWrite(); setDialog("remove"); }}>이 모음에서 빼기</button>}{chosen.some((id) => !rows.some((p) => p.id === id)) && <span>숨겨진 선택 {chosen.filter((id) => !rows.some((p) => p.id === id)).length}곳 포함</span>}</div>}
       {rows.map((p) => placeRow(p, selecting))}
-      {loaded && !rows.length && <div className={styles.empty}><Icon name={current ? current.icon : "heart"} width={32} /><h3>{current && !current.place_ids.length ? "이 모음에 장소를 담아봐요" : unfiled ? "미분류 장소가 없어요" : places.length ? "조건에 맞는 장소가 없어요" : "우리의 첫 장소를 담아봐요"}</h3><p>{current && !current.place_ids.length ? "이미 저장한 장소에서 골라 담을 수 있어요." : "저장한 장소는 여기에서 함께 볼 수 있어요."}</p>{current && !current.place_ids.length ? <button className="btn" onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}>장소 담기</button> : places.length > 0 && <button className="text-btn" onClick={() => { setUnfiled(false); onReset(); }}>전체 장소 보기</button>}</div>}
+      {loaded && !rows.length && <div className={styles.empty}><Icon name={current ? current.icon : "heart"} width={32} /><h3>{current && !current.place_ids.length ? "이 모음에 장소를 담아봐요" : unfiled ? "미분류 장소가 없어요" : places.length ? "조건에 맞는 장소가 없어요" : "첫 장소를 담아 봐요"}</h3><p>{current && !current.place_ids.length ? "이미 저장한 장소에서 골라 담을 수 있어요." : "저장한 장소는 여기에서 함께 볼 수 있어요."}</p>{current && !current.place_ids.length ? <button className="btn" onClick={() => { resetWrite(); setSelected([]); setPlaceQuery(""); setDialog("places"); }}>장소 담기</button> : places.length > 0 && <button className="text-btn" onClick={() => { setUnfiled(false); onReset(); }}>전체 장소 보기</button>}</div>}
       {selecting && <SelectedPlacesBar workspace={workspace} count={chosen.length} onCollect={openPicker} onTransfer={() => setTransferIds(chosen)} onDelete={() => {
         const picked = places.filter((p) => chosen.includes(p.id)), mine = picked.filter(deletable);
         if (!mine.length) { notify("내가 등록한 장소만 지울 수 있어요.", "info"); return; }

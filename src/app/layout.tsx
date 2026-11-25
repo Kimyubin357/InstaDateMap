@@ -10,7 +10,7 @@ import EdgeNavigationGuard from "@/components/EdgeNavigationGuard";
 
 export const metadata: Metadata = {
   title: "데이트맵",
-  description: "우리가 같이 가보고 싶은 곳",
+  description: "가고 싶은 곳을 지도에 모아요",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "데이트맵", statusBarStyle: "black-translucent", startupImage: appleStartupImages },
 };

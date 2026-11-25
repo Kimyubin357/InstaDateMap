@@ -135,8 +135,8 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
       <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
     </div>}
     overview={<><p className="addr">{place.address}</p>
-    <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>함께 가볼 곳</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] || "우리"}</strong><span>발견한 사람</span></div></div>
-    {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">우리에게 어떤 곳인가요?</span></div>
+    <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>분류</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? `${place.sharers.length}명` : place.sharers[0] || "알 수 없음"}</strong><span>발견한 사람</span></div></div>
+    {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">어떤 곳인가요?</span></div>
     <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div></>}
     </>}
     preview={<div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
@@ -145,14 +145,14 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     {activity && <p className="notice" role="status">{activity}</p>}
     {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
     <PlaceExtras placeId={place.id} />
-    <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "둘만의 메모"}</label><textarea id="place-memo" className="memo" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="다음에 같이 가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
+    <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "메모"}</label><textarea id="place-memo" className="memo" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
     {savedEarlierMemo && memoDirty && <p id="memo-unsaved-hint" className="hint" role="status">새로 쓴 내용은 아직 저장되지 않았어요.</p>}
     <div className="place-source-actions">
-      <ShellLink className="btn place-organize-btn" href={organizeHref} aria-disabled={busy || status.pending} onClick={(event) => {
+      <div className="place-organize-row"><ShellLink className="btn place-organize-btn" href={organizeHref} aria-disabled={busy || status.pending} onClick={(event) => {
         if (busy || status.pending) { event.preventDefault(); return; }
         if (memoDirty && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) { event.preventDefault(); setLeaving("organize"); }
       }}><Icon name="heart" width="20" />모음에 담기</ShellLink>
-      <button type="button" className="btn place-organize-btn" disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="map" width="20" />다른 방에 담기</button>
+      <button type="button" className="btn place-organize-btn" disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="map" width="20" />다른 방에 담기</button></div>
       {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
       {deletable ? <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>
         : <p className="hint place-delete-hint">삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
