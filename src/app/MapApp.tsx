@@ -21,8 +21,9 @@ import PlaceCarousel from "@/components/PlaceCarousel";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
 import useScopePlaces from "@/components/useScopePlaces";
 import AllPlacesList from "@/components/AllPlacesList";
-import { NewPlacesSheet, PlaceRoomsLine, RoomScopeButton, RoomsSheet, roomSettingsHref, type NewRoomEntry } from "@/components/Rooms";
+import { NewPlacesSheet, RoomScopeButton, RoomsSheet, roomSettingsHref, type NewRoomEntry } from "@/components/Rooms";
 import { EmptyMapCard, LoadingChip, SkeletonRows, useDelayed } from "@/components/EmptyStates";
+import { useQuietLocation } from "@/components/usePlaceBriefs";
 import type { MapRoomLook } from "@/components/MapCanvas";
 import { newPlacesByRoom, type MapPlace, type RoomSummary } from "@/lib/rooms";
 import { friendlyMessage } from "@/lib/client-request";
@@ -86,7 +87,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   /** Card deck opened from a region list: only that area's places, in the list's order. null = every place on the map. */
   const [deck, setDeck] = useState<string[] | null>(null);
   const [mapRequest, setMapRequest] = useState<MapViewRequest | null>(null); const requestSequence = useRef(0);
-  const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  // 리스트 거리: 위치 권한을 이미 허락했으면 조용히 받은 현재 위치(새로 묻지 않음)
+  const quietOrigin = useQuietLocation(); const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sort, setSort] = useState("recent"); const [locating, setLocating] = useState(false);
   const [savedArrival, setSavedArrival] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState<JustSaved | null>(null);
@@ -319,7 +322,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (!mapVisible.length) return;
     lastScope.current = scopeKey; fitAfterScope = false;
     setFocusedId(null); setRegionSelection(null); setDeck(null);
-    setMapRequest({ sequence: ++requestSequence.current, kind: "saved" });
+    // 전체 보기 버튼과 같은 맞춤(한 단계 가깝게). 방·전체로 바꿀 때 지도가 너무 멀리 보이지 않게(2026-11-26 사용자 결정).
+    setMapRequest({ sequence: ++requestSequence.current, kind: "saved", closer: true });
   }, [scopeKey, loaded, openRoom, mapVisible.length]);
   /** 지도 핀·지역 카드의 방 색: 전체 = 장소마다 그 방 색(여러 방이면 나눈 색), 방 안 = 그 방 색 */
   const look = useMemo<MapRoomLook | undefined>(() => roomsState.rooms ? {
@@ -365,6 +369,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     tour.finish();
     if (reason === "add") navigateShell("/add");
   }
+  // 장소 상세의 "누가 저장" 얼굴: 모든 방 멤버 이름 → 프로필 사진
+  const faces = useMemo(() => new Map((roomsState.rooms ?? []).flatMap((r) => r.member_names.map((n, i) => [n, r.member_avatars?.[i] ?? null] as const)).filter(([, a]) => a)), [roomsState.rooms]);
+  const faceOf = (name: string) => faces.get(name);
   const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
   const kindTool = <div className="list-tools"><button className={`list-filter kind-chip${category || !all ? " is-active" : ""}`} aria-label={category ? `종류: ${category}. 종류 바꾸기` : "종류로 거르기"} aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>{category || "종류"}</span><Icon name="chevron" width="14" className="list-filter-chevron" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>;
   return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
@@ -383,9 +390,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {!landscape && regionView}
     {!landscape && statusView}
     {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
-      {isAll ? <AllPlacesList mode={listMode === "rooms" ? "rooms" : "all"} places={visible} total={places.length} rooms={roomsState.rooms} roomsError={roomsState.roomsError} loaded={loaded} tools={kindTool} newPlaceIds={newPlaceIds} distanceOrigin={sort === "near" ? origin : null}
+      {isAll ? <AllPlacesList mode={listMode === "rooms" ? "rooms" : "all"} places={visible} total={places.length} rooms={roomsState.rooms} roomsError={roomsState.roomsError} loaded={loaded} tools={kindTool} newPlaceIds={newPlaceIds} distanceOrigin={origin ?? quietOrigin}
         onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onEnterRoom={enterRoom} onReset={reset} />
-      : <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode === "collections" ? "collections" : "all"} loaded={loaded} distanceOrigin={sort === "near" ? origin : null} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
+      : <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode === "collections" ? "collections" : "all"} loaded={loaded} distanceOrigin={origin ?? quietOrigin} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
         onMap={(id) => { setFocusedId(null); navigateShell(`/?collection=${encodeURIComponent(id)}&section=collections`); setMapRequest({ sequence: ++requestSequence.current, kind: "saved" }); }}
         tools={kindTool} />}
       {/* 리스트 로딩: 1초가 넘을 때만 뼈대 줄(시안 A2). 짧은 로딩은 아무것도 안 띄웁니다. */}
@@ -398,7 +405,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} view={view} onClose={close} onShowMap={() => showPlaceOnMap(selected)}
       room={selectedRoom ? { id: selectedRoom.id, who: selectedRoom.member_name, memberNames: selectedRoom.member_names, memberIds: selectedRoom.member_ids } : undefined}
-      rooms={selectedRooms.length > 0 ? <PlaceRoomsLine rooms={selectedRooms} /> : undefined}
+      rooms={selectedRooms.length > 0 ? selectedRooms : currentRoom ? [currentRoom] : undefined} origin={origin ?? quietOrigin} faceOf={faceOf}
       onOrganize={isAll ? () => { const room = selected.board_id; navigateShell(`/?view=list&organize=${encodeURIComponent(selected.id)}`, true); void pickScopeFromList(room); } : undefined}
       onPatch={(patch) => { if (selectedRoom) roomsStore.patchPlace(selected.id, patch); else store.patchPlace(selected.id, patch); }}
       onDelete={() => { if (selectedRoom) roomsStore.removePlace(selected.id); else store.removePlace(selected.id); setFocusedId(null); close(); setOverlay(null); setSelectedId(null); }} />}

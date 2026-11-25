@@ -27,8 +27,12 @@ export function RoomScopeButton({ name, open, onClick }: { name: string; open: b
 const roomMeta = (r: RoomSummary) => `장소 ${r.place_count}곳 · ${r.collection_count ? `모음 ${r.collection_count}개` : "모음 없음"}`;
 
 /** 멤버 이름 첫 글자 동그라미(최대 3개) + "2명"/"나만" */
-export function MemberFaces({ names, count }: { names: readonly string[]; count: number }) {
-  return <span className={styles.who}><span className={styles.faces} aria-hidden="true">{names.slice(0, 3).map((n, i) => <i key={`${n}-${i}`}>{Array.from(n.trim())[0] ?? "?"}</i>)}</span>{membersLabel(count)}</span>;
+export function MemberFaces({ names, avatars = [], count }: { names: readonly string[]; avatars?: readonly (string | null)[]; count: number }) {
+  // 프로필 사진이 있으면 사진, 없으면 이름 첫 글자
+  return <span className={styles.who}><span className={styles.faces} aria-hidden="true">{names.slice(0, 3).map((n, i) => avatars[i]
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <i key={`${n}-${i}`} className={styles.photo}><img src={avatars[i]!} alt="" referrerPolicy="no-referrer" decoding="async" /></i>
+    : <i key={`${n}-${i}`}>{Array.from(n.trim())[0] ?? "?"}</i>)}</span>{membersLabel(count)}</span>;
 }
 
 /** 그 방 설정(이름·색·멤버·초대)으로 바로 가는 주소 */
@@ -50,8 +54,8 @@ export function RoomCards({ rooms, selected, withAll, compact, disabled, onPick 
     {rooms.map((r) => <div key={r.id} className={styles.cell}>
       <button type="button" role={withAll ? "radio" : undefined} aria-checked={withAll ? selected === r.id : undefined} disabled={disabled}
         aria-label={`${r.name}, ${roomMeta(r)}, ${membersLabel(r.member_count)}${withAll ? "" : ". 이 방으로 들어가기"}`}
-        className={`${styles.card} ${styles.roomCard}${selected === r.id ? ` ${styles.on}` : ""}`} style={toneStyle(r.color)} onClick={() => onPick(r.id)}>
-        <strong>{r.name}</strong><small>{roomMeta(r)}</small><MemberFaces names={r.member_names} count={r.member_count} />{selected === r.id && check}
+        className={`${styles.card} ${styles.roomCard}${selected === r.id ? ` ${styles.on}` : ""}${r.color === "forest" ? ` ${styles.onRed}` : ""}`} style={toneStyle(r.color)} onClick={() => onPick(r.id)}>
+        <strong>{r.name}</strong><small>{roomMeta(r)}</small><MemberFaces names={r.member_names} avatars={r.member_avatars} count={r.member_count} />{selected === r.id && check}
       </button>
       <ShellLink href={roomSettingsHref(r.id)} className={styles.gear} aria-label={`${r.name} 방 설정`} aria-disabled={disabled} onClick={(e) => { if (disabled) e.preventDefault(); }}><i><Icon name="settings" width={17} /></i></ShellLink>
     </div>)}
@@ -88,10 +92,6 @@ export function RoomTags({ rooms }: { rooms: readonly Pick<RoomSummary, "id" | "
   return <span className={styles.tags}>{rooms.map((r) => <span key={r.id} className={styles.tag} style={toneStyle(r.color)}><i /><span>{r.name}</span></span>)}</span>;
 }
 
-/** 장소 상세: 이 장소가 있는 방(전체 보기에서만) */
-export function PlaceRoomsLine({ rooms }: { rooms: readonly Pick<RoomSummary, "id" | "name" | "color">[] }) {
-  return <p className={styles.placeRooms}><span>있는 방</span><RoomTags rooms={rooms} /></p>;
-}
 
 export interface NewRoomEntry { room: RoomSummary; places: PlaceView[] }
 /**

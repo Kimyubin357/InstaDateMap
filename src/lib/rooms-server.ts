@@ -27,12 +27,21 @@ export async function roomSummaries(userId: string): Promise<{ rooms: RoomSummar
   for (const m of memberResult.data ?? []) {
     const list = members.get(m.board_id) ?? []; list.push({ userId: m.user_id, name: m.member_name }); members.set(m.board_id, list);
   }
+  // 멤버 얼굴(방 카드·장소 리스트의 "누가 저장"): 프로필 사진. 직접 올린 사진은 256px라 작습니다(방당 최대 8명).
+  const faceIds = [...new Set([...members.values()].flatMap((list) => list.map((m) => m.userId)).filter(Boolean))];
+  const avatars = new Map<string, string | null>();
+  if (faceIds.length) {
+    const users = await db().from("app_users").select("id, avatar_url").in("id", faceIds);
+    if (users.error) console.error("roomSummaries: avatars failed", users.error.code, users.error.message);
+    for (const u of users.data ?? []) avatars.set(u.id, u.avatar_url ?? null);
+  }
   const collections = new Map<string, number>();
   for (const c of collectionResult.data ?? []) collections.set(c.board_id, (collections.get(c.board_id) ?? 0) + 1);
   return {
     members,
     rooms: folders.map((f) => ({ ...f, collection_count: collections.get(f.id) ?? 0,
-      member_ids: (members.get(f.id) ?? []).map((m) => m.userId), member_names: (members.get(f.id) ?? []).map((m) => m.name) })),
+      member_ids: (members.get(f.id) ?? []).map((m) => m.userId), member_names: (members.get(f.id) ?? []).map((m) => m.name),
+      member_avatars: (members.get(f.id) ?? []).map((m) => (m.userId && avatars.get(m.userId)) || null) })),
   };
 }
 

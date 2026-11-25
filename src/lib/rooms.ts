@@ -13,6 +13,8 @@ export interface RoomSummary extends FolderSummary {
   /** 지금 멤버의 계정 id·이름(삭제 권한 판단: 처음 등록한 사람만, 그 사람이 방에 없으면 누구나) */
   member_ids: string[];
   member_names: string[];
+  /** 멤버 프로필 사진(member_names와 같은 순서, 없으면 null). 방 카드·장소 리스트의 얼굴에 씁니다. */
+  member_avatars?: (string | null)[];
 }
 export interface RoomsResponse { current: string | null; rooms: RoomSummary[] }
 /** 전체 보기의 장소: 어느 방의 장소인지(board_id)를 함께 씁니다. */

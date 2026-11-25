@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import MapPlaceSheet from "./MapPlaceSheet";
-import ListPlaceSheet from "./ListPlaceSheet";
 import Icon from "./Icon";
 import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { STATUS_ORDER, type PlaceView, placeMeta, canDeletePlace } from "@/lib/place-view";
@@ -9,7 +8,11 @@ import { requestJson, RequestError } from "@/lib/client-request";
 import { CHECKING_SAVE, VerifiedWrite, UnconfirmedWriteError } from "@/lib/verified-write";
 import { verifyDeletedPlace, verifyPlacePatch, verifyMemoSave, placeUrl } from "@/lib/save-recovery";
 import MapCanvas from "./MapCanvas";
-import PlaceExtras from "./PlaceExtras";
+import { OpenChip, PlaceBooking, PlaceInfo, PlaceMenus, PlacePhotos, usePlaceDetails } from "./PlaceDetailParts";
+import { distanceLabel } from "@/lib/place-brief";
+import { distanceM } from "@/lib/place-view";
+import { toneStyle } from "./Palette";
+import styles from "./PlaceSheet.module.css";
 import ActionDialog from "./ActionDialog";
 import { useBoardState, useBoardSync } from "./BoardProvider";
 import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
@@ -22,10 +25,14 @@ const ignore = () => {};
 /** 전체 보기에서 이 기기가 연 방이 아닌 다른 방의 장소: 그 방에서의 내 이름과 지금 멤버(삭제 권한), 요청은 ?room= 으로 그 방에. */
 export interface PlaceRoom { id: string; who: string; memberNames: string[]; memberIds: string[] }
 /** Share mutations and draft protection; map/list components own their UI independently. */
-export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, onPatch, onDelete, room, rooms, onOrganize }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void;
+export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatch, onDelete, room, rooms, origin, faceOf, onOrganize }: { place: PlaceView; kakaoKey: string; view: "map" | "list"; onClose: () => void; onShowMap: () => void; onPatch: (patch: { status?: PlaceStatus; memo?: string; memo_version?: number }) => void; onDelete: () => void;
   room?: PlaceRoom;
-  /** 전체 보기: 이 장소가 있는 방 한 줄 */
-  rooms?: ReactNode;
+  /** 이 장소가 있는 방(이름 밑 방 칩). 전체 보기에서는 여러 개일 수 있습니다. */
+  rooms?: readonly { id: string; name: string; color?: string | null }[];
+  /** 현재 위치(거리 표시). 없으면 거리를 숨깁니다. */
+  origin?: { lat: number; lng: number } | null;
+  /** 저장한 사람 이름 → 프로필 사진 */
+  faceOf?: (name: string) => string | null | undefined;
   /** 전체 보기: 모음 정리는 그 방에 들어가서 합니다. */
   onOrganize?: () => void }) {
   const { notify, store, lock } = useBoardSync();
@@ -89,6 +96,7 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     }
   }, [deleting]);
   const preview = useMemo(() => [{ ...place, status: status.status }], [place, status.status]);
+  const info = usePlaceDetails(place.id, room?.id);
   function leave(destination: "close" | "map" | "organize") {
     if (destination === "map") onShowMap();
     else if (destination === "organize") { if (onOrganize) onOrganize(); else navigateShell(organizeHref); }
@@ -136,37 +144,81 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
     finally { deleteRequest.current = false; setBusy(false); }
   }
   const closeSheet = busy || deleting || leaving ? () => {} : () => requestLeave("close");
-  const Layout = view === "map" ? MapPlaceSheet : ListPlaceSheet;
-  return <><Layout title={place.name} onClose={closeSheet}
-    summary={<div className="detail-title"><h2>{place.name}</h2>{PLACE_STATUS_ENABLED && <span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span>}</div>}
-    closeAction={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
-    footer={<div className="detail-actions"><a className="btn primary" href={place.kakao_url || `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`} target="_blank" rel="noreferrer"><Icon name="external" />카카오맵 열기</a>
-      <button className="btn" disabled={busy} onClick={async () => { try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); } catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); } }}><Icon name="copy" />{copy.label} 복사</button>
+  const meta = [placeMeta(place), origin ? distanceLabel(distanceM(origin, place)) : ""].filter(Boolean).join(" · ");
+  const saver = place.sharers.length >= 2 ? `${place.sharers.length}명이 저장` : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "";
+  const savedOn = new Date(place.created_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" });
+  const route = `https://map.kakao.com/link/to/${encodeURIComponent(place.name)},${place.lat},${place.lng}`;
+  async function copyAddress() {
+    try { await navigator.clipboard.writeText(copy.text); notify(`${copy.object} 복사했어요.`); }
+    catch { notify(`${copy.object} 복사하지 못했어요. ${copy.object} 길게 눌러 복사해 주세요.`, "error"); }
+  }
+  // 끝까지 올린 창: 본문 맨 위 이름이 머리에 가려지면 ‹ 옆으로 이름을 올립니다(네이버 상세처럼).
+  const bodyTitle = useRef<HTMLDivElement>(null);
+  const [titleUp, setTitleUp] = useState(false);
+  useEffect(() => {
+    const el = bodyTitle.current, root = el?.closest(".sheet-body");
+    if (!el || !root) return;
+    const observer = new IntersectionObserver(([entry]) => setTitleUp(!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)), { root, threshold: 0 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const titleBlock = (body: boolean) => <>
+    <h2 className={styles.name}>{place.name}{PLACE_STATUS_ENABLED && <span className={`status-tag ${status.status}`}>{STATUS_LABEL[status.status]}</span>}</h2>
+    {meta && <p className={styles.meta}>{meta}</p>}
+    <div className={styles.chips}>
+      <OpenChip details={info.details} />
+      {(rooms ?? []).map((r) => <span key={r.id} className={styles.roomChip} style={toneStyle(r.color)}><i aria-hidden="true" />{r.name}</span>)}
+    </div>
+    {body && null}
+  </>;
+  const actions = <div className={styles.actions}>
+    <a className={`btn primary ${styles.route}`} href={route} target="_blank" rel="noreferrer"><Icon name="arrow" width="18" />길찾기</a>
+    <ShellLink className={`btn ${styles.act}`} href={organizeHref} aria-disabled={busy || status.pending} onClick={(event) => {
+      if (busy || status.pending) { event.preventDefault(); return; }
+      if (memoDirty && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) { event.preventDefault(); setLeaving("organize"); }
+      else if (onOrganize) { event.preventDefault(); onOrganize(); }
+    }}><Icon name="collection" width="18" />모음에 담기</ShellLink>
+    {deletable && <button type="button" className={`btn ${styles.act}`} disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="moveRoom" width="18" />옮기기</button>}
+  </div>;
+  return <><MapPlaceSheet title={place.name} onClose={closeSheet}
+    summary={<div className={`detail-title ${styles.summary}${titleUp ? ` ${styles.titleUp}` : ""}`}>
+      <div className={styles.full}>{titleBlock(false)}</div>
+      <strong className={styles.compact} aria-hidden="true">{place.name}</strong>
     </div>}
-    overview={<><p className="addr">{place.address}</p>{rooms}
-    <div className="detail-facts"><div><Icon name={categoryIcon(place.category)} width="20" /><strong>{placeMeta(place) || "저장한 장소"}</strong><span>분류</span></div><div><Icon name="user" width="20" /><strong>{place.sharers.length >= 2 ? `${place.sharers.length}명` : place.sharers[0] || "알 수 없음"}</strong><span>발견한 사람</span></div></div>
-    {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">어떤 곳인가요?</span></div>
-    <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div></>}
+    closeAction={<button type="button" className="icon-btn sheet-close-btn" aria-label="닫기" disabled={busy} onClick={closeSheet}><Icon name="close" width="18" /></button>}
+    footer={actions}
+    overview={<>
+      {/* 끝까지 올린 창에서만 보이는 본문 머리(이름·분류·칩). 시트일 때는 머리의 요약이 같은 내용을 보여 줍니다. */}
+      <div ref={bodyTitle} className={styles.bodyTitle}>{titleBlock(true)}</div>
+      <PlacePhotos details={info.details} loading={info.loading} />
     </>}
-    preview={<div className="detail-map"><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>}
     details={<>
     {statusPending && <button className="text-btn" disabled={busy} onClick={retryStatus}>상태 저장 확인·재시도</button>}
     {activity && <p className="notice" role="status">{activity}</p>}
     {memoConflict && <section className="memo-conflict" role="alert"><p>{memoConflict.who}님이 메모를 먼저 바꿨어요. 위 내용을 참고해 아래 초안을 정리한 뒤 저장해 주세요.</p><strong>현재 저장된 메모</strong><p className="memo-conflict-current">{memoConflict.memo || "(빈 메모)"}</p></section>}
-    <PlaceExtras placeId={place.id} room={room?.id} />
-    <label className="section-label" htmlFor="place-memo">{memoConflict ? "내 초안 · 수정해서 저장" : "메모"}</label><textarea id="place-memo" className="memo" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="가면 좋을 시간, 먹고 싶은 메뉴…" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} /><div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>
-    {savedEarlierMemo && memoDirty && <p id="memo-unsaved-hint" className="hint" role="status">새로 쓴 내용은 아직 저장되지 않았어요.</p>}
-    <div className="place-source-actions">
-      <div className="place-organize-row"><ShellLink className="btn place-organize-btn" href={organizeHref} aria-disabled={busy || status.pending} onClick={(event) => {
-        if (busy || status.pending) { event.preventDefault(); return; }
-        if (memoDirty && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) { event.preventDefault(); setLeaving("organize"); }
-        else if (onOrganize) { event.preventDefault(); onOrganize(); }
-      }}><Icon name="collection" width="20" />모음에 담기</ShellLink>
-      {deletable && <button type="button" className="btn place-organize-btn" disabled={busy || status.pending} onClick={() => setTransferring(true)}><Icon name="moveRoom" width="20" />다른 방으로 옮기기</button>}</div>
-      {place.sources.length > 0 ? place.sources.map((source, index) => <a key={source.url} className="btn instagram-source-btn" href={source.url} target="_blank" rel="noreferrer"><Icon name="instagram" /><span>원본 인스타 보러가기{place.sources.length > 1 ? ` ${index + 1}` : ""}</span><Icon name="external" width="18" /></a>) : <p className="hint">장소를 직접 찾아 저장했어요.</p>}
-      {deletable ? <button ref={deleteButton} className="btn place-delete-btn" disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="20" />장소 삭제</button>
-        : <p className="hint place-delete-hint">옮기기·삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
+    {PLACE_STATUS_ENABLED && <><div className="detail-section-heading"><span className="section-label">어떤 곳인가요?</span></div>
+    <div className="seg four place-status" role="group" aria-label="장소 상태" aria-busy={status.pending}>{STATUS_ORDER.map((s) => <button key={s} className={`place-status-${s}`} disabled={busy || statusPending || memoPending} aria-pressed={status.status === s} onClick={() => statusSelection.select(s)}>{STATUS_LABEL[s]}</button>)}</div></>}
+    <div className={styles.memo}>
+      {memoConflict && <label className="section-label" htmlFor="place-memo">내 초안 · 수정해서 저장</label>}
+      <textarea id="place-memo" className="memo" aria-label="메모" aria-describedby={savedEarlierMemo && memoDirty ? "memo-unsaved-hint" : undefined} placeholder="메모를 남겨 보세요" value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} rows={2} />
+      {(memoDirty || memoPending || memoConflict) && <div className="memo-footer"><small>{memo.length}/500</small><button className="text-btn" disabled={busy || status.pending || statusPending || (!memoPending && !memoConflict && !memoDirty)} onClick={saveMemo}>{busy ? "저장 확인 중…" : memoPending ? "메모 저장 확인·재시도" : "메모 저장"}</button></div>}
+      {savedEarlierMemo && memoDirty && <p id="memo-unsaved-hint" className="hint" role="status">새로 쓴 내용은 아직 저장되지 않았어요.</p>}
     </div>
+    <PlaceInfo details={info.details} address={place.address} onCopyAddress={() => void copyAddress()} error={info.error} onRetry={info.retry} />
+    <PlaceMenus details={info.details} />
+    <PlaceBooking details={info.details} />
+    {place.sources.map((source, index) => <a key={source.url} className={styles.insta} href={source.url} target="_blank" rel="noreferrer">
+      <span className={styles.instaIcon} aria-hidden="true"><Icon name="instagram" width="22" /></span>
+      <span className={styles.instaText}><b>원본 인스타{place.sources.length > 1 ? ` ${index + 1}` : ""}</b><span>{source.media_type === "reel" ? "릴스" : "게시물"} 보러 가기</span></span>
+      <Icon name="chevron" width="18" />
+    </a>)}
+    {saver && <p className={styles.byline}>{place.sharers.slice(0, 2).map((n, i) => { const src = faceOf?.(n);
+      // eslint-disable-next-line @next/next/no-img-element
+      return src ? <img key={`${n}-${i}`} src={src} alt="" referrerPolicy="no-referrer" /> : <i key={`${n}-${i}`} aria-hidden="true"><Icon name="user" width="12" /></i>; })}<span>{saver} · {savedOn}</span></p>}
+    {!place.sources.length && <p className="hint">장소를 직접 찾아 저장했어요.</p>}
+    <div className={`detail-map ${styles.mini}`}><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>
+    {deletable ? <button ref={deleteButton} className={styles.delete} disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="19" />장소 삭제</button>
+      : <p className="hint place-delete-hint">옮기기·삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
     </>} />{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); leave(destination); }} />}
     {transferring && <FolderTransferDialog ids={[place.id]} from={room?.id} onClose={() => setTransferring(false)} onDone={(result) => {
       // 지금 방에서는 빠졌으니 상세를 닫고 목록·지도에서 바로 뺍니다(서버 확인은 변경 알림으로 다시 받음).
