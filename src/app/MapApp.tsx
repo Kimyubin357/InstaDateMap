@@ -29,6 +29,7 @@ import { STATUS_LABEL, type PlaceStatus } from "@/lib/types";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import { DEFAULT_STATUSES, STATUS_ORDER, filterPlaces, sortPlaces, type PlaceView } from "@/lib/place-view";
 import { navigateShell } from "@/lib/shell-navigation";
+import Onboarding, { useOnboarding, type OnboardingEnd } from "@/components/Onboarding";
 type Overlay = "filters" | "pending" | "place" | "rooms" | "new" | null;
 const PANELS = ["filters", "pending", "rooms", "new"] as const;
 const panelOf = (value: string | null): Overlay => (PANELS as readonly string[]).includes(value ?? "") ? value as Overlay : null;
@@ -36,7 +37,7 @@ const panelOf = (value: string | null): Overlay => (PANELS as readonly string[])
 let fitAfterScope = false;
 export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }: { who: string; kakaoKey: string; active: boolean; keyboard: boolean; onViewChange: (href: string) => void }) {
   const router = useRouter();
-  const { store, notify, rooms: roomsStore, chooseScope } = useBoardSync(); const { snapshot: data, error: roomError, syncing } = useBoardState();
+  const { store, notify, rooms: roomsStore, chooseScope } = useBoardSync(); const { snapshot: data, error: roomError, syncing, access } = useBoardState();
   // 보는 범위(2026-11-25 방 고르기·전체 보기): 전체 = 모든 방의 장소(같은 가게는 핀 하나), 방 = 이 기기가 연 방.
   const scope = useScopePlaces(); const { isAll, flat, repOf, roomById, order: roomOrder, rooms: roomsState } = scope;
   const places: MapPlace[] = scope.grouped, pending = data?.pending || []; const board = data?.board || "이 방", loaded = scope.loaded;
@@ -49,6 +50,10 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const groupIds = (id: string) => places.find((p) => p.id === repId(id))?.group_ids ?? [id];
   const openRoom = data?.boardId ?? null;
   const currentRoom: RoomSummary | undefined = openRoom ? roomById.get(openRoom) : undefined;
+  /** 사용법의 모음·초대 장에 보여 줄 방: 전체일 때는 함께 쓰는(멤버가 많은) 방, 같으면 장소가 많은 방. 방 안이면 그 방. */
+  const tourRoom: RoomSummary | undefined = isAll && roomsState.rooms?.length
+    ? [...roomsState.rooms].sort((x, y) => y.member_count - x.member_count || y.place_count - x.place_count)[0]
+    : currentRoom;
   const navigation = useSearchParams().toString();
   const params = new URLSearchParams(navigation);
   const collectionId = isAll ? null : params.get("collection");
@@ -72,6 +77,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     }
   }, [collectionId, collection, loaded, error, data?.collections, notify]);
   const [view, setView] = useState<"map" | "list">("map");
+  // 처음 사용법(온보딩): 로그인·약관 뒤 지도에 처음 들어오면 한 번(계정 기준), 설정 → 사용법 다시 보기로 다시.
+  const tour = useOnboarding(access?.userId ?? null, active);
   useEffect(() => { if (active && new URLSearchParams(navigation).get("from") !== "search") onViewChange(viewHref(view)); }, [active, view, navigation, onViewChange]);
   const [statuses, setStatuses] = useState<PlaceStatus[]>([...DEFAULT_STATUSES]); const [category, setCategory] = useState("");
   const [overlay, setOverlay] = useState<Overlay>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -266,7 +273,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     return { top: (search?.bottom || 80) + 16, bottom: root.current.clientHeight - deck.offsetTop + 10 };
   }
   // Map states (docs/redesign/map-home-compare.md): portrait = centred modal over a dim screen, landscape = left-column card.
-  const statusKind = !active || view !== "map" || overlay ? null
+  const statusKind = !active || view !== "map" || overlay || tour.open ? null
     : !loaded && !error ? "loading" : error && !loaded ? "error"
     : mapRecovery ? (mapRecovery.loading ? "map-loading" : "map-error")
     : loaded && !error && mapVisible.length === 0 ? (places.length ? "filtered" : "empty") : null;
@@ -343,6 +350,16 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     try { if (!await chooseScope(id)) fitAfterScope = false; }
     catch (e) { fitAfterScope = false; notify(friendlyMessage(e, "방에 들어가지 못했어요. 다시 시도해 주세요."), "error"); }
   }
+  // 사용법은 지도 위에서 + 버튼·방 버튼을 짚으므로, 열릴 때 지도 화면(열린 시트·지역 목록 없이)으로 돌아갑니다.
+  useEffect(() => {
+    if (!tour.open) return;
+    setRegionSelection(null); setJustSaved(null); setFocusedId(null);
+    if (view !== "map" || overlay) navigateShell("/", true);
+  }, [tour.open]);
+  function endTour(reason: OnboardingEnd) {
+    tour.finish();
+    if (reason === "add") navigateShell("/add");
+  }
   const roomButton = searchTools && createPortal(<RoomScopeButton name={scopeName} colors={scopeColors} open={overlay === "rooms"} onClick={() => open("rooms")} />, searchTools);
   const kindTool = <div className="list-tools"><button className={`list-filter kind-chip${category || !all ? " is-active" : ""}`} aria-label={category ? `종류: ${category}. 종류 바꾸기` : "종류로 거르기"} aria-haspopup="dialog" aria-expanded={overlay === "filters"} onClick={() => open("filters")}><span>{category || "종류"}</span><Icon name="chevron" width="14" className="list-filter-chevron" /></button><select aria-label="장소 정렬" value={sort} disabled={locating} onChange={(e) => e.target.value === "near" ? locate(true) : setSort("recent")}><option value="recent">최근 저장순</option><option value="near">가까운순</option></select></div>;
   return <div ref={root} className={`app-root view-${view}${pending.length ? " has-pending-links" : ""}${showPlaceCard ? " has-place-card" : ""}${showJustSaved ? " has-just-saved" : ""}`}>
@@ -389,5 +406,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
         if (isAll) { void pickScope(entry.room.id); return; }
         close(); setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "bounds", points });
       }} />}
+    {tour.open && <Onboarding rooms={roomsState.rooms} roomScope={isAll ? "all" : openRoom} invited={tour.invited} onEnd={endTour}
+      room={{ name: tourRoom?.name ?? board, color: tourRoom?.color, placeCount: tourRoom?.place_count ?? data?.places.length ?? 0, members: tourRoom?.member_names ?? [] }}
+      collections={tourRoom && tourRoom.id !== openRoom ? [] : (data?.collections ?? []).map((c) => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, count: c.place_ids.length }))}
+      placeCount={tourRoom?.place_count ?? data?.places.length ?? 0} />}
   </div>;
 }
