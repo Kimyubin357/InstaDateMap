@@ -92,7 +92,8 @@ export default function AddForm({ initialUrl, initialRetry = false }: { initialU
       complete(data, link);
     } catch (e) {
       if (e instanceof RequestError && e.status === 401) { window.location.replace(`/login?next=${encodeURIComponent(`/add?url=${encodeURIComponent(link)}`)}`); return; }
-      setResult({ status: "error", message: e instanceof TypeError ? "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요." : e instanceof Error ? e.message : "연결하지 못했어요. 다시 시도해 주세요." });
+      // 요청 자체가 실패하면(연결 끊김·서버 오류) 링크 문제가 아니라 서버 문제로 보여 주고 다시 시도하게 합니다.
+      setResult({ status: "error", code: "server", message: "" });
     } finally { setBusy(false); setChecking(false); }
   }
   useEffect(() => { if (initialUrl && !started.current) { started.current = true; void submit(initialUrl, initialRetry); } }, []);
@@ -176,6 +177,8 @@ function FailureView({ kind, result, roomLine, source, busy, sessionError, onAno
     ai_wait: { icon: "clock", title: ai?.title ?? "AI가 잠시 장소를 못 읽었어요", body: (ai?.body ?? "") + kept, cause: "원인 · AI 분석 실패 (잠시)" },
     ai_limit: { icon: "clock", title: ai?.title ?? "AI 분석 한도에 걸렸어요", body: (ai?.body ?? "") + kept, cause: "원인 · AI 분석 한도" },
     busy: { icon: "clock", title: "이 링크는 지금 저장 중이에요", body: result.message, cause: "원인 · 다른 화면에서 작업 중" },
+    trashed: { icon: "link", title: "삭제한 장소에 있는 링크예요", body: "이 링크로 담았던 장소를 지운 적이 있어요. 설정 → 삭제한 장소에서 되돌릴 수 있어요.", cause: "원인 · 삭제한 장소" },
+    server: { icon: "refresh", title: "서버에 잠시 문제가 생겼어요", body: "링크에는 문제가 없어요. 연결이 끊겼거나 서버가 잠시 응답하지 않았어요. 잠시 뒤 다시 시도해 주세요.", cause: "원인 · 서버·연결 오류" },
     failed: { icon: "refresh", title: "분석을 끝내지 못했어요", body: result.message + kept, cause: "원인 · 처리 중 오류" },
   };
   const c = copy[kind];
@@ -196,6 +199,7 @@ function FailureView({ kind, result, roomLine, source, busy, sessionError, onAno
     <div className={styles.bar}>
       {kind === "unreadable" ? <>{another}<div className={styles.row2}>{retry(false, "다시 읽어 보기")}{dismiss}</div></>
         : kind === "not_instagram" ? another
+        : kind === "trashed" ? <>{<ShellLink className="btn primary green" href="/settings/trash"><Icon name="trash" width={18} />삭제한 장소 보기</ShellLink>}{<button type="button" className="btn" disabled={busy} onClick={onAnother}><Icon name="link" width={18} />다른 링크 넣기</button>}</>
         : kind === "ai_limit" ? <>{confirmPath ? <ShellLink className="btn primary" href={confirmPath}><Icon name="search" width={18} />이름으로 직접 찾기</ShellLink> : toMap()}<div className={styles.row2}>{retry(false)}{confirmPath ? toMap("나중에 할게요") : dismiss}</div></>
         : <>{retry(true)}{toMap()}</>}
     </div>

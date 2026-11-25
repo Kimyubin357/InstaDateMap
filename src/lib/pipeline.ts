@@ -67,7 +67,7 @@ export async function savePlace(args: { boardId: string; sourceId: string | null
 export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Promise<ShareResponse> {
   const raw = firstUrl(input.text) ?? input.text;
   const url = normalizeInstagramUrl(raw);
-  if (!url) return { status: "error", message: "인스타그램 게시물이나 릴스 링크가 아니에요." };
+  if (!url) return { status: "error", code: "not_instagram", message: "인스타그램 게시물이나 릴스 링크가 아니에요." };
 
   const manualCaption = input.caption?.trim() || null;
   const images = input.images ?? [];
@@ -75,7 +75,7 @@ export async function ingestShare(input: ShareInput, llm: LlmCall = callLlm): Pr
   const claimed = await db().rpc("dm_begin_source", { p_board: input.boardId, p_url: url, p_media: detectMediaType(url), p_who: input.who, p_owner: input.owner, p_retry: !!(input.retry || manualCaption || images.length) });
   checkDb(claimed.error, "링크 저장 실패");
   if (claimed.data.outcome === "busy") return { status: "busy", message: SOURCE_MESSAGES.SOURCE_BUSY };
-  if (claimed.data.outcome === "trashed") return { status: "error", message: "이 링크의 장소는 삭제한 장소에 있어요. 설정에서 복구해 주세요." };
+  if (claimed.data.outcome === "trashed") return { status: "error", code: "trashed", message: "이 링크의 장소는 삭제한 장소에 있어요. 설정에서 복구해 주세요." };
   const existing = claimed.data.source;
   const sourceId = existing.id as string;
   if (claimed.data.outcome === "duplicate" || claimed.data.outcome === "resume") {

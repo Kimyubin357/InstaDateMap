@@ -85,7 +85,11 @@ describe("/add 결과를 원인별로", () => {
     expect(addFailure({ status: "busy", message: "" })).toBe("busy");
     expect(addFailure({ status: "error", message: "", code: "gemini_rate_limit", source_id: "s" })).toBe("ai_wait");
     expect(addFailure({ status: "error", message: "", code: "gemini_free_daily_quota", source_id: "s" })).toBe("ai_limit");
-    expect(addFailure({ status: "error", message: "인스타그램 게시물이나 릴스 링크가 아닙니다." })).toBe("not_instagram");
+    expect(addFailure({ status: "error", code: "not_instagram", message: "인스타그램 게시물이나 릴스 링크가 아니에요." })).toBe("not_instagram");
+    expect(addFailure({ status: "error", code: "trashed", message: "" })).toBe("trashed");
+    // 분석 전에 서버·연결이 실패하면(source_id 없음) 링크 오류가 아니라 서버 오류로 보여 줍니다.
+    expect(addFailure({ status: "error", message: "장소 저장에 실패했어요. 잠시 후 다시 시도해 주세요." })).toBe("server");
+    expect(addFailure({ status: "error", code: "server", message: "" })).toBe("server");
     expect(addFailure({ status: "error", message: "연결이 끊겼어요", source_id: "s" })).toBe("failed");
   });
   it("AI 실패 안내에는 서비스 이름이 없음", () => {
