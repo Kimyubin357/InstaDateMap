@@ -11,13 +11,15 @@ const SECTIONS: { key: "new" | "all" | PlaceStatus; title: string }[] = !PLACE_S
 
 /** A neighbourhood card's places (mockup A, S2 frame 2): portrait sheet above the nav, landscape left column. */
 export default function RegionPlacesList({ label, places, newPlaceIds, onPick, onClose }: {
-  label: string | null; places: PlaceView[]; newPlaceIds: ReadonlySet<string>; onPick: (id: string) => void; onClose: () => void;
+  label: string | null; places: PlaceView[]; newPlaceIds: ReadonlySet<string>; onPick: (id: string, order: string[]) => void; onClose: () => void;
 }) {
   const name = label || "이 지역";
   const wish = places.filter((p) => p.status === "wish").length, fresh = places.filter((p) => newPlaceIds.has(p.id)).length;
   const recent = [...places].sort((a, b) => (b.last_saved_at || b.created_at).localeCompare(a.last_saved_at || a.created_at));
   const sections = SECTIONS.map((section) => ({ ...section, places: recent.filter((p) => section.key === "new" ? newPlaceIds.has(p.id) : (section.key === "all" || p.status === section.key) && !newPlaceIds.has(p.id)) }))
     .filter((section) => section.places.length);
+  /** The card deck opened from this list follows the same order, so its counter reads "n / this area". */
+  const order = sections.flatMap((section) => section.places.map((p) => p.id));
   return <section className="region-sheet" aria-labelledby="region-sheet-title">
     <header className="region-sheet-head">
       <div className="region-sheet-title"><h2 id="region-sheet-title">{name} {places.length}곳</h2>{(PLACE_STATUS_ENABLED || fresh > 0) && <p>{PLACE_STATUS_ENABLED && <>가고 싶음 {wish}</>}{PLACE_STATUS_ENABLED && fresh > 0 && " · "}{fresh > 0 && <><span className="new-place-badge">NEW</span> {fresh}</>}</p>}</div>
@@ -25,10 +27,10 @@ export default function RegionPlacesList({ label, places, newPlaceIds, onPick, o
     </header>
     <div className="region-sheet-body">
       {sections.map((section) => <section key={section.key} aria-label={`${section.title} ${section.places.length}곳`}>
-        <h3>{section.title} <small>{section.places.length}</small></h3>
-        <ul>{section.places.map((place) => <li key={place.id}><button type="button" className="region-place-row" onClick={() => onPick(place.id)}>
+        {PLACE_STATUS_ENABLED && <h3>{section.title} <small>{section.places.length}</small></h3>}
+        <ul>{section.places.map((place) => <li key={place.id}><button type="button" className="region-place-row" onClick={() => onPick(place.id, order)}>
           {PLACE_STATUS_ENABLED && <span className={`status-tag ${place.status}`}>{STATUS_LABEL[place.status]}</span>}
-          <span className="region-place-copy"><strong>{place.name}</strong><small>{[placeMeta(place) || place.address, place.sharers.length >= 2 ? "둘 다 저장함" : place.sharers[0] ? `${place.sharers[0]}님이 저장` : ""].filter(Boolean).join(" · ")}</small></span>
+          <span className="region-place-copy"><strong>{place.name}</strong><small>{[placeMeta(place) || place.address, place.sharers.length >= 2 ? `${place.sharers.length}명이 저장` : place.sharers[0] ? `${place.sharers[0]}님이 저장` : ""].filter(Boolean).join(" · ")}</small></span>
           {newPlaceIds.has(place.id) && <span className="new-place-badge" aria-label="새로 등록한 장소">NEW</span>}
           <Icon name="chevron" width="17" />
         </button></li>)}</ul>

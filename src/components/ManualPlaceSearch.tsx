@@ -10,7 +10,7 @@ import { PlaceSearch } from "@/lib/place-search";
 import { useBoardSync } from "./BoardProvider";
 import type { ShareResult } from "@/lib/share-stream";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
-export default function ManualPlaceSearch({ sourceId, version, sourceReady = true, saveLabel = "우리 지도에 저장", onSaved }: { sourceId?: string; version?: string; sourceReady?: boolean; saveLabel?: string; onSaved: (r: ShareResult) => void }) {
+export default function ManualPlaceSearch({ sourceId, version, sourceReady = true, saveLabel = "이 방에 저장", onSaved }: { sourceId?: string; version?: string; sourceReady?: boolean; saveLabel?: string; onSaved: (r: ShareResult) => void }) {
   const { lock } = useBoardSync();
   const [model] = useState(() => new PlaceSearch());
   const { query, searched, results, busy: searching, error: searchError } = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);

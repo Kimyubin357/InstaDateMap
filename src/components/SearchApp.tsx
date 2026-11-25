@@ -101,14 +101,14 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
     <header className="unified-search-header">
       <form role="search" onClick={() => input.current?.focus({ preventScroll: true })} onSubmit={(e) => { e.preventDefault(); run(); }}><Icon name="search" width="20" /><input ref={input} aria-label="통합 장소 검색" placeholder="장소 이름, 지역으로 검색" value={active ? state.query : ""} onFocus={open} onChange={(e) => { open(); changeQuery(e.target.value); }} maxLength={100} enterKeyHint="search" autoComplete="off" />{active && state.query && <button type="button" className="icon-btn" aria-label="검색어 지우기" onClick={clear}><Icon name="close" width="20" /></button>}<button type="submit" className="sr-only">검색 실행</button></form>
       <div id={SEARCH_TOOLS_ID} className="search-header-tools" hidden={active} />
-      {active ? <button type="button" className="search-cancel" onClick={cancel}>취소</button> : <ShellLink href="/settings" className="icon-btn floating-settings" aria-label="우리 설정"><Icon name="settings" width="21" /></ShellLink>}
+      {active ? <button type="button" className="search-cancel" onClick={cancel}>취소</button> : <ShellLink href="/settings" className="icon-btn floating-settings" aria-label="설정"><Icon name="settings" width="21" /></ShellLink>}
     </header>
     <div className="unified-search-body" aria-hidden={!active} ref={scroll} onScroll={(e) => { scrollTop.current = e.currentTarget.scrollTop; }}>
       {!query ? <section className="recent-searches"><div className="search-group-heading"><h1>최근 검색</h1>{recent.length > 0 && <button className="text-btn" onClick={() => setRecent(history.clear())}>전체 삭제</button>}</div>
         {!recent.length && <p className="search-hint">가보고 싶은 곳을 찾아보세요.<br />저장한 장소도 함께 찾을 수 있어요.</p>}
         {recent.map((term) => <div className="recent-search-row" key={term}><button className="recent-term" onClick={() => run(term)}><Icon name="clock" /><span>{term}</span></button><button className="icon-btn" aria-label={`${term} 최근 검색 삭제`} onClick={() => setRecent(history.remove(term))}><Icon name="close" width="18" /></button></div>)}
       </section> : <>
-        <section aria-label="저장된 장소 검색 결과"><div className="search-group-heading"><h2>우리 지도에 저장된 곳 <small>{saved.length}곳</small></h2></div>
+        <section aria-label="저장된 장소 검색 결과"><div className="search-group-heading"><h2>이 방에 저장된 곳 <small>{saved.length}곳</small></h2></div>
           {!snapshot ? <p className="search-hint" role="status">저장한 장소를 확인하고 있어요…</p> : !saved.length ? <p className="search-hint">저장된 장소 중에는 없어요.</p> : saved.slice(0, savedLimit).map((place) => <button className="unified-place-row" key={place.id} onClick={() => { record(); input.current?.blur(); navigateShell(`/?place=${encodeURIComponent(place.id)}&from=search`); }}><span className="search-category"><Icon name={categoryIcon(place.category)} width="20" /></span><span className="search-place-copy"><strong>{place.name}</strong><small>{[place.category, place.address].filter(Boolean).join(" · ")}</small></span><span className="saved-badge">저장됨</span><Icon name="chevron" width="17" /></button>)}
           {saved.length > savedLimit && <button className="text-btn search-more" onClick={() => setSavedLimit((count) => count + 3)}>저장한 장소 더 보기 · {saved.length - savedLimit}곳 남음</button>}
         </section>
@@ -120,6 +120,6 @@ export default function SearchApp({ active, backHref, viewport }: { active: bool
       </>}
     </div>
     </div>
-    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 확인 중…" : write.pending ? "저장 확인·재시도" : "우리 지도에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p>{PLACE_STATUS_ENABLED && <span className="status-tag wish">가고 싶음으로 저장</span>}{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
+    {picked && active && <Modal title="여기가 맞나요?" variant="compact" onClose={closePick} footer={<div className="actions"><button className="btn" disabled={saving} onClick={closePick}>다시 고르기</button><button className="btn primary" disabled={saving} onClick={save}>{saving ? "저장 확인 중…" : write.pending ? "저장 확인·재시도" : "이 방에 저장"}</button></div>}><div className="search-confirm"><h3>{picked.name}</h3><p className="addr">{picked.address}</p>{PLACE_STATUS_ENABLED && <span className="status-tag wish">가고 싶음으로 저장</span>}{saveError && <p className="error" role="alert">{saveError}</p>}</div></Modal>}
   </div>;
 }

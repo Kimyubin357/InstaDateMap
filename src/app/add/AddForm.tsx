@@ -17,7 +17,7 @@ import { reviewDestination, shareDestination } from "@/lib/share-navigation";
 import { boardChanged } from "@/lib/board-events";
 import { navigateShell } from "@/lib/shell-navigation";
 import { useBoardState, useBoardSync } from "@/components/BoardProvider";
-import { addFailure, aiIssueCopy, instagramLinkIn, linkKind, linkTail, type AddFailure } from "@/lib/registration";
+import { addFailure, aiIssueCopy, instagramLinkIn, linkKind, linkTail, postLinkIn, POST_LINK_HINT, type AddFailure } from "@/lib/registration";
 import { placeIdFrom, rememberJustSaved, rememberSavedRoom } from "@/lib/saved-memory";
 import styles from "@/components/Registration.module.css";
 
@@ -79,8 +79,11 @@ export default function AddForm({ initialUrl, initialRetry = false }: { initialU
     else setResult(data);
   }
   async function submit(value = text, retry = false) {
-    const link = value.trim();
-    if (!link || busy) return;
+    if (!value.trim() || busy) return;
+    // 인스타 게시물·릴스 주소가 아니면 분석 화면으로 가지 않고 입력칸 아래에서 바로 알려 줍니다(넣은 글은 그대로 둠).
+    const checked = write.pending ? { link: value.trim() } : postLinkIn(value);
+    if ("problem" in checked) { setText(value); setHint(POST_LINK_HINT[checked.problem]); requestAnimationFrame(() => input.current?.focus()); return; }
+    const link = checked.link;
     let retryAfter = 0;
     setBusy(true); setResult(null); setStage("caption"); setChecking(write.pending); setHint("");
     if (!write.pending) { setSent(link); setSentAt(new Date()); }
@@ -201,7 +204,6 @@ function FailureView({ kind, result, roomLine, source, busy, sessionError, onAno
       <span className={styles.failIcon}><Icon name={c.icon} width={36} /></span>
       <h2>{c.title}</h2>
       <p>{c.body}</p>
-      <span className={styles.cause}>{c.cause}</span>
       {sessionError && <p className={styles.hintLine}>{sessionError}</p>}
     </div>
     <div className={styles.bar}>

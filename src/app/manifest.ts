@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "데이트맵",
     short_name: "데이트맵",
-    description: "우리가 같이 가보고 싶은 곳",
+    description: "가고 싶은 곳을 지도에 모아요",
     lang: "ko",
     start_url: "/",
     scope: "/",

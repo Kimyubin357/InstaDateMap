@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return Response.json({ status: "error", message: "JSON 형식이 아닙니다." }, { status: 400 });
+      return Response.json({ status: "error", message: "요청 형식이 올바르지 않아요." }, { status: 400 });
     }
     if (!body || typeof body !== "object") return Response.json({ status: "error", message: "입력 내용이 없습니다." }, { status: 400 });
     const text = String(body.url ?? body.text ?? "");

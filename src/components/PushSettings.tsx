@@ -17,18 +17,19 @@ export default function PushSettings() {
   const [hint, setHint] = useState("");
   const [folders, setFolders] = useState<FolderPush[]>([]);
   const version = useRef(0), writing = useRef(false), queuedCheck = useRef(false), mounted = useRef(false);
+  const [cantUse, setCantUse] = useState(false);
   const recheck = useRef<() => void>(() => {}), cancelCheck = useRef<() => void>(() => {});
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     let alive = true, flight = false, queued = false;
     let controller: AbortController | undefined, worker: ServiceWorkerRegistration | undefined;
-    setChecking(true); setHint(""); setConfig(undefined); setRegistration(undefined); setSubscribed(false);
+    setChecking(true); setHint(""); setCantUse(false); setConfig(undefined); setRegistration(undefined); setSubscribed(false);
     if (suspended) { setHint("입장 상태를 확인한 뒤 알림을 다시 확인해 주세요."); setChecking(false); return; }
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const installed = matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone;
-    if (ios && !installed) { setHint("아이폰에서는 홈 화면에 추가한 데이트맵을 열어 알림을 켜 주세요."); setChecking(false); return; }
+    if (ios && !installed) { setCantUse(true); setHint("이 기기에서는 아직 켤 수 없어요."); setChecking(false); return; }
     if (!window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-      setHint("이 브라우저에서는 알림을 받을 수 없어요. 홈 화면 앱이나 알림을 지원하는 브라우저에서 열어 주세요."); setChecking(false); return;
+      setCantUse(true); setHint("이 기기에서는 아직 켤 수 없어요."); setChecking(false); return;
     }
     async function prepare() {
       if (!alive) return;
@@ -156,7 +157,7 @@ export default function PushSettings() {
         <Icon name="map" width={18} /><span className="settings-copy"><span>{f.name}</span></span><span className="settings-switch" aria-hidden="true" /></button>)}
     </div>}
     <span className="sr-only" role="status">{status}</span>
-    {hint && !checking && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
+    {hint && !checking && !cantUse && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
     {!checking && available && !subscribed && <p className="hint settings-hint">로그아웃하면 이 기기의 알림도 멈춰요. 다시 로그인한 뒤 여기에서 켜 주세요.</p>}
   </div>;
 }
