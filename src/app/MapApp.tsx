@@ -64,7 +64,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const collection = collectionId ? data?.collections?.find((c) => c.id === collectionId) : undefined;
   function viewHref(target: "map" | "list") {
     const q = new URLSearchParams(); if (target === "list") q.set("view", "list");
-    if (collectionId) q.set("collection", collectionId);
+    // 모음 안에서 리스트 탭을 한 번 더 누르면 모음 목록으로 갑니다(시안 design-lab/collection-back A안).
+    if (collectionId && !(target === "list" && view === "list")) q.set("collection", collectionId);
     if (listMode !== "all") q.set("section", listMode);
     return "/" + (q.size ? `?${q}` : "");
   }

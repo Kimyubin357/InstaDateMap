@@ -118,12 +118,6 @@
 .mcopy small{font-size:15px;line-height:1.4;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mrowAdd .mcopy strong{color:var(--forest)}
 .addTile{width:52px;height:52px;flex:none;border-radius:16px;border:1.5px dashed var(--forest);color:var(--forest);display:grid;place-items:center}
-.crumb{flex:1;min-width:0;display:flex;align-items:center;gap:4px;font-size:16px;color:var(--ink-soft);white-space:nowrap;overflow:hidden}
-.crumb>svg{flex:none;color:var(--ink-soft)}
-.crumb button.text-btn,.crumb :global(.text-btn){min-height:44px;padding:0 4px;font-size:16px;color:var(--forest)}
-.crumb b{font-weight:400;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis}
-.crumbRoom{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40%;color:var(--ink)}
-.crumbRoom>span:last-child{overflow:hidden;text-overflow:ellipsis}
 .detailNav{align-items:center;gap:8px}
 
 /* 빈 모음 바로 넣기(시안 A5) */
@@ -137,3 +131,14 @@
 .quickPlus:disabled{opacity:.5}
 .quickMore{width:100%;min-height:52px;margin-top:14px;gap:6px}
 .quickMore:global(.btn.primary){background:var(--forest) var(--grain);border-color:var(--forest);box-shadow:var(--print-shadow)}
+
+/* 모음 안 "‹ 모음" 뒤로 버튼(시안 design-lab/collection-back A안) */
+.detailNav .back{display:inline-flex;align-items:center;gap:2px;min-height:44px;height:44px;padding:0 14px 0 6px;margin-left:-2px;border-radius:14px;border:1px dashed var(--line);background:var(--cream) var(--weave);box-shadow:var(--print-shadow);color:var(--ink);font:inherit;font-size:17px;-webkit-tap-highlight-color:transparent}
+.detailNav .back:active{background-color:var(--mist)}
+.detail p.count{display:flex;align-items:center;gap:6px;min-width:0}
+.detail p.count>span:first-child{flex:none}
+
+/* 모음 줄 밀어서 삭제: 구분선은 움직이지 않는 바깥 줄에 둡니다(시안 design-lab/collection-swipe). */
+.mlist>[data-swipe-row]{border-bottom:0;border-top:1px dashed var(--line)}
+.mlist>[data-swipe-row]:first-child{border-top:0}
+.mlist>[data-swipe-row]>.mrow{border-top:0}
