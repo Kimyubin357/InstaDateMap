@@ -117,7 +117,6 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .card-bottom{font-size:14px;line-height:1.3;padding-top:3px}
 .card-open{background:var(--forest) var(--grain);color:var(--cream)}
 .carousel-dismiss.icon-btn{color:var(--ink)}
-.carousel-dismiss::before{background:var(--cream)}
 .carousel-step{background:var(--cream);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
 .status-tag{background:var(--accent-soft);color:var(--accent-ink);font-size:16px;border-radius:6px;padding:0 7px}
 .status-tag.again{background:#ede1bd;color:#71511b}
@@ -187,7 +186,7 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .instagram-source-btn:focus-visible{outline-color:#833ab4}
 .place-source-actions .place-delete-btn{color:var(--danger);background:transparent;border:1px dashed var(--line);font-size:18px;box-shadow:none}
 .detail-map{border:1px dashed var(--line);border-radius:22px}
-.preview-map-button,.sheet-place .sheet-heading-actions .sheet-close-btn{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+.preview-map-button{background:var(--cream) var(--weave);color:var(--ink);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
 .preview-map-button{font-size:15px;min-height:38px;padding:6px 10px}
 .detail-title>h2{font-size:32px;line-height:1.3;letter-spacing:0;font-weight:400}
 .detail-title>.status-tag{font-size:16px;margin-top:5px;padding:2px 8px;border-radius:8px;white-space:nowrap}
@@ -282,15 +281,15 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
   .entry-page.is-pin-editing .btn.large{height:52px;min-height:52px}
 }
 
-/* A small printed close mark, with a separate 44px touch target. */
-.sheet-place .sheet-heading-actions .sheet-close-btn,.carousel-dismiss.icon-btn{position:relative;border:0;background:none;box-shadow:none;border-radius:50%;width:44px;height:44px;min-height:44px}
-.sheet-place .sheet-heading-actions .sheet-close-btn::before,.carousel-dismiss::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
-.sheet-place .sheet-close-btn>svg,.carousel-dismiss>svg{position:relative;width:18px;height:18px}
-.sheet-place.is-fullscreen .sheet-close-btn::before{display:none}
-.sheet-place.is-fullscreen .sheet-close-btn>svg{width:22px;height:22px}
-.sheet-place .sheet-close-btn:enabled:active::before,.carousel-dismiss:enabled:active::before{background-color:var(--mist)}
+/* 모든 X 닫기 버튼 하나의 모양(2026-11-26 사용자 결정): 44px 터치 영역 안에 32px 크림 원단 동그라미 + 따뜻한 점선 + 인쇄 그림자, 18px X.
+   전체 화면으로 올린 시트에서도 동그라미를 유지합니다(예전엔 벗겨졌음). 위치는 시트 머리 오른쪽 여백(20px)에 버튼 끝을 맞춥니다. */
+.sheet-close-btn,.sheet-close-btn.icon-btn,.region-sheet-close.icon-btn,.map-status-close.icon-btn,.carousel-dismiss.icon-btn,.close-x{position:relative;flex:none;display:grid;place-items:center;border:0;background:none;box-shadow:none;border-radius:50%;width:44px;height:44px;min-width:44px;min-height:44px;margin:0;padding:0;color:var(--ink)}
+.sheet-close-btn::before,.region-sheet-close::before,.map-status-close::before,.carousel-dismiss::before,.close-x::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--cream) var(--weave);border:1px dashed var(--line);box-shadow:var(--print-shadow)}
+.sheet-close-btn>svg,.region-sheet-close>svg,.map-status-close>svg,.carousel-dismiss>svg,.close-x>svg{position:relative;width:18px;height:18px}
+.sheet-close-btn:enabled:active::before,.region-sheet-close:enabled:active::before,.map-status-close:enabled:active::before,.carousel-dismiss:enabled:active::before,.close-x:enabled:active::before{background-color:var(--mist)}
+.sheet-close-btn:disabled{opacity:.5}
 
-.carousel-dismiss.icon-btn{position:absolute}
+.carousel-dismiss.icon-btn,.map-status-close.icon-btn{position:absolute}
 /* 우리 설정 v2 (2026-10-27 시안): 그룹 라벨 + 열린 행. 값·스위치는 행 오른쪽, 설명은 행 안의 작은 글씨. */
 .settings-page .page-header{margin-bottom:4px}
 .settings-notice{padding:8px 0 12px;border-bottom:1px dashed var(--line)}

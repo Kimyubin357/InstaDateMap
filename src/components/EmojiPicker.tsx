@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import { Emoji } from "./Palette";
-import { EMOJI_CATEGORIES, rememberEmoji, recentEmoji, searchEmoji } from "@/lib/emoji";
+import { EMOJI_CATEGORIES, FREQUENT_EMOJI, rememberEmoji, recentEmoji, searchEmoji } from "@/lib/emoji";
 import { lastEmoji } from "@/lib/palette";
 import styles from "./EmojiPicker.module.css";
 
@@ -21,6 +21,8 @@ export default function EmojiPicker({ value, suggestions = [], onPick, onClose }
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(() => EMOJI_CATEGORIES.find((c) => c.items.some(([e]) => e === value))?.key ?? EMOJI_CATEGORIES[0].key);
   const [recent] = useState(() => [...new Set([...recentEmoji(), ...suggestions])].slice(0, 7));
+  // 자주 쓰는 이모지 14개(시안 design-lab/emoji-picker 2번). 최근 줄에 있는 건 빼서 겹치지 않게 합니다.
+  const frequent = useMemo(() => FREQUENT_EMOJI.filter((e) => !recent.includes(e)), [recent]);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog || document.querySelector(".app-recovery")) return;
@@ -62,6 +64,7 @@ export default function EmojiPicker({ value, suggestions = [], onPick, onClose }
         {results.length > 0 && <div className={styles.grid}>{shown.map(cell)}</div>}
       </> : <>
         {recent.length > 0 && <><p className={styles.label}>최근</p><div className={styles.recent}>{recent.map(cell)}</div></>}
+        <p className={styles.label}>자주 쓰는</p><div className={styles.grid}>{frequent.map(cell)}</div>
         <div className={styles.cats} role="group" aria-label="이모지 묶음">
           {EMOJI_CATEGORIES.map((c) => <button key={c.key} type="button" aria-pressed={category === c.key} onClick={() => setCategory(c.key)}>{c.label}</button>)}
         </div>

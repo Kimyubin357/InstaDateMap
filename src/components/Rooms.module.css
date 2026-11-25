@@ -89,3 +89,7 @@
 .bandCopy strong{display:block;font-size:20px;font-weight:400;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bandCopy small{display:block;font-size:13px;line-height:1.4;opacity:.92}
 .band .gear{position:static;flex:none}
+/* 누름 효과는 카드와 ⚙ 를 한 덩어리로(⚙ 가 따로 놀지 않게). 카드만 줄이던 전역 규칙 대신 칸 전체가 같이 줄어듭니다. */
+.cell{transition:scale .12s ease-out}
+.cell:has(>.card:enabled:active),.cell:has(>.gear:active){scale:.95}
+.cell>.card:enabled:active{scale:1}
