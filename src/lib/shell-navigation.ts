@@ -1,4 +1,4 @@
-const PATHS = new Set(["/", "/search", "/add", "/settings", "/settings/trash"]);
+const PATHS = new Set(["/", "/search", "/add", "/settings", "/settings/trash", "/settings/leave"]);
 export function shellDestination(href: string, origin: string): string | null {
   try {
     const url = new URL(href, origin);

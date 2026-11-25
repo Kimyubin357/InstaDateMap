@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import { useBoardState, useBoardSync } from "./BoardProvider";
+import { useBoardState, useBoardSync, useRooms } from "./BoardProvider";
+import ActionSheet from "./ActionSheet";
+import Icon from "./Icon";
+import { toneStyle } from "./Palette";
+import { categoryIcon } from "@/lib/place-presentation";
 import ActionDialog from "./ActionDialog";
 import ClientReady from "./ClientReady";
 import PageHeader from "./PageHeader";
@@ -23,6 +27,7 @@ export default function TrashPlaces() {
   const [readError, setReadError] = useState(""), [actionError, setActionError] = useState("");
   const error = actionError || readError;
   const [purging, setPurging] = useState<TrashLogItem | null>(null);
+  const [chosen, setChosen] = useState<TrashLogItem | null>(null);
   const writing = useRef(false);
   const readVersion = useRef(0);
   useEffect(() => {
@@ -56,23 +61,32 @@ export default function TrashPlaces() {
     } catch (e) { setActionError(friendlyMessage(e, "처리 결과를 확인하지 못했어요. 목록을 다시 확인해 주세요.")); }
     finally { ++readVersion.current; writing.current = false; setBusy(false); setRefresh((n) => n + 1); }
   }
-  return <main className="form-page"><PageHeader title="삭제한 장소" backHref="/settings" /><ClientReady>
-    <div id="deleted-places" className="stack" aria-busy={loading || busy}>
-      <p className="hint">내가 지운 장소만 보여요. 되돌리면 지웠던 방으로 메모·상태·원본 링크와 함께 돌아가요.</p>
-      {loading && <p role="status" className="hint">삭제한 장소를 확인하고 있어요…</p>}
-      {!loading && !places.length && !error && <p className="hint">삭제한 장소가 없어요.</p>}
-      {places.map((place) => <article key={place.id} className="trash-place">
-        <h3>{place.name}</h3>{place.address && <p className="hint">{place.address}</p>}
-        <p className="hint">{place.board_name} · {new Date(place.deleted_at).toLocaleDateString("ko-KR")} 삭제</p>
-        {place.memo && <p className="trash-memo">{place.memo}</p>}
-        {!place.restorable && <p className="hint">방이 없어졌거나 나간 방이라 되돌릴 수 없어요.</p>}
-        <div className="trash-actions">
-          <button className="btn primary" disabled={busy || !place.restorable} onClick={() => void change(place)}>되돌리기</button>
-          <button className="btn" disabled={busy} onClick={() => { setActionError(""); setPurging(place); }}>기록에서 지우기</button>
-        </div>
-      </article>)}
-      {error && !purging && <p className="error" role="alert">{error}</p>}
+  const rooms = useRooms().rooms;
+  const colorOf = new Map((rooms ?? []).map((r) => [r.id, r.color]));
+  const day = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" });
+  // 삭제한 장소(시안 design-lab/settings 9·10번): 사진 줄 · 방 · 지운 날, 줄을 누르면 시트(되돌리기 · 기록에서 지우기).
+  return <main className="form-page settings-page"><PageHeader title="삭제한 장소" backHref="/settings" /><ClientReady>
+    <div id="deleted-places" aria-busy={loading || busy}>
+      {loading && !places.length && <p role="status" className="hint">삭제한 장소를 확인하고 있어요…</p>}
+      {!loading && !places.length && !readError && <div className="set-empty"><span className="set-empty-icon" aria-hidden="true"><Icon name="trash" width={30} /></span><b>삭제한 장소가 없어요</b></div>}
+      {readError && !places.length && <div className="set-empty"><b>{readError}</b><button type="button" className="btn" onClick={() => setRefresh((n) => n + 1)}>다시 시도</button></div>}
+      {places.length > 0 && <>
+        <section className="set-group" aria-label="삭제한 장소">{places.map((place) => <button key={place.id} type="button" className="set-row set-trash-row" disabled={busy} aria-haspopup="dialog" onClick={() => { setActionError(""); setChosen(place); }} style={toneStyle(place.board_id ? colorOf.get(place.board_id) : null)}>
+          {place.photo
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img className="set-trash-thumb" src={place.photo} alt="" loading="lazy" referrerPolicy="no-referrer" />
+            : <span className={`set-trash-thumb is-icon category-${categoryIcon(place.category)}`} aria-hidden="true"><Icon name={categoryIcon(place.category)} width={24} /></span>}
+          <span className="set-title"><span className="set-trash-name">{place.name}</span><small className="set-trash-room"><i aria-hidden="true" />{place.board_name}{!place.restorable && " · 되돌릴 수 없음"}</small></span>
+          <span className="set-value">{day(place.deleted_at)}</span>
+        </button>)}</section>
+        <p className="set-hint">줄을 누르면 되돌리거나 기록에서 지울 수 있어요.</p>
+      </>}
+      {error && !purging && !chosen && places.length > 0 && <p className="error" role="alert">{error}</p>}
     </div>
+    {chosen && <ActionSheet title={chosen.name} note={`${chosen.board_name} · ${day(chosen.deleted_at)} 삭제${chosen.memo ? " · 메모 있음" : ""}`} onClose={() => setChosen(null)} items={[
+      ...(chosen.restorable ? [{ icon: "refresh" as const, title: "되돌리기", note: "지웠던 방으로 메모 · 원본 링크와 함께 돌아가요", chevron: false, onSelect: () => { const place = chosen; setChosen(null); void change(place); } }] : []),
+      { icon: "trash" as const, title: "기록에서 지우기", note: chosen.restorable ? "다시 되돌릴 수 없어요" : "방이 없어졌거나 나간 방이라 되돌릴 수 없어요", danger: true, onSelect: () => { const place = chosen; setChosen(null); setPurging(place); } },
+    ]} />}
     {purging && <ActionDialog title="이 기록을 지울까요?" destructive message={`${purging.name}의 삭제 기록을 지우면 다시 되돌릴 수 없어요.`} cancelLabel="취소" confirmLabel="기록에서 지우기" busy={busy} onClose={() => setPurging(null)} onConfirm={() => change(purging, true)}>{actionError && <p className="error" role="alert">{actionError}</p>}</ActionDialog>}
   </ClientReady></main>;
 }

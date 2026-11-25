@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { friendlyMessage, requestJson, withRequestDeadline } from "@/lib/client-request";
-import { useBoardSync, useBoardState } from "./BoardProvider";
+import { useBoardSync, useBoardState, useRooms } from "./BoardProvider";
+import { toneStyle } from "./Palette";
 type FolderPush = { id: string; name: string; on: boolean };
 type Config = { configured: boolean; publicKey?: string; subscribed: boolean; folders?: FolderPush[] };
 function serverKey(value: string) {
@@ -149,15 +150,30 @@ export default function PushSettings() {
   const available = !!registration && !!config?.configured;
   const onCount = folders.filter((f) => f.on).length;
   const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? (folders.length > 1 ? `방 ${onCount}곳의 알림을 이 기기에서 받고 있어요.` : "이 기기에서 알림을 받고 있어요.") : "멤버가 장소를 담거나 메모를 바꾸면 알려드려요.");
+  const rooms = useRooms().rooms;
+  const colorOf = new Map((rooms ?? []).map((r) => [r.id, r.color]));
+  const denied = typeof Notification !== "undefined" && Notification.permission === "denied";
+  // 알림을 켤 수 없을 때(시안 design-lab/settings 8번): 막다른 길 대신 위에 이유 한 줄 + 방법. 스위치는 흐리게 그대로 보여 줍니다.
+  const notice = cantUse ? { title: "홈 화면 앱에서만 알림을 받을 수 있어요", body: "사파리에서 공유 → 홈 화면에 추가한 뒤, 그 앱에서 켜 주세요." }
+    : denied ? { title: "휴대폰에서 알림이 꺼져 있어요", body: "휴대폰 설정 → 데이트맵 → 알림에서 허용한 뒤 돌아오세요." }
+    : config && !config.configured ? { title: "알림 기능을 준비 중이에요", body: "준비되면 여기에서 켤 수 있어요." } : null;
+  const roomRows: FolderPush[] = folders.length ? folders : (rooms ?? []).map((r) => ({ id: r.id, name: r.name, on: false }));
+  const roomsEnabled = subscribed && !checking && !busy && !suspended;
   return <div className="push-settings" aria-busy={busy || checking}>
-    <button type="button" className="settings-row" role="switch" aria-label="새 장소·메모 알림" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
-      <Icon name="bell" /><span className="settings-copy"><span>새 장소·메모 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
-    {subscribed && !checking && folders.length > 1 && <div className="push-folders" role="group" aria-label="방별 알림">
-      {folders.map((f) => <button key={f.id} type="button" className="settings-row push-folder-row" role="switch" aria-checked={f.on} disabled={busy || suspended} onClick={() => void toggleFolder(f.id)}>
-        <Icon name="map" width={18} /><span className="settings-copy"><span>{f.name}</span></span><span className="settings-switch" aria-hidden="true" /></button>)}
-    </div>}
+    {notice && <div className="set-notice" role="status"><Icon name="bell" width={22} /><span><b>{notice.title}</b><small>{notice.body}</small></span></div>}
+    <section className="set-group" aria-label="알림 받기">
+      <button type="button" className="set-row" role="switch" aria-label="알림 받기" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
+        <span className="set-tile is-gold"><Icon name="bell" /></span><span className="set-title">알림 받기</span><span className="set-switch" aria-hidden="true" /></button>
+    </section>
+    {roomRows.length > 0 && <>
+      <h2 className="set-label">새 장소 · 메모를 알려 줄 방</h2>
+      <section className="set-group" role="group" aria-label="방별 알림">
+        {roomRows.map((f) => <button key={f.id} type="button" className="set-row" role="switch" aria-checked={roomsEnabled && f.on} disabled={!roomsEnabled} onClick={() => void toggleFolder(f.id)} style={toneStyle(colorOf.get(f.id))}>
+          <span className="set-room small" aria-hidden="true" /><span className="set-title">{f.name}</span><span className="set-switch" aria-hidden="true" /></button>)}
+      </section>
+    </>}
     <span className="sr-only" role="status">{status}</span>
-    {hint && !checking && !cantUse && <button className="text-btn settings-recheck" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button>}
-    {!checking && available && !subscribed && <p className="hint settings-hint">로그아웃하면 이 기기의 알림도 멈춰요. 다시 로그인한 뒤 여기에서 켜 주세요.</p>}
+    {hint && !checking && !cantUse && !denied && <p className="set-hint" style={{ marginTop: -8 }}>{hint} <button className="text-btn" disabled={busy || suspended} onClick={() => recheck.current()}>다시 확인</button></p>}
+    {!checking && available && !subscribed && <p className="set-hint" style={{ marginTop: -8 }}>로그아웃하면 이 기기의 알림도 멈춰요.</p>}
   </div>;
 }

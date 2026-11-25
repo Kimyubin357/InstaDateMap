@@ -5,37 +5,25 @@ import { useEffect, useRef, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import Icon from "@/components/Icon";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
-import { useBoardState, useBoardSync } from "@/components/BoardProvider";
+import { useBoardSync, useRooms } from "@/components/BoardProvider";
+import type { Profile } from "@/lib/profile";
 import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import Avatar from "@/components/Avatar";
-import type { FoldersResponse } from "@/lib/folders";
 import { requestOnboardingReplay } from "@/lib/onboarding";
 import { navigateShell } from "@/lib/shell-navigation";
 
-/** 탈퇴하면 사라지는 것: 혼자 쓰는 폴더는 삭제, 함께 쓰는 폴더는 나가기(방장이면 다음 멤버에게 넘김) */
-function leaveSummary(data: FoldersResponse) {
-  const solo = data.folders.filter((f) => f.member_count <= 1);
-  const shared = data.folders.filter((f) => f.member_count > 1);
-  const lines: string[] = [];
-  if (solo.length) lines.push(`혼자 쓰는 방 ${solo.length}개(${solo.map((f) => f.name).join(", ")})는 장소·메모와 함께 삭제돼요.`);
-  if (shared.length) lines.push(`함께 쓰는 방 ${shared.length}개(${shared.map((f) => f.name).join(", ")})에서는 나가요. 남긴 장소·메모는 그 방에 남아요.`);
-  return lines;
-}
-
 export default function SettingsForm({ who }: { who: string }) {
   const sync = useBoardSync();
-  const folderName = useBoardState().snapshot?.board ?? "";
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [locking, setLocking] = useState(false);
-  const [leaving, setLeaving] = useState<string[] | null>(null);
   const acting = useRef(false);
   const accessRetry = useRef<HTMLButtonElement>(null);
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Pick<Profile, "avatar" | "provider"> | null>(null);
   useEffect(() => {
     let alive = true;
-    requestJson<{ avatar: string | null }>("/api/profile", { cache: "no-store", notifyBoardChange: false })
-      .then((p) => { if (alive) setAvatar(p.avatar); }).catch(() => {});
+    requestJson<Profile>("/api/profile", { cache: "no-store", notifyBoardChange: false })
+      .then((p) => { if (alive) setProfile(p); }).catch(() => {});
     return () => { alive = false; };
   }, [who]);
   useEffect(() => {
@@ -55,43 +43,29 @@ export default function SettingsForm({ who }: { who: string }) {
       setError(friendlyMessage(e, method === "DELETE" ? "탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요." : "로그아웃하지 못했어요. 다시 시도해 주세요."));
     } finally { acting.current = false; setBusy(false); }
   }
-  async function openLeave() {
-    if (busy) return;
-    setError(""); setBusy(true);
-    try { setLeaving(leaveSummary(await requestJson<FoldersResponse>("/api/folders", { cache: "no-store", notifyBoardChange: false }))); }
-    catch (e) { setError(friendlyMessage(e, "탈퇴 정보를 불러오지 못했어요. 다시 시도해 주세요.")); }
-    finally { setBusy(false); }
-  }
+  const rooms = useRooms().rooms;
+  const providerText = profile?.provider === "kakao" ? "카카오로 로그인" : profile?.provider === "google" ? "구글로 로그인" : "";
+  const chevron = <Icon name="chevron" width="18" className="set-chevron" />;
+  // 설정(시안 design-lab/settings 1번): 프로필 카드 → 방·장소 → 알림 → 도움, 로그아웃·회원 탈퇴는 맨 아래 작은 글자.
   return <main className="form-page settings-page"><PageHeader title="설정" /><ClientReady>
-    {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
-    <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">방</h2>
-      <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>방 바꾸기·관리</span><small>새 방 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
+    {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "로그인 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(); }}>다시 확인</button>}</section>}
+    <ShellLink className="set-me" href="/settings/profile" aria-label={`프로필: ${who}`}><Avatar src={profile?.avatar ?? null} size={56} /><span className="set-me-copy"><strong>{who}</strong>{providerText && <small>{providerText}</small>}</span>{chevron}</ShellLink>
+    <h2 className="set-label">방 · 장소</h2>
+    <section className="set-group" aria-label="방 · 장소">
+      <ShellLink className="set-row" href="/folders"><span className="set-tile"><Icon name="rooms" /></span><span className="set-title">내 방</span>{rooms && <span className="set-value">{rooms.length}개</span>}{chevron}</ShellLink>
+      <ShellLink className="set-row" href="/settings/trash"><span className="set-tile is-red"><Icon name="trash" /></span><span className="set-title">삭제한 장소</span>{chevron}</ShellLink>
     </section>
-    <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
-      <ShellLink className="settings-row settings-link" href="/settings/notifications"><Icon name="bell" /><span className="settings-copy"><span>알림 설정</span><small>새 장소·메모 알림, 방별 알림, 광고성 정보</small></span><Icon name="chevron" width="18" /></ShellLink>
+    <h2 className="set-label">알림</h2>
+    <section className="set-group" aria-label="알림">
+      <ShellLink className="set-row" href="/settings/notifications"><span className="set-tile is-gold"><Icon name="bell" /></span><span className="set-title">알림</span>{chevron}</ShellLink>
     </section>
-    <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
-      <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{who}</span><Icon name="chevron" width="18" /></ShellLink>
-      <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
+    <h2 className="set-label">도움</h2>
+    <section className="set-group" aria-label="도움">
+      <button type="button" className="set-row" onClick={() => { requestOnboardingReplay(); navigateShell("/"); }}><span className="set-tile is-navy"><Icon name="book" /></span><span className="set-title">사용법 다시 보기</span>{chevron}</button>
+      <Link className="set-row" href="/terms"><span className="set-tile is-navy"><Icon name="list" /></span><span className="set-title">약관 및 정책</span>{chevron}</Link>
     </section>
-    <section className="settings-group" aria-labelledby="settings-help"><h2 id="settings-help" className="settings-label">도움말</h2>
-      <button type="button" className="settings-row" onClick={() => { requestOnboardingReplay(); navigateShell("/"); }}><Icon name="refresh" /><span className="settings-copy"><span>사용법 다시 보기</span><small>장소 담기·방·모음·친구 초대를 1분 만에 다시 봐요</small></span><Icon name="chevron" width="18" /></button>
-    </section>
-    <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
-      <Link className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></Link>
-    </section>
-    <section className="settings-group" aria-labelledby="settings-places"><h2 id="settings-places" className="settings-label">장소</h2>
-      <ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span className="settings-copy"><span>삭제한 장소</span><small>복구하거나 영구 삭제해요</small></span><Icon name="chevron" width="18" /></ShellLink>
-    </section>
-    <button type="button" className="text-btn settings-leave" disabled={busy} onClick={() => { void openLeave(); }}>회원 탈퇴</button>
-    {error && !locking && !leaving && <p role="alert" className="error">{error}</p>}
+    <div className="set-foot"><button type="button" disabled={busy} onClick={() => { setError(""); setLocking(true); }}>로그아웃</button><span aria-hidden="true">·</span><ShellLink href="/settings/leave">회원 탈퇴</ShellLink></div>
+    {error && !locking && <p role="alert" className="error">{error}</p>}
     {locking && <ActionDialog title="로그아웃할까요?" message="다음에 지도를 열 때 카카오·구글로 다시 로그인해요." tone="info" cancelLabel="취소" confirmLabel="로그아웃" busy={busy} busyLabel="로그아웃하는 중…" onClose={() => { if (!busy) { setLocking(false); setError(""); } }} onConfirm={() => signOut("/api/access/lock", "POST")}>{error && <p className="error" role="alert">{error}</p>}</ActionDialog>}
-    {leaving && <ActionDialog title="정말 탈퇴할까요?" destructive cancelLabel="취소" confirmLabel="탈퇴하기" busy={busy} busyLabel="탈퇴하는 중…" onClose={() => { if (!busy) { setLeaving(null); setError(""); } }} onConfirm={() => signOut("/api/account", "DELETE")}>
-      <div className="settings-leave-detail">
-        {leaving.map((line) => <p key={line}>{line}</p>)}
-        <p>프로필·로그인 연결·알림 설정이 지워지고 되돌릴 수 없어요.</p>
-      </div>
-      {error && <p className="error" role="alert">{error}</p>}
-    </ActionDialog>}
     </ClientReady></main>;
 }
