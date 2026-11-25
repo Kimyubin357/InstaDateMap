@@ -10,6 +10,8 @@ import ActionDialog from "@/components/ActionDialog";
 import ShellLink from "@/components/ShellLink";
 import Avatar from "@/components/Avatar";
 import type { FoldersResponse } from "@/lib/folders";
+import { requestOnboardingReplay } from "@/lib/onboarding";
+import { navigateShell } from "@/lib/shell-navigation";
 
 /** 탈퇴하면 사라지는 것: 혼자 쓰는 폴더는 삭제, 함께 쓰는 폴더는 나가기(방장이면 다음 멤버에게 넘김) */
 function leaveSummary(data: FoldersResponse) {
@@ -71,6 +73,9 @@ export default function SettingsForm({ who }: { who: string }) {
     <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
       <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{who}</span><Icon name="chevron" width="18" /></ShellLink>
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
+    </section>
+    <section className="settings-group" aria-labelledby="settings-help"><h2 id="settings-help" className="settings-label">도움말</h2>
+      <button type="button" className="settings-row" onClick={() => { requestOnboardingReplay(); navigateShell("/"); }}><Icon name="refresh" /><span className="settings-copy"><span>사용법 다시 보기</span><small>장소 담기·방·모음·친구 초대를 1분 만에 다시 봐요</small></span><Icon name="chevron" width="18" /></button>
     </section>
     <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
       <Link className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></Link>

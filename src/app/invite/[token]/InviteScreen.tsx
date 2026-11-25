@@ -5,6 +5,7 @@ import { toneStyle } from "@/components/Palette";
 import { ProviderButtons } from "@/app/login/LoginScreen";
 import { friendlyMessage, requestJson } from "@/lib/client-request";
 import type { InvitePreview } from "@/lib/folders";
+import { rememberInvite } from "@/lib/onboarding";
 import styles from "@/app/login/Login.module.css";
 import invite from "./Invite.module.css";
 
@@ -16,7 +17,12 @@ export default function InviteScreen({ token, preview, loggedIn }: { token: stri
   async function join() {
     if (busy) return;
     setBusy(true); setError("");
-    try { await requestJson(`/api/invites/${token}`, { method: "POST", notifyBoardChange: false }); window.location.assign("/"); }
+    try {
+      await requestJson(`/api/invites/${token}`, { method: "POST", notifyBoardChange: false });
+      // 처음 사용법의 환영 문구를 "○○님의 방에 들어왔어요"로(새로 참여한 경우만)
+      if (preview?.code === "OK") rememberInvite({ owner: preview.owner ?? null, room: preview.name ?? null });
+      window.location.assign("/");
+    }
     catch (e) { setError(friendlyMessage(e, "방에 참여하지 못했어요. 다시 시도해 주세요.")); setBusy(false); }
   }
   const valid = preview && preview.code !== "INVITE_INVALID";
