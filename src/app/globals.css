@@ -3,6 +3,9 @@
   --accent:#b92b25; --accent-ink:#a52620; --accent-soft:#f4e1d3; --wish:#b92b25; --again:#a87828; --visited:#365b40; --meh:#81776d;
   --danger:#a52620; --forest:#244b37; --cream:#fbf6e8; --weave:url('/textures/canvas-weave.svg'); --grain:url('/textures/ink-grain.svg');
   --print-shadow:0 2px 0 #382f2512,0 4px 12px #382f2510;
+  /* 방·모음 색 10가지(src/lib/palette.ts, 018). 빨강·초록은 기존 잉크 토큰 그대로 */
+  --palette-red:var(--accent); --palette-orange:#bb6229; --palette-gold:#8b692d; --palette-olive:#676c2c; --palette-forest:var(--forest);
+  --palette-teal:#2f7a6c; --palette-blue:#466b79; --palette-navy:#33406c; --palette-plum:#7a3d5e; --palette-taupe:#7a6553;
   --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
   color-scheme:light; --app-height:100dvh;
 }

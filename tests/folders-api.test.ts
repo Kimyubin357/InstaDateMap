@@ -37,15 +37,22 @@ describe("폴더 API 인증과 입력", () => {
     const r = new Request("http://localhost/api/folders", { method: "POST", headers: { cookie: `datemap_session=${account}`, origin: "https://evil.test" }, body: "{}" });
     expect((await create(r)).status).toBe(403);
   });
-  it("이름·색·아이콘을 검사하고, 만든 폴더를 이 기기에서 바로 연다", async () => {
-    const bad = await create(req("folders", "POST", { name: " ", color: "red", icon: "heart" }));
+  it("이름·색만 검사하고(아이콘은 무시), 만든 방을 이 기기에서 바로 연다", async () => {
+    const bad = await create(req("folders", "POST", { name: " ", color: "red" }));
     expect(bad.status).toBe(400); expect((await bad.json()).message).toMatch(/1~30자/);
-    expect((await create(req("folders", "POST", { name: "부산", color: "purple", icon: "heart" }))).status).toBe(400);
+    expect((await create(req("folders", "POST", { name: "부산", color: "purple" }))).status).toBe(400);
     rpc.mockImplementation((name: string) => ok(name === "dm_create_folder" ? { board_id: folder } : {}));
-    const res = await create(req("folders", "POST", { name: "  부산   여행 ", color: "blue", icon: "map" }));
+    // 새 색(남색)도 받고, 예전 화면이 보낸 아이콘은 쓰지 않는다
+    const res = await create(req("folders", "POST", { name: "  부산   여행 ", color: "navy", icon: "map" }));
     expect(await res.json()).toEqual({ id: folder, current: folder });
-    expect(rpc.mock.calls[0]).toEqual(["dm_create_folder", { p_user: user, p_name: "부산 여행", p_color: "blue", p_icon: "map" }]);
+    expect(rpc.mock.calls[0]).toEqual(["dm_create_folder", { p_user: user, p_name: "부산 여행", p_color: "navy", p_icon: "heart" }]);
     expect(rpc.mock.calls[1]).toEqual(["dm_switch_folder", { p_user: user, p_session: tokenHash(account), p_board: folder }]);
+  });
+  it("방 수정은 이름·색만 보내고 아이콘은 DB 값을 그대로 둔다", async () => {
+    rpc.mockImplementation((name: string) => ok(name === "dm_list_folders" ? [{ id: folder, name: "제주", color: "teal", role: "owner" }] : name === "dm_folder_members" ? [] : null));
+    const res = await update(req(`folders/${folder}`, "PATCH", { name: "제주", color: "teal", icon: "tree" }), p({ id: folder }));
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0]).toEqual(["dm_update_folder", { p_user: user, p_board: folder, p_name: "제주", p_color: "teal", p_icon: null }]);
   });
   it("목록은 지금 보는 폴더와 함께 돌려준다", async () => {
     rpc.mockImplementation(() => ok([{ id: folder, name: "내 장소" }]));
@@ -56,7 +63,7 @@ describe("폴더 API 인증과 입력", () => {
 describe("DB 규칙 오류와 결과", () => {
   it("DB의 한국어 안내(P0001)는 그대로, 그 밖의 오류는 일반 안내로 바꾼다", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "폴더를 만든 사람만 바꿀 수 있어요." } });
-    const denied = await update(req(`folders/${folder}`, "PATCH", { name: "제주", color: "gold", icon: "tree" }), p({ id: folder }));
+    const denied = await update(req(`folders/${folder}`, "PATCH", { name: "제주", color: "gold" }), p({ id: folder }));
     expect(denied.status).toBe(409); expect((await denied.json()).message).toBe("방을 만든 사람만 바꿀 수 있어요."); // DB 안내의 "폴더"는 화면 용어 "방"으로 바꿔 보냄
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     rpc.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "relation boards does not exist" } });

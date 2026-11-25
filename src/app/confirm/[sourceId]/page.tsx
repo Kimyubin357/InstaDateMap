@@ -17,6 +17,6 @@ export default async function ConfirmPage({ params: route, searchParams: query }
   if (rowError) throw new Error("장소 후보를 읽지 못했어요.");
   // 장소 이름은 캡션에서만 읽습니다. 예전에 위치 태그(역·동네)로 만든 후보는 보여 주지도, 보내지도 않습니다.
   const extractions: ExtractionView[] = (rows || []).filter((r) => r.module !== "location_tag").map((r) => ({ id: r.id, module: r.module, name: [r.raw_name, r.branch].filter(Boolean).join(" "), rawName: r.raw_name, branch: r.branch, areaHint: r.area_hint, candidates: (r.candidates || []) as KakaoPlace[], excluded: r.excluded }));
-  const { data: look } = await db().from("boards").select("color, icon").eq("id", board.id).maybeSingle();
-  return <ConfirmForm key={`${source.id}:${source.analysis_version}:${source.status}:${extractions.map((e) => e.id).join(",")}`} room={{ id: board.id, name: board.name, color: look?.color, icon: look?.icon }} source={{ id: source.id, url: source.url, status: source.status, version: source.analysis_version, recoveryReason: source.recovery_reason }} extractions={extractions} />;
+  const { data: look } = await db().from("boards").select("color").eq("id", board.id).maybeSingle();
+  return <ConfirmForm key={`${source.id}:${source.analysis_version}:${source.status}:${extractions.map((e) => e.id).join(",")}`} room={{ id: board.id, name: board.name, color: look?.color }} source={{ id: source.id, url: source.url, status: source.status, version: source.analysis_version, recoveryReason: source.recovery_reason }} extractions={extractions} />;
 }
