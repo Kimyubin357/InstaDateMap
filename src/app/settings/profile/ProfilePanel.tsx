@@ -15,7 +15,7 @@ export default function ProfilePanel() {
   const [error, setError] = useState("");
   const load = () => { setError(""); requestJson<Profile>("/api/profile", { cache: "no-store", notifyBoardChange: false }).then(setProfile).catch((e) => setError(friendlyMessage(e, "프로필을 불러오지 못했어요."))); };
   useEffect(load, []);
-  return <main className={`form-page settings-page ${styles.page}`}><ClientReady><PageHeader title="프로필 수정" backHref="/settings" />
+  return <main className={`form-page settings-page ${styles.page}`}><PageHeader title="프로필 수정" backHref="/settings" /><ClientReady>
     {!profile && !error && <p className="hint" role="status">프로필을 불러오고 있어요…</p>}
     {error && <section className="settings-notice"><p className="error" role="alert">{error}</p><button type="button" className="btn" onClick={load}>다시 불러오기</button></section>}
     {profile && <ProfileEditor key={`${profile.name}:${profile.avatar?.slice(-24) ?? ""}`} initial={profile} submitLabel="저장" requireChange onSaved={async (saved) => {

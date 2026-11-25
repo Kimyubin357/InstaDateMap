@@ -170,7 +170,7 @@ export default function AddForm({ initialUrl, initialRetry = false }: { initialU
     {pendingCount > 0 && <ShellLink className={styles.goRow} href="/?panel=pending"><Icon name="clock" width={18} /><span>확인 대기 <b>{pendingCount}개</b></span><Icon name="chevron" width={17} /></ShellLink>}
   </>;
 
-  return <main className={`form-page ${styles.page}`}><ClientReady><PageHeader title="장소 추가" />{body}</ClientReady></main>;
+  return <main className={`form-page ${styles.page}`}><PageHeader title="장소 추가" /><ClientReady>{body}</ClientReady></main>;
 }
 
 /** 원인별 실패 화면(시안 10·11번): 제목·설명·다음 행동 하나. */

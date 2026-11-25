@@ -162,6 +162,6 @@ export default function PlaceSheet({ place, kakaoKey, view, onClose, onShowMap, 
       setTransferring(false); notify(`‘${result.folder}’에도 담았어요.`);
     }} />}
     {deleting && <ActionDialog title="이 장소를 삭제할까요?" destructive cancelLabel="취소" confirmLabel="삭제하기" busy={busy} busyLabel="삭제 중…" onClose={dismissDelete} onConfirm={remove}>
-      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>이 폴더에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 메모와 원본 링크까지 되돌릴 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
+      <strong className="delete-dialog-name">{place.name}</strong>{place.address && <p className="delete-dialog-address">{place.address}</p>}<p>이 방에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 메모와 원본 링크까지 되돌릴 수 있어요.</p>{error && <p className="error" role="alert">{error}</p>}
     </ActionDialog>}</>;
 }

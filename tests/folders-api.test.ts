@@ -57,7 +57,7 @@ describe("DB 규칙 오류와 결과", () => {
   it("DB의 한국어 안내(P0001)는 그대로, 그 밖의 오류는 일반 안내로 바꾼다", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { code: "P0001", message: "폴더를 만든 사람만 바꿀 수 있어요." } });
     const denied = await update(req(`folders/${folder}`, "PATCH", { name: "제주", color: "gold", icon: "tree" }), p({ id: folder }));
-    expect(denied.status).toBe(409); expect((await denied.json()).message).toBe("폴더를 만든 사람만 바꿀 수 있어요.");
+    expect(denied.status).toBe(409); expect((await denied.json()).message).toBe("방을 만든 사람만 바꿀 수 있어요."); // DB 안내의 "폴더"는 화면 용어 "방"으로 바꿔 보냄
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     rpc.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "relation boards does not exist" } });
     const failed = await remove(req(`folders/${folder}`, "DELETE"), p({ id: folder }));

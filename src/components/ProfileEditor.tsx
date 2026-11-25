@@ -103,7 +103,7 @@ export default function ProfileEditor({ initial, submitLabel, busyLabel = "저�
     <div className={styles.fields}>
       <label className={styles.name}>닉네임
         <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 유빈" autoComplete="nickname" enterKeyHint="done" disabled={busy} />
-        <small>장소를 저장하거나 메모를 남기면 폴더 멤버에게 이 이름으로 보여요.</small>
+        <small>장소를 저장하거나 메모를 남기면 방 멤버에게 이 이름으로 보여요.</small>
       </label>
       {initial.provider_name && providerLabel && trimmed !== initial.provider_name && <button type="button" className={`text-btn ${styles.useProviderName}`} disabled={busy} onClick={() => setName(initial.provider_name!.slice(0, 20))}>{providerLabel} 이름으로 바꾸기</button>}
       {error && <p className="error" role="alert">{error}</p>}

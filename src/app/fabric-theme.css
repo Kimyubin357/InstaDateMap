@@ -354,3 +354,9 @@ input::placeholder,textarea::placeholder{color:#857968;opacity:1}
 .dismiss-list li span{flex:1;min-width:0;overflow-wrap:anywhere}
 .dismiss-list small{font-size:14px;color:var(--ink-soft);white-space:nowrap}
 .dismiss-note{font-size:14px;color:var(--ink-soft);margin:10px 0 0}
+
+/* 뒤로 가기·제목이 있는 화면의 헤더는 스크롤해도 위에 붙어 있습니다(설정과 같은 규칙).
+   홈 화면 앱(black-translucent)에서는 상태 표시줄 아래에서 멈추고, 그 위 띠도 같은 원단으로 덮습니다. */
+.form-page .page-header,.confirm .page-header{position:sticky;top:var(--safe-t);z-index:3;background:var(--paper) var(--weave);border-bottom:1px dashed var(--line)}
+.form-page .page-header::before,.confirm .page-header::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:var(--safe-t);background:var(--paper) var(--weave)}
+.form-page:not(.settings-page) .page-header,.confirm .page-header{margin-left:-20px;margin-right:-20px;padding:6px 12px}

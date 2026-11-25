@@ -147,11 +147,11 @@ export default function PushSettings() {
   }
   const available = !!registration && !!config?.configured;
   const onCount = folders.filter((f) => f.on).length;
-  const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? (folders.length > 1 ? `폴더 ${onCount}곳의 알림을 이 기기에서 받고 있어요.` : "이 기기에서 알림을 받고 있어요.") : "멤버가 장소를 담거나 메모를 바꾸면 알려드려요.");
+  const status = busy ? "설정 중…" : checking ? "알림 설정을 확인하고 있어요…" : hint || (subscribed ? (folders.length > 1 ? `방 ${onCount}곳의 알림을 이 기기에서 받고 있어요.` : "이 기기에서 알림을 받고 있어요.") : "멤버가 장소를 담거나 메모를 바꾸면 알려드려요.");
   return <div className="push-settings" aria-busy={busy || checking}>
     <button type="button" className="settings-row" role="switch" aria-label="새 장소·메모 알림" aria-checked={subscribed} disabled={checking || busy || suspended || !available} onClick={subscribed ? disable : enable}>
       <Icon name="bell" /><span className="settings-copy"><span>새 장소·메모 알림</span><small>{status}</small></span><span className="settings-switch" aria-hidden="true" /></button>
-    {subscribed && !checking && folders.length > 1 && <div className="push-folders" role="group" aria-label="폴더별 알림">
+    {subscribed && !checking && folders.length > 1 && <div className="push-folders" role="group" aria-label="방별 알림">
       {folders.map((f) => <button key={f.id} type="button" className="settings-row push-folder-row" role="switch" aria-checked={f.on} disabled={busy || suspended} onClick={() => void toggleFolder(f.id)}>
         <Icon name="map" width={18} /><span className="settings-copy"><span>{f.name}</span></span><span className="settings-switch" aria-hidden="true" /></button>)}
     </div>}

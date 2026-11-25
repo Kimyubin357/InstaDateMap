@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import ClientReady from "@/components/ClientReady";
 import { useEffect, useRef, useState } from "react";
 import PageHeader from "@/components/PageHeader";
@@ -15,8 +16,8 @@ function leaveSummary(data: FoldersResponse) {
   const solo = data.folders.filter((f) => f.member_count <= 1);
   const shared = data.folders.filter((f) => f.member_count > 1);
   const lines: string[] = [];
-  if (solo.length) lines.push(`혼자 쓰는 폴더 ${solo.length}개(${solo.map((f) => f.name).join(", ")})는 장소·메모와 함께 삭제돼요.`);
-  if (shared.length) lines.push(`함께 쓰는 폴더 ${shared.length}개(${shared.map((f) => f.name).join(", ")})에서는 나가요. 남긴 장소·메모는 그 폴더에 남아요.`);
+  if (solo.length) lines.push(`혼자 쓰는 방 ${solo.length}개(${solo.map((f) => f.name).join(", ")})는 장소·메모와 함께 삭제돼요.`);
+  if (shared.length) lines.push(`함께 쓰는 방 ${shared.length}개(${shared.map((f) => f.name).join(", ")})에서는 나가요. 남긴 장소·메모는 그 방에 남아요.`);
   return lines;
 }
 
@@ -59,20 +60,20 @@ export default function SettingsForm({ who }: { who: string }) {
     catch (e) { setError(friendlyMessage(e, "탈퇴 정보를 불러오지 못했어요. 다시 시도해 주세요.")); }
     finally { setBusy(false); }
   }
-  return <main className="form-page settings-page"><ClientReady><PageHeader title="우리 설정" />
+  return <main className="form-page settings-page"><PageHeader title="우리 설정" /><ClientReady>
     {(sync.checkingAccess || sync.accessError) && <section className="settings-notice" aria-busy={sync.checkingAccess}><p className="hint" role="status">{sync.checkingAccess ? "입장 정보를 확인하고 있어요…" : sync.accessError}</p>{sync.accessError && <button ref={accessRetry} className="btn" onClick={() => { void sync.resetAccess(false); }}>입장 정보 다시 확인</button>}</section>}
-    <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">폴더</h2>
-      <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>폴더 바꾸기·관리</span><small>새 폴더 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
+    <section className="settings-group" aria-labelledby="settings-folder"><h2 id="settings-folder" className="settings-label">방</h2>
+      <ShellLink className="settings-row settings-link" href="/folders"><Icon name="map" /><span className="settings-copy"><span>방 바꾸기·관리</span><small>새 방 만들기, 초대 링크, 멤버</small></span><span className="settings-value">{folderName}</span><Icon name="chevron" width="18" /></ShellLink>
     </section>
     <section className="settings-group" aria-labelledby="settings-device"><h2 id="settings-device" className="settings-label">이 기기</h2>
       <ShellLink className="settings-row settings-link" href="/settings/profile"><Avatar src={avatar} size={28} /><span className="settings-copy"><span>프로필</span><small>이름과 사진을 바꿔요</small></span><span className="settings-value">{who}</span><Icon name="chevron" width="18" /></ShellLink>
-      <ShellLink className="settings-row settings-link" href="/settings/notifications"><Icon name="bell" /><span className="settings-copy"><span>알림 설정</span><small>새 장소·메모 알림, 폴더별 알림, 광고성 정보</small></span><Icon name="chevron" width="18" /></ShellLink>
+      <ShellLink className="settings-row settings-link" href="/settings/notifications"><Icon name="bell" /><span className="settings-copy"><span>알림 설정</span><small>새 장소·메모 알림, 방별 알림, 광고성 정보</small></span><Icon name="chevron" width="18" /></ShellLink>
     </section>
     <section className="settings-group" aria-labelledby="settings-account"><h2 id="settings-account" className="settings-label">계정</h2>
       <button className="settings-row" disabled={busy} onClick={() => { setError(""); setLocking(true); }}><Icon name="lock" /><span className="settings-copy"><span>로그아웃</span><small>다음에 열 때 카카오·구글로 다시 로그인해요</small></span><Icon name="chevron" width="18" /></button>
     </section>
     <section className="settings-group" aria-labelledby="settings-terms"><h2 id="settings-terms" className="settings-label">약관 및 정책</h2>
-      <a className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></a>
+      <Link className="settings-row settings-link" href="/terms"><Icon name="list" /><span className="settings-copy"><span>약관 보기</span><small>이용약관·개인정보 처리방침·위치기반서비스</small></span><Icon name="chevron" width="18" /></Link>
     </section>
     <section className="settings-group" aria-labelledby="settings-places"><h2 id="settings-places" className="settings-label">장소</h2>
       <ShellLink className="settings-row settings-link" href="/settings/trash"><Icon name="trash" /><span className="settings-copy"><span>삭제한 장소</span><small>복구하거나 영구 삭제해요</small></span><Icon name="chevron" width="18" /></ShellLink>

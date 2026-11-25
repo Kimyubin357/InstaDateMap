@@ -45,7 +45,7 @@ export default function PlacesDeleteDialog({ places, onClose, onDeleted }: {
     confirmLabel={pending ? "삭제 확인·재시도" : completed ? `남은 ${remaining}곳 삭제` : `${targets.length}곳 삭제`}
     busy={busy} busyLabel={`${completed}/${targets.length}곳 삭제 중…`} onClose={dismiss} onConfirm={remove}>
     <p>{targets.slice(0, 2).map((place) => place.name).join(", ")}{targets.length > 2 ? ` 외 ${targets.length - 2}곳` : ""}</p>
-    <p>이 폴더와 모든 모음에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 되돌릴 수 있어요.</p>
+    <p>이 방과 모든 모음에서 바로 빠져요.<br />설정의 ‘삭제한 장소’(나만 보는 기록)에서 되돌릴 수 있어요.</p>
     {completed > 0 && <p role="status">{targets.length}곳 중 {completed}곳을 삭제했어요. {remaining}곳이 남았어요.</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </ActionDialog>;
