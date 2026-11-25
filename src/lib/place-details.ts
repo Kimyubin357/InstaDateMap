@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { env } from "./env";
-import { parseMenuPage, parsePlaceHome, parseSearch, pickCandidate, searchQuery, distance, type NaverPlace, type PlaceHours, type PlaceMenu, type PlacePhoto } from "./naver-place";
+import { fallbackQueries, parseMenuPage, parsePlaceHome, parseSearch, pickCandidate, searchQuery, distance, type NaverPlace, type PlaceHours, type PlaceMenu, type PlacePhoto } from "./naver-place";
 
 export interface PlaceDetails {
   status: "ok" | "not_found" | "error";
@@ -12,7 +12,9 @@ export interface DetailTarget { kakao_place_id: string; name: string; address: s
 type Fetcher = typeof fetch;
 
 /** 다시 읽기까지: 찾음 7일, 못 찾음 3일, 오류 30분 */
-const TTL = { ok: 7 * 86400e3, not_found: 3 * 86400e3, error: 30 * 60e3 } as const;
+const TTL = { ok: 7 * 86400e3, not_found: 86400e3, error: 30 * 60e3 } as const;
+/** 네이버에서 가게를 못 찾고 카카오 전화번호만 저장한 예전 "ok" 줄은 사진이 없으므로 몇 시간 뒤 다시 찾습니다(2026-11-26). */
+const PHONE_ONLY_TTL = 6 * 3600e3;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const inFlight = new Map<string, Promise<PlaceDetails>>();
 
@@ -22,7 +24,8 @@ export function toDetails(row: Record<string, any>): PlaceDetails {
     phone: row.phone ?? null, photos: row.photos ?? [], menus: row.menus ?? [], hours: row.hours ?? null,
     booking_url: row.booking_url ?? null, catchtable_url: row.catchtable_url ?? null, fetched_at: row.fetched_at };
 }
-export const isFresh = (row: { status: keyof typeof TTL; fetched_at: string }, now = Date.now()) => now - new Date(row.fetched_at).getTime() < TTL[row.status];
+export const isFresh = (row: { status: keyof typeof TTL; fetched_at: string; naver_place_id?: string | null }, now = Date.now()) =>
+  now - new Date(row.fetched_at).getTime() < (row.status === "ok" && "naver_place_id" in row && !row.naver_place_id ? PHONE_ONLY_TTL : TTL[row.status]);
 
 async function page(url: string, fetcher: Fetcher) {
   const res = await fetcher(url, { headers: { "User-Agent": UA, "Accept-Language": "ko-KR,ko;q=0.9", Accept: "text/html" }, signal: AbortSignal.timeout(6000), cache: "no-store" });
@@ -42,8 +45,10 @@ export async function kakaoPhone(target: DetailTarget, fetcher: Fetcher): Promis
 
 /** 네이버 검색 → 같은 가게 고르기 → 장소 홈(필요하면 메뉴 탭)까지 읽습니다. */
 export async function findNaverPlace(target: DetailTarget, fetcher: Fetcher): Promise<NaverPlace | null> {
-  const search = await page(`https://m.search.naver.com/search.naver?where=m_local&query=${encodeURIComponent(searchQuery(target.name, target.address))}`, fetcher);
-  const candidates = parseSearch(search);
+  const search = (query: string) => page(`https://m.search.naver.com/search.naver?where=m_local&query=${encodeURIComponent(query)}`, fetcher);
+  let candidates = parseSearch(await search(searchQuery(target.name, target.address)));
+  // 지점·지역을 붙인 검색이 비면 더 짧은 검색어로 한 번씩 더 묻습니다(좌표·이름 확인은 똑같이 합니다).
+  for (const query of fallbackQueries(target.name, target.address)) { if (candidates.length) break; candidates = parseSearch(await search(query)); }
   const near = (p: NaverPlace | null) => p && p.lat != null && p.lng != null && distance(target, { lat: p.lat, lng: p.lng }) <= 150 ? p : null;
   let picked = pickCandidate(candidates, target);
   let place: NaverPlace | null = null;
@@ -68,10 +73,11 @@ async function collect(target: DetailTarget, fetcher: Fetcher): Promise<Omit<Pla
   const kakao = phone.status === "fulfilled" ? phone.value : null;
   if (naver.status === "rejected") {
     console.warn("place details: naver lookup failed", naver.reason instanceof Error ? naver.reason.message : naver.reason);
-    return { status: kakao ? "ok" : "error", naver_place_id: null, phone: kakao, photos: [], menus: [], hours: null, booking_url: null, catchtable_url: null };
+    // 네이버가 잠깐 막히거나 늦으면 "실패"로 짧게(30분) 저장하고 다시 찾습니다. 카카오 전화번호는 그대로 보여 줍니다.
+    return { status: "error", naver_place_id: null, phone: kakao, photos: [], menus: [], hours: null, booking_url: null, catchtable_url: null };
   }
   const p = naver.value;
-  if (!p) return { status: kakao ? "ok" : "not_found", naver_place_id: null, phone: kakao, photos: [], menus: [], hours: null, booking_url: null, catchtable_url: null };
+  if (!p) return { status: "not_found", naver_place_id: null, phone: kakao, photos: [], menus: [], hours: null, booking_url: null, catchtable_url: null };
   return { status: "ok", naver_place_id: p.id, phone: kakao ?? p.phone, photos: p.photos, menus: p.menus, hours: p.hours, booking_url: p.bookingUrl, catchtable_url: null };
 }
 

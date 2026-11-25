@@ -40,9 +40,13 @@ export async function GET(req: Request) {
       if (row && isFresh(row)) briefs[id] = brief(toDetails(row));
       else { if (row) briefs[id] = brief(toDetails(row)); stale.push(target); }
     }
+    // 네이버에 한꺼번에 몰아 묻지 않도록 두 곳씩 나눠 읽습니다(한꺼번에 읽다 막혀 사진을 못 받던 문제, 2026-11-26).
     const now = stale.slice(0, FETCH_PER_CALL);
-    const results = await Promise.allSettled(now.map((t) => placeDetails(t)));
-    results.forEach((r, i) => { if (r.status === "fulfilled") briefs[now[i].kakao_place_id] = brief(r.value); });
+    for (let i = 0; i < now.length; i += 2) {
+      const pair = now.slice(i, i + 2);
+      const results = await Promise.allSettled(pair.map((t) => placeDetails(t)));
+      results.forEach((r, j) => { if (r.status === "fulfilled") briefs[pair[j].kakao_place_id] = brief(r.value); });
+    }
     return Response.json({ briefs, pending: stale.slice(FETCH_PER_CALL).map((t) => t.kakao_place_id) } satisfies BriefsResponse, { headers: { "Cache-Control": "no-store" } });
   } catch (e) { return accessError(e); }
 }

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeDb, reset, tables } from "./fakeDb";
 vi.mock("@/lib/db", () => ({ db: () => fakeDb }));
-import { apolloObjects, parseMenuPage, parsePlaceHome, parseSearch, pickCandidate, searchQuery, similarName } from "@/lib/naver-place";
+import { apolloObjects, decodeEntities, parseMenuPage, parsePlaceHome, parseSearch, pickCandidate, searchQuery, similarName } from "@/lib/naver-place";
 import { isFresh, placeDetails } from "@/lib/place-details";
 import { tokenHash } from "@/lib/token";
 import { GET as detailsRoute } from "@/app/api/places/[id]/details/route";
@@ -76,8 +76,9 @@ describe("가게 정보 캐시", () => {
     expect(f.mock.calls.length).toBe(calls);
     expect(isFresh({ status: "ok", fetched_at: first.fetched_at }, Date.now() + 8 * 86400e3)).toBe(false);
   });
-  it("네이버가 막히면 카카오 전화번호만이라도, 둘 다 없으면 오류로 짧게 캐시하고 예전 성공 정보는 덮어쓰지 않는다", async () => {
-    expect(await placeDetails(target, fetcher({ naver: "fail", kakaoPhone: "02-1" + "23-4567" }) as unknown as typeof fetch)).toMatchObject({ status: "ok", phone: "02-123-4567", photos: [] });
+  it("네이버가 막히면 카카오 전화번호는 보여 주되 오류로 짧게 캐시하고, 예전 성공 정보는 덮어쓰지 않는다", async () => {
+    // 네이버 실패는 전화번호가 있어도 "실패"로 짧게 저장해 30분 뒤 다시 찾습니다(예전에는 "ok"로 7일 저장돼 사진을 다시 찾지 않았음).
+    expect(await placeDetails(target, fetcher({ naver: "fail", kakaoPhone: "02-1" + "23-4567" }) as unknown as typeof fetch)).toMatchObject({ status: "error", phone: "02-123-4567", photos: [] });
     tables.place_details = [{ kakao_place_id: "k1", status: "ok", naver_place_id: "111", phone: "0507", photos: [{ url: "https://ldb-phinf.pstatic.net/b.jpg" }], menus: [], hours: null, booking_url: null, catchtable_url: null, fetched_at: "2000-01-01T00:00:00Z" }];
     const stale = await placeDetails(target, fetcher({ naver: "fail" }) as unknown as typeof fetch);
     expect(stale).toMatchObject({ status: "ok", naver_place_id: "111" });
@@ -107,5 +108,29 @@ describe("가게 정보 API", () => {
     const req = (cookie: string) => new Request("http://localhost/api/places/p-other/details", { headers: { cookie } });
     expect((await detailsRoute(req(""), { params: Promise.resolve({ id: "p-other" }) })).status).toBe(401);
     expect((await detailsRoute(req(`datemap_session=${token}`), { params: Promise.resolve({ id: "p-other" }) })).status).toBe(404);
+  });
+});
+
+describe("사진을 다시 찾는 규칙과 이름 비교(2026-11-26)", () => {
+  it("네이버를 못 찾고 전화번호만 저장한 예전 ok 줄은 6시간 뒤 다시 찾고, 네이버를 찾은 ok는 7일", () => {
+    const at = "2026-11-25T00:00:00Z", t0 = new Date(at).getTime();
+    expect(isFresh({ status: "ok", fetched_at: at, naver_place_id: null }, t0 + 5 * 3600e3)).toBe(true);
+    expect(isFresh({ status: "ok", fetched_at: at, naver_place_id: null }, t0 + 7 * 3600e3)).toBe(false);
+    expect(isFresh({ status: "ok", fetched_at: at, naver_place_id: "111" }, t0 + 6 * 86400e3)).toBe(true);
+    expect(isFresh({ status: "not_found", fetched_at: at }, t0 + 2 * 86400e3)).toBe(false);
+  });
+  it("검색 결과 이름의 &amp; 를 되돌려 같은 가게로 고른다", () => {
+    expect(decodeEntities("씨랄라워터파크&amp;찜질방")).toBe("씨랄라워터파크&찜질방");
+    expect(decodeEntities("A&#38;B &lt;C&gt; &unknown;")).toBe("A&B <C> &unknown;");
+    expect(similarName("씨랄라워터파크&amp;찜질방", "씨랄라워터파크&찜질방")).toBe(true);
+    expect(pickCandidate([{ id: "9", name: "씨랄라워터파크&amp;찜질방", lat: 37.5001, lng: 127.0001 }], { name: "씨랄라워터파크&찜질방", lat: 37.5, lng: 127 })?.id).toBe("9");
+  });
+});
+
+describe("검색이 비었을 때 다시 묻는 검색어", () => {
+  it("지점 이름을 빼고 구와 함께 → 상호만", async () => {
+    const { fallbackQueries } = await import("@/lib/naver-place");
+    expect(fallbackQueries("숲속한방랜드 본점", "서울 서대문구 봉원사길 75-66")).toEqual(["숲속한방랜드 서대문구", "숲속한방랜드"]);
+    expect(fallbackQueries("삼호궁전보석사우나", "서울 서초구 반포대로 1")).toEqual(["삼호궁전보석사우나"]);
   });
 });
