@@ -27,10 +27,17 @@ export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
   return 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
+/**
+ * 검색 비교용 글자. 겉모양은 같아도 자모가 나뉜 한글(NFD·호환 자모)이나 보이지 않는 글자가 섞이면
+ * includes가 실패하므로, 검색어와 대상을 같은 형태로 맞춥니다.
+ */
+export function searchKey(text: string) {
+  return text.normalize("NFKC").replace(/[​-‍⁠﻿]/g, "").toLocaleLowerCase();
+}
 export function filterPlaces(places: PlaceView[], query: string, statuses: PlaceStatus[], category: string) {
-  const words = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  const words = searchKey(query).trim().split(/\s+/).filter(Boolean);
   return places.filter((p) => statuses.includes(p.status) && (!category || p.category === category) &&
-    words.every((w) => `${p.name} ${p.address || ""} ${p.memo || ""}`.toLocaleLowerCase().includes(w)));
+    words.every((w) => searchKey(`${p.name} ${p.address || ""} ${p.memo || ""}`).includes(w)));
 }
 export function sortPlaces(places: PlaceView[], origin?: { lat: number; lng: number } | null) {
   return [...places].sort((a, b) => origin ? distanceM(origin, a) - distanceM(origin, b) :

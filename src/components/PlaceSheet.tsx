@@ -106,8 +106,9 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     if (memoDirty) setLeaving(destination);
     else leave(destination);
   }
-  async function saveMemo() {
-    if (busy) return;
+  /** 저장이 끝나면 true(나가기 확인 창의 '저장하고 닫기'가 이어서 닫습니다). */
+  async function saveMemo(): Promise<boolean> {
+    if (busy) return false;
     const value = { memo };
     const expected = memoBase.current;
     setBusy(true); setError("");
@@ -117,7 +118,8 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
       setSavedEarlierMemo(saved.memo !== memoDraft.current);
       onPatch(saved); setActivity("");
       if (saved.memo === memoDraft.current) notify("메모를 저장했어요.");
-    } catch (e) { mutationError(e); } finally { setMemoPending(memoWrite.pending); setBusy(false); }
+      return true;
+    } catch (e) { mutationError(e); return false; } finally { setMemoPending(memoWrite.pending); setBusy(false); }
   }
   async function retryStatus() {
     if (busy || !statusWrite.pending) return;
@@ -220,7 +222,11 @@ export default function PlaceSheet({ place, kakaoKey, onClose, onShowMap, onPatc
     <div className={`detail-map ${styles.mini}`}><MapCanvas places={preview} selectedId={place.id} apiKey={kakaoKey} active initialPosition={{ lat: place.lat, lng: place.lng, level: 4 }} onPosition={ignore} onPick={ignore} location={null} viewRequest={null} interactive={false} /><button className="preview-map-button" disabled={busy} onClick={() => requestLeave("map")}><Icon name="pin" width="15" />지도에서 보기<Icon name="arrow" width="15" /></button></div>
     {deletable ? <button ref={deleteButton} className={styles.delete} disabled={busy || status.pending} onClick={requestDelete}><Icon name="trash" width="19" />장소 삭제</button>
       : <p className="hint place-delete-hint">옮기기·삭제는 처음 등록한 {place.registrant}님만 할 수 있어요.</p>}
-    </>} />{leaving && <ActionDialog title="메모를 저장하지 않고 나갈까요?" message="작성 중인 메모는 사라져요." tone="info" cancelLabel="계속 작성" confirmLabel="저장하지 않고 나가기" onClose={() => setLeaving(null)} onConfirm={() => { const destination = leaving; setLeaving(null); leave(destination); }} />}
+    </>} />{leaving && <ActionDialog title="메모를 저장할까요?" message="저장하지 않으면 쓴 내용은 사라져요." tone="info" icon="edit" confirmTone="green" cancelLabel="저장 안 함" confirmLabel="저장하고 닫기" busy={busy} busyLabel="저장 중…"
+      // 바깥을 누르거나 Esc = 계속 쓰기. 저장에 실패하면(충돌 등) 창을 닫아 상세의 안내를 보여 줍니다.
+      onClose={() => setLeaving(null)}
+      onCancel={() => { const destination = leaving; setLeaving(null); leave(destination); }}
+      onConfirm={async () => { const destination = leaving; const saved = await saveMemo(); setLeaving(null); if (saved) leave(destination); }} />}
     {transferring && <FolderTransferDialog ids={[place.id]} from={room?.id} onClose={() => setTransferring(false)} onDone={(result) => {
       // 지금 방에서는 빠졌으니 상세를 닫고 목록·지도에서 바로 뺍니다(서버 확인은 변경 알림으로 다시 받음).
       setTransferring(false); onDelete(); notify(`‘${result.folder}’ 방으로 옮겼어요.`);

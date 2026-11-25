@@ -24,3 +24,7 @@
   .layout:global(.sheet-place) :global(.sheet-footer){padding-top:8px;padding-bottom:max(8px,var(--safe-b))}
 }
 @media(prefers-reduced-motion:reduce){.layout:global(.sheet-place){transition:none}}
+/* 메모를 쓰는 동안(키보드 열림): 아래 할 일 줄이 키보드 위로 올라와 '메모 저장'을 덮지 않게 숨기고,
+   끝까지 올린 창 아래(키보드 뒤 반투명 줄)로 지도가 비치지 않게 바탕을 이어 칠합니다. */
+.layout:global(.sheet-place):global(.is-keyboard) :global(.sheet-footer){display:none}
+.layout:global(.sheet-place):global(.is-fullscreen):global(.is-keyboard){box-shadow:0 50vh 0 50vh var(--paper)}

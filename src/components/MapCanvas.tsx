@@ -14,7 +14,7 @@ import { roomShares, splitColors } from "@/lib/rooms";
 export interface MapPosition { lat: number; lng: number; level: number }
 /** A failed interactive map reports here so the map screen can show it with the other map states. */
 export interface MapRecovery { loading: boolean; retry?: () => void }
-export type MapViewRequest = { sequence: number; kind: "saved"; closer?: boolean } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number }
+export type MapViewRequest = { sequence: number; kind: "saved"; closer?: boolean } | { sequence: number; kind: "place"; lat: number; lng: number; smooth?: boolean; level?: number; /** 지금 축척 그대로 옮기기만(핀을 눌렀을 때). */ keepLevel?: boolean }
   | { sequence: number; kind: "bounds"; points: { lat: number; lng: number }[] };
 export interface MapInsets { top: number; right: number; bottom: number; left: number }
 /** A neighbourhood card opens its place list; the map then fits those places beside the list. */
@@ -439,7 +439,8 @@ export default function MapCanvas({ places, selectedId, apiKey, active, initialP
       const k = window.kakao.maps;
       framedPlace.current = viewRequest;
       // Selecting one place must leave the count-marker range, including when already at level 4.
-      const targetLevel = viewRequest.level ?? PIN_FLOOR_LEVEL + 1;
+      // 핀을 직접 눌렀다면 이미 핀이 보이는 축척이므로 그대로 둡니다(1km에서 누르면 100m로 확 당겨지지 않게).
+      const targetLevel = viewRequest.keepLevel ? map.current.getLevel() : viewRequest.level ?? PIN_FLOOR_LEVEL + 1;
       if (viewRequest.smooth) {
         const center = map.current.getCenter();
         if (map.current.getLevel() > targetLevel) map.current.setLevel(targetLevel);

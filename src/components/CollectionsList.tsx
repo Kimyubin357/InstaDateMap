@@ -8,7 +8,7 @@ import type { FoldersResponse } from "@/lib/folders";
 import { friendlyMessage, requestJson, RequestError, ConnectionError } from "@/lib/client-request";
 import { VerifiedWrite, CHECKING_SAVE } from "@/lib/verified-write";
 import { collectionUndo } from "@/lib/collection-undo";
-import { placeMeta, type PlaceView } from "@/lib/place-view";
+import { placeMeta, searchKey, type PlaceView } from "@/lib/place-view";
 import { categoryIcon } from "@/lib/place-presentation";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import { useBoardState, useBoardSync, useRooms } from "./BoardProvider";
@@ -259,7 +259,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {collections.length > 4 && <label className={styles.search}><Icon name="search" width={18} /><input aria-label="모음 이름 검색" placeholder="모음 이름으로 찾기" value={query} maxLength={40} onChange={(e) => setQuery(e.target.value)} /></label>}
       {/* 모음 = 색 없는 이모지 타일 줄 목록(방은 색 카드). 장소 이름 몇 개를 미리 보여 줍니다.
           장소 줄처럼 왼쪽으로 밀면 빨간 삭제(시안 design-lab/collection-swipe). 끝까지 밀어도 바로 지우지 않고 한 번 더 묻습니다. */}
-      {collections.length > 0 && <div className={styles.mlist}>{collections.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((c) => <SwipeablePlaceRow key={c.id} placeId={c.id} name={`${c.name} 모음`} className={styles.mrow} open={revealedId === c.id}
+      {collections.length > 0 && <div className={styles.mlist}>{collections.filter((c) => searchKey(c.name).includes(searchKey(query.trim()))).map((c) => <SwipeablePlaceRow key={c.id} placeId={c.id} name={`${c.name} 모음`} className={styles.mrow} open={revealedId === c.id}
         onReveal={(open) => setRevealedId(open ? c.id : null)} onOpen={() => onNavigate("collections", c.id)}
         onDelete={() => { if (frozen) return; const value = editorOf(c); setRevealedId(null); resetWrite(); initialEditor.current = JSON.stringify(value); setEditor(value); setDialog("delete"); }}>
         <CollectionCover icon={c.icon} size={52} /><span className={styles.mcopy}><strong>{c.name}</strong><small>{c.place_ids.length}곳{c.place_ids.length ? ` · ${c.place_ids.map((id) => nameOf.get(id)).filter(Boolean).slice(0, 3).join(" · ")}` : ""}</small></span><Icon name="chevron" width={18} />
@@ -269,7 +269,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
         { icon: <Icon name="plus" width={22} />, title: "새 모음 만들기", note: "이름과 이모지만 정하면 돼요", onClick: () => beginEditor() },
         ...EXAMPLE_COLLECTIONS.map((e) => ({ icon: e.icon, title: e.name, note: "눌러서 이 이름으로 만들기", action: "add" as const, label: `‘${e.name}’ 모음 만들기`, onClick: () => beginEditor(undefined, false, e) })),
       ]} />}
-      {query && !collections.some((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) && <p className={styles.empty}>이 이름의 모음은 없어요.</p>}
+      {query && !collections.some((c) => searchKey(c.name).includes(searchKey(query.trim()))) && <p className={styles.empty}>이 이름의 모음은 없어요.</p>}
     </> : roomEmpty ? <EmptyStart icon={<Icon name="pin" width={26} />} title={`${room?.name ?? roomName ?? "이 방"} 방에 첫 장소를 담아요`} note="담은 곳은 이 목록과 지도에 함께 모여요." rows={[
       // 빈 방 리스트(시안 A4): 0인 도구(선택·종류·정렬·미분류)를 숨기고 시작할 일만.
       { icon: <Icon name="plus" width={22} />, title: "인스타 링크로 담기", note: "Copy link → 오른쪽 아래 + 에 붙여넣기", href: "/add" },

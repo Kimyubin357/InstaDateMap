@@ -274,7 +274,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     const settle = () => {
       // 중간 높이가 정해질 때까지(첫 몇 프레임) 기다렸다가 옮깁니다.
       if (++frames < 4 && !root.current?.querySelector(".sheet-place[data-resizable=true]")) { requestAnimationFrame(settle); return; }
-      setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true });
+      setMapRequest({ sequence: ++requestSequence.current, kind: "place", lat: place.lat, lng: place.lng, smooth: true, keepLevel: true });
     };
     requestAnimationFrame(() => requestAnimationFrame(settle));
   }
