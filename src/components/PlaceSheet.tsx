@@ -15,7 +15,7 @@ import { toneStyle } from "./Palette";
 import styles from "./PlaceSheet.module.css";
 import ActionDialog from "./ActionDialog";
 import { useBoardState, useBoardSync } from "./BoardProvider";
-import { categoryIcon, placeCopyContent } from "@/lib/place-presentation";
+import { placeCopyContent } from "@/lib/place-presentation";
 import { StatusSelection } from "@/lib/status-selection";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import ShellLink from "./ShellLink";

@@ -9,7 +9,7 @@ import { friendlyMessage, requestJson, RequestError, ConnectionError } from "@/l
 import { VerifiedWrite, CHECKING_SAVE } from "@/lib/verified-write";
 import { collectionUndo } from "@/lib/collection-undo";
 import { placeMeta, searchKey, type PlaceView } from "@/lib/place-view";
-import { categoryIcon } from "@/lib/place-presentation";
+import CategoryGlyph, { categoryTone } from "./CategoryGlyph";
 import { PLACE_STATUS_ENABLED } from "@/lib/features";
 import { useBoardState, useBoardSync, useRooms } from "./BoardProvider";
 import { RoomHeader, roomSettingsHref } from "./Rooms";
@@ -280,7 +280,7 @@ export default function CollectionsList({ places, visible, collections = EMPTY, 
       {places.length > 0 ? <>
         <p className={styles.quickLabel}><span>이 방 장소에서 바로 넣기</span></p>
         {places.slice(0, 3).map((p) => <div key={p.id} className={styles.quickRow}>
-          <span className={`category-icon category-${categoryIcon(p.category)}`} aria-hidden="true"><Icon name={categoryIcon(p.category)} width={22} /></span>
+          <span className={`category-icon category-${categoryTone(p.category, p.name)}`} aria-hidden="true"><CategoryGlyph category={p.category} name={p.name} size={22} /></span>
           <span className={styles.mcopy}><strong>{p.name}</strong><small>{placeMeta(p)}</small></span>
           <button type="button" className={styles.quickPlus} disabled={frozen} aria-label={`${p.name} 이 모음에 넣기`} onClick={() => void mutate({ action: "add", collection_ids: [current.id], place_ids: [p.id] }, (res) => completeMembership(res, "모음에 담았어요."))}><i><Icon name="plus" width={15} strokeWidth={2.2} /></i></button>
         </div>)}

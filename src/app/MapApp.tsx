@@ -107,7 +107,9 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
   const [regionSelection, setRegionSelection] = useState<RegionSelection | null>(null);
   useEffect(() => { setSearchTools(document.getElementById(SEARCH_TOOLS_ID)); }, []);
   const listPositions = useRef(new Map<string, number>());
-  const listKey = `${listMode}:${collectionId ?? ""}`;
+  const modeKey = `${listMode}:${collectionId ?? ""}`;
+  // 스크롤 위치는 방·전체 범위마다 따로 기억합니다. 방을 바꾸면 새 목록이 이전 방의 스크롤 위치에서 시작하지 않고 맨 위부터 보입니다.
+  const listKey = `${roomsState.scope}:${openRoom ?? ""}|${modeKey}`, firstListKey = useRef(listKey);
   const root = useRef<HTMLDivElement>(null);
   const mapPosition = useRef<MapPosition | undefined>(undefined); const listScroll = useRef(0); const snapshot = useRef({ statuses, category });
   snapshot.current = { statuses, category };
@@ -147,7 +149,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     if (saved && !store.getSnapshot().snapshot?.places.some((p) => p.id === saved)) void store.refresh();
   // repOf changes with every place list; the overlay only follows navigation.
   }, [active, navigation, store]);
-  useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listPositions.current.get(listKey) ?? (listKey === "all:" ? listScroll.current : 0); }, [view, loaded, listKey]);
+  useEffect(() => { if (view === "list" && list.current) list.current.scrollTop = listPositions.current.get(listKey) ?? (listKey === firstListKey.current && modeKey === "all:" ? listScroll.current : 0); }, [view, loaded, listKey]);
   function open(kind: Exclude<Overlay, null>, id?: string) {
     const url = new URL(window.location.href); url.searchParams.delete("place"); url.searchParams.delete("panel");
     if (kind === "place" && id) url.searchParams.set("place", id); else url.searchParams.set("panel", kind);
@@ -415,7 +417,7 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
       onOpen={(id) => previewPlace(id, mapVisible.map((p) => p.id))} onClose={() => navigateCollections("collections", collection.id)} />}
     {!landscape && regionView}
     {!landscape && statusView}
-    {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (listKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
+    {view === "list" && <div ref={list} className="places-list collections-list" onScroll={(e) => { listPositions.current.set(listKey, e.currentTarget.scrollTop); if (modeKey === "all:") listScroll.current = e.currentTarget.scrollTop; }}>
       {isAll ? <AllPlacesList mode={listMode === "rooms" ? "rooms" : "all"} places={visible} total={places.length} rooms={roomsState.rooms} roomsError={roomsState.roomsError} loaded={loaded} tools={kindTool} newPlaceIds={newPlaceIds} distanceOrigin={origin ?? quietOrigin}
         onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onEnterRoom={enterRoom} onReset={reset} />
       : <CollectionsList who={who} places={places} visible={visible} collections={data?.collections} currentId={collectionId} mode={listMode === "collections" ? "collections" : "all"} loaded={loaded} distanceOrigin={origin ?? quietOrigin} newPlaceIds={newPlaceIds} onNavigate={navigateCollections} onOpen={(id) => open("place", id)} onReset={reset}
@@ -433,7 +435,8 @@ export default function MapApp({ who, kakaoKey, active, keyboard, onViewChange }
     {showJustSaved && <JustSavedSheet room={board} places={justPlaces} url={justSaved?.url ?? null} onOpen={(id) => open("place", id)} onClose={() => setJustSaved(null)} />}
     {view === "map" && focused && <PlaceCarousel hidden={!showPlaceCard} newPlaceIds={newPlaceIds} places={deckPlaces} selectedId={focused.id} onSelect={previewPlace} onOpen={(id) => open("place", id)} onDismiss={() => setFocusedId(null)} />}
     <div className="map-controls">{view === "map" && <><button className="saved-places-btn" disabled={!mapVisible.length} aria-label="저장한 장소로 이동" onClick={() => { setFocusedId(null); setMapRequest({ sequence: ++requestSequence.current, kind: "saved", closer: true }); }}><Icon name="fit" width="23" /></button><button className="locate-btn icon-btn" disabled={locating} aria-label="내 위치로 이동" onClick={() => { setFocusedId(null); locate(false); }}><Icon name="location" /></button></>}<ShellLink href="/add" className="save-fab" aria-label="장소 저장"><Icon name="plus" width="28" /></ShellLink></div>
-    <BottomNav hidden={keyboard} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
+    {/* 모음 지도 시트가 열려 있으면 아래 탭을 숨깁니다. 시트의 X가 모음으로 돌아가는 길이고, 탭이 시트 목록을 가리지 않게 합니다. */}
+    <BottomNav hidden={keyboard || (view === "map" && !!collection && !showPlaceCard)} current={view} mapHref={viewHref("map")} listHref={viewHref("list")} />
     {overlay === "place" && selected && <PlaceSheet key={selected.id} place={selected} kakaoKey={kakaoKey} view={view} onClose={close} onShowMap={() => showPlaceOnMap(selected)}
       room={selectedRoom ? { id: selectedRoom.id, who: selectedRoom.member_name, memberNames: selectedRoom.member_names, memberIds: selectedRoom.member_ids } : undefined}
       rooms={selectedRooms.length > 0 ? selectedRooms : currentRoom ? [currentRoom] : undefined} origin={origin ?? quietOrigin} faceOf={faceOf}

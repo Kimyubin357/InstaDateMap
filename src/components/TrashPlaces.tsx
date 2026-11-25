@@ -5,7 +5,7 @@ import { useBoardState, useBoardSync, useRooms } from "./BoardProvider";
 import ActionSheet from "./ActionSheet";
 import Icon from "./Icon";
 import { toneStyle } from "./Palette";
-import { categoryIcon } from "@/lib/place-presentation";
+import CategoryGlyph, { categoryTone } from "./CategoryGlyph";
 import ActionDialog from "./ActionDialog";
 import ClientReady from "./ClientReady";
 import PageHeader from "./PageHeader";
@@ -75,7 +75,7 @@ export default function TrashPlaces() {
           {place.photo
             // eslint-disable-next-line @next/next/no-img-element
             ? <img className="set-trash-thumb" src={place.photo} alt="" loading="lazy" referrerPolicy="no-referrer" />
-            : <span className={`set-trash-thumb is-icon category-${categoryIcon(place.category)}`} aria-hidden="true"><Icon name={categoryIcon(place.category)} width={24} /></span>}
+            : <span className={`set-trash-thumb is-icon category-${categoryTone(place.category, place.name)}`} aria-hidden="true"><CategoryGlyph category={place.category} name={place.name} size={24} /></span>}
           <span className="set-title"><span className="set-trash-name">{place.name}</span><small className="set-trash-room"><i aria-hidden="true" />{place.board_name}{!place.restorable && " · 되돌릴 수 없음"}</small></span>
           <span className="set-value">{day(place.deleted_at)}</span>
         </button>)}</section>

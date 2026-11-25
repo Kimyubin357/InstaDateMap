@@ -1,7 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import Icon from "./Icon";
-import { categoryIcon } from "@/lib/place-presentation";
+import CategoryGlyph, { categoryTone } from "./CategoryGlyph";
 import { distanceM, placeMeta, type PlaceView } from "@/lib/place-view";
 import { distanceLabel, openState, type PlaceBrief } from "@/lib/place-brief";
 import styles from "./PlaceRowBody.module.css";
@@ -19,7 +19,7 @@ export default function PlaceRowBody({ place, brief, origin, faceOf, isNew, extr
   /** 선택 모드의 체크처럼 사진 자리를 대신할 것 */
   lead?: ReactNode;
 }) {
-  const icon = categoryIcon(place.category);
+  const tone = categoryTone(place.category, place.name);
   const open = openState(brief?.hours ?? null);
   const savers = place.sharers.slice(0, 2);
   const saver = place.sharers.length >= 2 ? `${place.sharers.length}명이 저장` : place.sharers[0] ? `${place.sharers[0]}님이 저장` : "";
@@ -28,7 +28,7 @@ export default function PlaceRowBody({ place, brief, origin, faceOf, isNew, extr
       {brief?.photo
         // eslint-disable-next-line @next/next/no-img-element
         ? <img className={styles.thumb} src={brief.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-        : <span className={`${styles.thumb} ${styles.noPhoto} category-${icon}`}><Icon name={icon} width={38} strokeWidth={1.6} /></span>}
+        : <span className={`${styles.thumb} ${styles.noPhoto} category-${tone}`}><CategoryGlyph category={place.category} name={place.name} size={36} /></span>}
     </span>}
     <span className={`row-copy ${styles.copy}`}>
       <span className={styles.title}><strong>{place.name}{isNew && <> <span className="new-place-badge">NEW</span></>}</strong>{origin && <span className={styles.km}>{distanceLabel(distanceM(origin, place))}</span>}</span>

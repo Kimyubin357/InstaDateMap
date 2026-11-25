@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import FolderTransferDialog from "./FolderTransferDialog";
 import { useBoardSync } from "./BoardProvider";
-import { categoryIcon } from "@/lib/place-presentation";
+import CategoryGlyph, { categoryTone } from "./CategoryGlyph";
 import { placeMeta, type PlaceView } from "@/lib/place-view";
 import styles from "./Registration.module.css";
 
@@ -32,7 +32,7 @@ export default function JustSavedSheet({ room, places, url, onOpen, onClose }: {
     </header>
     <div className={styles.justBody}>
       {places.map((place) => <button key={place.id} type="button" className={styles.justRow} onClick={() => onOpen(place.id)}>
-        <span className={`category-icon category-${categoryIcon(place.category)}`} aria-hidden="true"><Icon name={categoryIcon(place.category)} width={22} /></span>
+        <span className={`category-icon category-${categoryTone(place.category, place.name)}`} aria-hidden="true"><CategoryGlyph category={place.category} name={place.name} size={22} /></span>
         <span><strong>{place.name}</strong><small>{placeMeta(place) || place.address}</small></span>
         <Icon name="chevron" width={17} />
       </button>)}

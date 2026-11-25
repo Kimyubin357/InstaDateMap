@@ -85,3 +85,18 @@ export function mapGlyph(category: string | null | undefined, name = ""): MapGly
 export function mapGlyphSvg(glyph: MapGlyph) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${MAP_GLYPHS[glyph]}</svg>`;
 }
+
+/** 리스트 타일 바탕색 묶음(fabric-theme.css의 .category-*). 아이콘은 지도 핀과 같은 41가지를 쓰고, 색만 8묶음으로 나눕니다. */
+export type GlyphTone = "cup" | "food" | "culture" | "tree" | "activity" | "bag" | "bed" | "pin";
+const TONES: Record<GlyphTone, MapGlyph[]> = {
+  cup: ["cafe", "bakery", "ice_cream"],
+  food: ["restaurant", "pizza", "chicken", "fast_food", "pub"],
+  culture: ["art_gallery", "museum", "cinema", "theater", "music_venues", "karaoke", "studio"],
+  tree: ["park", "forest", "mountain", "beach", "lake", "botanical_garden", "tourist_spot", "historic_sites", "observatory"],
+  activity: ["amusement_park", "aquarium", "zoo", "water_park", "spa", "swimming_pool", "sports_center", "bowling", "billiard_room", "camping"],
+  bag: ["department_store", "fashion", "mart"],
+  bed: ["hotel", "accommodation", "resort"],
+  pin: ["etc"],
+};
+const TONE_OF = new Map(Object.entries(TONES).flatMap(([tone, glyphs]) => glyphs.map((g) => [g, tone as GlyphTone])));
+export function glyphTone(glyph: MapGlyph): GlyphTone { return TONE_OF.get(glyph) ?? "pin"; }

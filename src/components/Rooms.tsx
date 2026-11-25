@@ -10,7 +10,7 @@ import { friendlyMessage, requestJson } from "@/lib/client-request";
 import { navigateShell } from "@/lib/shell-navigation";
 import ShellLink from "./ShellLink";
 import { toneStyle } from "./Palette";
-import { categoryIcon } from "@/lib/place-presentation";
+import CategoryGlyph, { categoryTone } from "./CategoryGlyph";
 import { placeMeta, type PlaceView } from "@/lib/place-view";
 import { membersLabel, splitColors, timeAgo, type RoomSummary, type Scope } from "@/lib/rooms";
 import { INVITE_DAYS, type FolderSummary } from "@/lib/folders";
@@ -221,7 +221,7 @@ export function NewPlacesSheet({ entries, scope, onPlace, onAllSeen, onRoomMap, 
     {!single && <button type="button" className={`text-btn ${styles.backLink}`} onClick={() => setRoomId(null)}><Icon name="back" width={18} />새 장소가 있는 방</button>}
     <p className={styles.lead}>누르면 그 장소로 가고, NEW가 사라져요.</p>
     <div>{entry.places.map((p) => <button type="button" key={p.id} className={styles.placeRow} onClick={() => onPlace(p)}>
-      <span className={`category-icon category-${categoryIcon(p.category)}`} aria-hidden="true"><Icon name={categoryIcon(p.category)} width={22} /></span>
+      <span className={`category-icon category-${categoryTone(p.category, p.name)}`} aria-hidden="true"><CategoryGlyph category={p.category} name={p.name} size={22} /></span>
       <span className={styles.rowCopy}><strong><span>{p.name}</span><span className="new-place-badge" aria-label="새로 등록한 장소">NEW</span></strong>
         <small>{placeMeta(p) || p.address}</small><small>{[p.registrant || p.sharers[0], timeAgo(p.created_at, now)].filter(Boolean).join(" · ")}</small></span>
       <Icon name="chevron" width={18} className={styles.chev} />

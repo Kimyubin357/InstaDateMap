@@ -398,7 +398,7 @@ body:has(.persistent-map:not(.is-away) .view-list [data-selecting=true]):not(:ha
 .has-just-saved .map-controls{bottom:calc(var(--map-bottom) + var(--just-saved-height,0px) + 12px)}
 body:has(.persistent-map:not(.is-away) .has-just-saved) .global-feedback.is-map{bottom:calc(var(--map-bottom) + var(--just-saved-height,0px) + 12px)}
 /* 모음 지도 시트가 있을 때 지도 버튼(전체 보기 · 내 위치 · +)은 시트 위로, 끝까지 올리면 숨김 */
-.has-collection-sheet.collection-sheet-low .map-controls{bottom:calc(var(--map-bottom) + 108px)}
+.has-collection-sheet.collection-sheet-low .map-controls{bottom:calc(var(--safe-b) + 116px)}
 .has-collection-sheet.collection-sheet-mid .map-controls{bottom:calc(min(46%,420px) + 12px)}
 .has-collection-sheet.collection-sheet-high .map-controls{visibility:hidden}
 .has-collection-sheet .map-controls{transition:bottom .24s cubic-bezier(.2,.8,.2,1)}
